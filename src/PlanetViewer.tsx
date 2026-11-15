@@ -15,6 +15,11 @@ const ASTROS: Record<AstroId, { name: string; url: string; credit: string }> = {
   mars: { name: 'Marte', url: 'https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg', credit: 'NASA/JPL Solar System Trek' },
 }
 
+type PlanetViewerProps = {
+  active: boolean
+  onHome: () => void
+}
+
 function createEllipsoid(astro: AstroId) {
   if (astro === 'earth') return Cesium.Ellipsoid.WGS84
   if (astro === 'moon') return new Cesium.Ellipsoid(1737400, 1737400, 1737400)
@@ -36,7 +41,7 @@ function addMarker(viewer: Cesium.Viewer, position: Cesium.Cartesian3) {
   })
 }
 
-export default function PlanetViewer() {
+export default function PlanetViewer({ active, onHome }: PlanetViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<Cesium.Viewer | null>(null)
   const ellipsoidRef = useRef<Cesium.Ellipsoid | null>(null)
@@ -49,6 +54,7 @@ export default function PlanetViewer() {
   const [copyStatus, setCopyStatus] = useState('')
 
   useEffect(() => {
+    if (!active) return
     const container = containerRef.current
     if (!container) return
 
@@ -66,6 +72,7 @@ export default function PlanetViewer() {
         })
 
     const viewer = new Cesium.Viewer(container, {
+      contextOptions: { webgl: { alpha: true } },
       baseLayer: new Cesium.ImageryLayer(provider),
       terrainProvider: new Cesium.EllipsoidTerrainProvider({ ellipsoid }),
       baseLayerPicker: false,
@@ -81,11 +88,13 @@ export default function PlanetViewer() {
     })
     viewerRef.current = viewer
     ellipsoidRef.current = ellipsoid
+    viewer.scene.backgroundColor = Cesium.Color.TRANSPARENT
     viewer.scene.highDynamicRange = false
     viewer.scene.fog.enabled = false
     viewer.scene.globe.enableLighting = false
     viewer.scene.globe.showGroundAtmosphere = false
     if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = false
+    if (viewer.scene.skyBox) viewer.scene.skyBox.show = false
     viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#222')
     viewer.camera.setView({
       destination: Cesium.Cartesian3.fromDegrees(0, 0, ellipsoid.maximumRadius * 3, ellipsoid),
@@ -121,7 +130,7 @@ export default function PlanetViewer() {
       ellipsoidRef.current = null
       Cesium.Ellipsoid.default = previousDefaultEllipsoid
     }
-  }, [activeAstro])
+  }, [active, activeAstro])
 
   useEffect(() => { coordinatesRef.current = coordinates }, [coordinates])
 
@@ -168,7 +177,17 @@ export default function PlanetViewer() {
           </button>
         ))}
       </nav>
-      <a className="pv-btn pv-home" href="/">Volver</a>
+      <a
+        className="pv-btn pv-home"
+        href="/"
+        onClick={(event) => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+          event.preventDefault()
+          onHome()
+        }}
+      >
+        Volver
+      </a>
       <section className="pv-panel pv-glass" aria-live="polite">
         <h1>{ASTROS[activeAstro].name}</h1>
         {coordinates ? (
