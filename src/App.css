@@ -143,6 +143,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   font: 600 10px/1 'DM Sans', sans-serif;
   letter-spacing: .12em;
   text-transform: uppercase;
+  text-decoration: none;
   transition: transform .25s ease, color .25s ease, background .25s ease, box-shadow .25s ease;
 }
 .find-button svg {

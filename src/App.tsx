@@ -1,4 +1,5 @@
 import './App.css'
+import PlanetViewer from './PlanetViewer'
 
 const starPositions = Array.from({ length: 48 }, (_, index) => ({
   left: `${(index * 37 + 7) % 100}%`,
@@ -46,6 +47,10 @@ function Orbit() {
 }
 
 function App() {
+  if (window.location.pathname === '/find') {
+    return <PlanetViewer />
+  }
+
   return (
     <main className="page-shell">
       <div className="stars" aria-hidden="true">
@@ -65,12 +70,12 @@ function App() {
           Compare worlds. Understand environments. Discover the place on our
           planet that feels made for you.
         </p>
-        <button className="find-button" type="button">
+        <a className="find-button" href="/find">
           <span>Find your spot</span>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 12h13M14 7l5 5-5 5" />
           </svg>
-        </button>
+        </a>
         <Orbit />
       </section>
 
