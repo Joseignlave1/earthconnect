@@ -166,7 +166,9 @@ button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
   font: 600 11px/1 'DM Sans', sans-serif;
   letter-spacing: .12em;
   text-transform: uppercase;
+
   transition: transform .25s ease, background .25s ease;
+
 }
 .enter-button svg {
   width: 19px;

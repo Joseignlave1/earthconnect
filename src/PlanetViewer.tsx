@@ -55,7 +55,6 @@ export default function PlanetViewer({ active, onHome }: PlanetViewerProps) {
 
   useEffect(() => {
     if (!active) return
-
     const container = containerRef.current
     if (!container) return
 
