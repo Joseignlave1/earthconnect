@@ -48,6 +48,29 @@ button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
   font-family: 'DM Sans', system-ui, sans-serif;
 }
 
+.app-view {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(1.015);
+  transition:
+    opacity .45s cubic-bezier(.22,.61,.36,1),
+    transform .45s cubic-bezier(.22,.61,.36,1),
+    visibility 0s .45s;
+}
+.app-view.is-active {
+  z-index: 1;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: scale(1);
+  transition-delay: 0s;
+}
+
 /* ---------- Fondo compartido (inicio y lo que hay debajo) ---------- */
 .workspace,
 .intro {
@@ -257,4 +280,5 @@ button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   .earth, .moon-orbit, .mars { animation: none; }
   .intro, .hero, .enter-button { transition-duration: .01s; }
+  .app-view { transition-duration: .01s; transition-delay: 0s; }
 }

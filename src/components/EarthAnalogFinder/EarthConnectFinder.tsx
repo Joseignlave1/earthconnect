@@ -13,7 +13,11 @@ function Arrow() {
   )
 }
 
-export default function EarthConnectFinder() {
+type EarthConnectFinderProps = {
+  onFind: () => void
+}
+
+export default function EarthConnectFinder({ onFind }: EarthConnectFinderProps) {
   return (
     <main className="eaf">
       <div className="stars" aria-hidden="true">
@@ -44,7 +48,15 @@ export default function EarthConnectFinder() {
           Compare worlds. Understand environments. Find the planets most like
           our own.
         </p>
-        <a className="enter glass" href="/find">
+        <a
+          className="enter glass"
+          href="/find"
+          onClick={(event) => {
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+            event.preventDefault()
+            onFind()
+          }}
+        >
           <span>Find</span>
           <Arrow />
         </a>
