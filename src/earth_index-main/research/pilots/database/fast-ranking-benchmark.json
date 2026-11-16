@@ -1,0 +1,212 @@
+{
+  "status": "passed",
+  "generated_at": "2026-11-14T21:05:18.174248+00:00",
+  "bundle_sha256": "a1f93b34a79e55e15d278e367817b9b6aa93219cb1a3b64626499f223a88b2dd",
+  "spec_sha256": "dfea1d43c799183e65478bb5780dcd350fd9f42baf446d90eb12a8402361fe5c",
+  "processor_sha256": "c4a5785746226d8a6ad62e2ab967e06794d811af8707b22d05de60ce2d010b66",
+  "fast_builder_sha256": "9c7aa4426d941dbd61b53391a9b213207ec497ea0c9dc51e9b3541639fcd10d9",
+  "profiles": {
+    "hot_balanced": {
+      "label": "Hot / dry / bare, balanced",
+      "bands_read": 7,
+      "timings": {
+        "original": [
+          {
+            "status": "passed",
+            "wall_seconds": 7.626346087025013
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 8.549731776991393
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 7.763359092990868
+          }
+        ],
+        "fast": [
+          {
+            "status": "passed",
+            "wall_seconds": 1.118164957035333
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 1.1012639009859413
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 0.8622379929875024
+          }
+        ]
+      },
+      "median_seconds": {
+        "original": 7.763359092990868,
+        "fast": 1.1012639009859413
+      },
+      "speedup": 7.049499294438395,
+      "windows_verified": 2700,
+      "max_sql_numpy_error": 1.6653345369377348e-15,
+      "full_lower_upper_rank_order_unchanged": true
+    },
+    "heat_priority": {
+      "label": "Prioritize heat",
+      "bands_read": 7,
+      "timings": {
+        "original": [
+          {
+            "status": "passed",
+            "wall_seconds": 6.506411928974558
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 8.2970126310247
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 8.236731560959015
+          }
+        ],
+        "fast": [
+          {
+            "status": "passed",
+            "wall_seconds": 1.1547614329610951
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 1.1569958559703082
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 1.1006465399987064
+          }
+        ]
+      },
+      "median_seconds": {
+        "original": 8.236731560959015,
+        "fast": 1.1547614329610951
+      },
+      "speedup": 7.132842616537677,
+      "windows_verified": 2700,
+      "max_sql_numpy_error": 1.7763568394002505e-15,
+      "full_lower_upper_rank_order_unchanged": true
+    },
+    "flat_priority": {
+      "label": "Prioritize flatness",
+      "bands_read": 7,
+      "timings": {
+        "original": [
+          {
+            "status": "passed",
+            "wall_seconds": 7.625440347997937
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 8.623733846994583
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 8.178475273016375
+          }
+        ],
+        "fast": [
+          {
+            "status": "passed",
+            "wall_seconds": 1.1563613479956985
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 1.0870142219937406
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 1.1127434929949231
+          }
+        ]
+      },
+      "median_seconds": {
+        "original": 8.178475273016375,
+        "fast": 1.1127434929949231
+      },
+      "speedup": 7.349829789616832,
+      "windows_verified": 2700,
+      "max_sql_numpy_error": 2.220446049250313e-15,
+      "full_lower_upper_rank_order_unchanged": true
+    },
+    "cold_ground": {
+      "label": "Cold / bare / frozen ground",
+      "bands_read": 9,
+      "timings": {
+        "original": [
+          {
+            "status": "passed",
+            "wall_seconds": 7.964944721024949
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 8.254693174967542
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 7.595806467987131
+          }
+        ],
+        "fast": [
+          {
+            "status": "passed",
+            "wall_seconds": 1.2830823400290683
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 1.2850113459862769
+          },
+          {
+            "status": "passed",
+            "wall_seconds": 1.2861773850163445
+          }
+        ]
+      },
+      "median_seconds": {
+        "original": 7.964944721024949,
+        "fast": 1.2850113459862769
+      },
+      "speedup": 6.198345832434393,
+      "windows_verified": 2700,
+      "max_sql_numpy_error": 2.3314683517128287e-15,
+      "full_lower_upper_rank_order_unchanged": true
+    }
+  },
+  "concurrent_4_clients": {
+    "hot_balanced": {
+      "status": "passed",
+      "wall_seconds": 0.9800318269990385
+    },
+    "heat_priority": {
+      "status": "passed",
+      "wall_seconds": 1.0554490039939992
+    },
+    "flat_priority": {
+      "status": "passed",
+      "wall_seconds": 0.972198984993156
+    },
+    "cold_ground": {
+      "status": "passed",
+      "wall_seconds": 1.165636382997036
+    }
+  },
+  "concurrent_batch_seconds_including_verification": 1.4962495350046083,
+  "index_fingerprint_before": {
+    "sha256": "4da521b50193ac8e517f9ccd7844ee21d802fe2cfe73a170af1eae488d67e198",
+    "count": 15
+  },
+  "index_fingerprint_after": {
+    "sha256": "4da521b50193ac8e517f9ccd7844ee21d802fe2cfe73a170af1eae488d67e198",
+    "count": 15
+  },
+  "wall_seconds": 117.58336963999318,
+  "method": "Alternating original/optimized execution order, same frozen source data and scoring, fresh connections, reader role, 10-second statement timeout. Returns all 2700 windows. Warm-cache local measurements, not production latency percentiles.",
+  "limits": [
+    "Optimized source assumes the existing aligned 100x100 single-tile-per-layer pilot constraints.",
+    "SQL result equivalence does not improve scientific resolution, coverage or calibration.",
+    "No persistent cache, extra index, extension, source download or quantization change."
+  ]
+}

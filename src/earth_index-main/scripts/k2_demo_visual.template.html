@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+#k2-demo{display:grid;gap:20px;color:var(--foreground);font-family:var(--font-sans)}
+#k2-demo h3,#k2-demo p{margin:0;font-weight:400}
+#k2-demo .controls{display:flex;flex-wrap:wrap;gap:16px;align-items:center}
+#k2-demo label{display:grid;gap:6px}
+#k2-demo .plot{display:grid;grid-template-columns:minmax(0,320px) minmax(160px,1fr);gap:18px;align-items:center}
+#k2-demo canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+#k2-demo .muted{color:var(--muted-foreground)}
+#k2-demo .detail{display:grid;gap:12px;min-width:0}
+#k2-demo [data-viz-container]{height:330px}
+@media(max-width:500px){#k2-demo .plot{grid-template-columns:minmax(0,1fr)}}
+</style></head><body>
+<main id="k2-demo">
+  <h3>Atacama · 10,000 cells at 1 km²</h3>
+  <div class="controls">
+    <label class="form-label">Temperature ≥ <output id="hot-value">310 K</output>
+      <input class="form-range" id="hot" type="range" min="300" max="327" step="1" value="310" aria-label="Minimum daytime surface temperature in kelvin">
+    </label>
+    <label class="form-label">Terrain below 5° ≥ <output id="flat-value">90%</output>
+      <input class="form-range" id="flat" type="range" min="0" max="100" step="5" value="90" aria-label="Minimum fraction of native terrain below five degrees">
+    </label>
+    <label class="form-label">View
+      <select class="form-select" id="layer"><option value="match">Matching cells</option><option value="day_temperature_k">Temperature</option><option value="slope_mean_deg">Mean slope</option><option value="elevation_mean_m">Elevation</option></select>
+    </label>
+  </div>
+  <div class="plot">
+    <div><canvas id="raster" width="100" height="100" role="img" aria-label="Atacama 100 by 100 kilometre grid, north at top; each pixel is one square kilometre."></canvas><p class="muted">North ↑ · 100 km × 100 km</p></div>
+    <div class="detail">
+      <p id="count" aria-live="polite"></p>
+      <p id="legend" class="muted"></p>
+      <p class="muted">Temperature coverage ≥95% in each match.</p>
+      <p class="muted">2024-01-01–08 daytime LST; mixed-epoch terrain.</p>
+      <p class="muted">Same 1 km footprint; sub-km co-location is unresolved.</p>
+    </div>
+  </div>
+  <section id="storage" data-viz-composition>
+    <div data-viz-container></div>
+    <script type="application/json" data-viz-chart>__CHART__</script>
+  </section>
+  <p class="muted">Five bands · same quantized values · payload bytes, shared grid metadata excluded. Interactive filters use the verified decoded grid.</p>
+</main>
+<script id="grid-data" type="application/json">__DATA__</script>
+<script>
+(() => {
+  const root=document.getElementById('k2-demo');
+  const data=JSON.parse(document.getElementById('grid-data').textContent);
+  const bands={};
+  for(const [name,meta] of Object.entries(data.bands)){
+    const bytes=Uint8Array.from(atob(meta.base64),c=>c.charCodeAt(0));
+    const view=new DataView(bytes.buffer); const values=[];
+    for(let i=0;i<10000;i++){const code=view.getUint16(i*2,true);values.push(code===0?null:(code+meta.origin)*meta.quantum);}
+    bands[name]=values;
+  }
+  const hot=root.querySelector('#hot'), flat=root.querySelector('#flat'), layer=root.querySelector('#layer');
+  const canvas=root.querySelector('#raster'), ctx=canvas.getContext('2d');
+  const swatch=document.createElement('span');swatch.hidden=true;root.appendChild(swatch);
+  function color(token){swatch.style.color=`var(${token})`;return getComputedStyle(swatch).color;}
+  function matches(t,f){return bands.day_temperature_k.map((v,i)=>v!==null && v+1e-8>=t && bands.day_temperature_valid_fraction[i]+1e-8>=.95 && bands.slope_lt_5deg_fraction[i]+1e-8>=f);}
+  for(const test of data.tests){
+    const count=matches(test.hot,test.flat).filter(Boolean).length;
+    if(count!==test.count)throw Error('Filter validation failed');
+  }
+  console.log('Verified three filter states against independently computed counts.');
+  function draw(){
+    const mask=matches(+hot.value,+flat.value/100), selected=layer.value;
+    root.querySelector('#hot-value').textContent=hot.value+' K';
+    root.querySelector('#flat-value').textContent=flat.value+'%';
+    root.querySelector('#count').textContent=mask.filter(Boolean).length.toLocaleString()+' matching 1 km² cells';
+    const values=selected==='match'?mask:bands[selected];
+    const range=selected==='match'?[0,1]:data.bands[selected].range;
+    const accent=color('--chart-1'), muted=color('--muted');
+    ctx.globalAlpha=1;ctx.clearRect(0,0,100,100);ctx.fillStyle=muted;ctx.fillRect(0,0,100,100);
+    ctx.fillStyle=accent;
+    for(let i=0;i<10000;i++){
+      if(values[i]===null || (selected==='match'&&!values[i]))continue;
+      ctx.globalAlpha=selected==='match'?1:.1+.9*(values[i]-range[0])/(range[1]-range[0]);
+      ctx.fillRect(i%100,Math.floor(i/100),1,1);
+    }
+    ctx.globalAlpha=1;
+    root.querySelector('#legend').textContent=selected==='match'?'Colored: all conditions hold in this footprint.':
+      range[0].toFixed(1)+' → '+range[1].toFixed(1)+' '+data.bands[selected].unit+' · stronger color = higher';
+  }
+  for(const input of [hot,flat,layer])input.addEventListener('input',draw);
+  new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:['class','style','data-theme']});
+  draw();
+})();
+</script>
+<script type="module">
+import {mountChart} from 'https://persistent.oaistatic.com/plugins/visualize/charts/1.2.3/element.js';
+const root=document.getElementById('storage');
+mountChart(root.querySelector('[data-viz-container]'),JSON.parse(root.querySelector('[data-viz-chart]').textContent));
+</script>
+</body></html>

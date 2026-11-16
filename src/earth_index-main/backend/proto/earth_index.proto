@@ -1,0 +1,151 @@
+syntax = "proto3";
+package earth_index.v1;
+
+import "google/protobuf/struct.proto";
+
+// Native gRPC and binary gRPC-Web share this service and protocol.
+service EarthIndex {
+  rpc Query(QueryRequest) returns (QueryResponse);
+  rpc Metadata(MetadataRequest) returns (MetadataResponse);
+  rpc Health(HealthRequest) returns (HealthResponse);
+  // Best-effort public-source measurements. No database import is required.
+  rpc SamplePoint(SamplePointRequest) returns (SamplePointResponse);
+}
+message MetadataRequest {}
+message HealthRequest {}
+
+// Named placeholders are :name; keys omit the colon.
+message QueryRequest {
+  string query = 1;
+  map<string, Value> params = 2;
+  string datasource_id = 3;
+}
+
+// A JSON-like value with exact signed integers and native binary payloads.
+message Value {
+  oneof kind {
+    google.protobuf.NullValue null_value = 1;
+    bool bool_value = 2;
+    sint64 integer_value = 3;
+    double number_value = 4;
+    string string_value = 5;
+    bytes bytes_value = 6;
+    List list_value = 7;
+    Object object_value = 8;
+  }
+}
+message List { repeated Value values = 1; }
+message Object { map<string, Value> fields = 1; }
+
+message QueryResponse {
+  repeated Column columns = 1;
+  repeated Row rows = 2;
+}
+message Column {
+  string name = 1;
+  // Legacy field name: contains the DuckDB result type.
+  string pg_type = 2;
+}
+message Row { repeated Value values = 1; }
+
+message MetadataResponse { repeated Datasource datasources = 1; }
+message Datasource {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string body = 4;
+  string revision = 5;
+  repeated Relation relations = 6;
+  repeated Function functions = 7;
+  repeated Grid grids = 8;
+  repeated Coverage coverage = 9;
+}
+message Relation {
+  string name = 1;
+  string description = 2;
+  repeated ColumnMetadata columns = 3;
+}
+message ColumnMetadata {
+  string name = 1;
+  // Legacy field name: contains the DuckDB result type.
+  string pg_type = 2;
+  string description = 3;
+  string unit = 4;
+  bool nullable = 5;
+  string missing_data = 6;
+  // Per-site source, aggregation, original import precision and category dictionaries.
+  repeated Object provenance = 7;
+}
+message Function {
+  string signature = 1;
+  string description = 2;
+}
+message Grid {
+  string site_key = 1;
+  int32 srid = 2;
+  string crs_wkt = 3;
+  uint32 width = 4;
+  uint32 height = 5;
+  // GDAL affine transform [a,b,c,d,e,f]: X=a*x+b*y+c; Y=d*x+e*y+f.
+  repeated double transform = 6;
+  string cell_addressing = 7;
+}
+message Coverage {
+  string site_key = 1;
+  bytes wkb = 2;
+  int32 srid = 3;
+  string description = 4;
+}
+message HealthResponse { bool ready = 1; }
+
+enum PlanetaryBody {
+  PLANETARY_BODY_UNSPECIFIED = 0;
+  MOON = 1;
+  MARS = 2;
+}
+message SamplePointRequest {
+  PlanetaryBody body = 1;
+  // East-positive longitude [-180,180], latitude [-90,90], in degrees.
+  // Moon uses the IAU 2000 sphere; Mars uses planetocentric latitude.
+  double longitude = 2;
+  double latitude = 3;
+}
+enum MeasurementStatus {
+  MEASUREMENT_STATUS_UNSPECIFIED = 0;
+  AVAILABLE = 1;
+  NO_DATA = 2;
+  OUTSIDE_COVERAGE = 3;
+  SOURCE_ERROR = 4;
+  SOURCE_TIMEOUT = 5;
+}
+message SamplePointResponse {
+  PlanetaryBody body = 1;
+  double longitude = 2;
+  double latitude = 3;
+  repeated PointMeasurement measurements = 4;
+  // Some applicable sources failed, timed out, or returned truncated matches.
+  // NO_DATA / OUTSIDE_COVERAGE alone do not make the response partial.
+  bool partial = 5;
+  bool cached = 6;
+  // Retrieval time, not the observation date of these historical/model products.
+  string retrieved_at = 7;
+}
+message PointMeasurement {
+  // Stable concept ID; several source products may provide the same concept.
+  string variable_id = 1;
+  string label = 2;
+  // Absent unless AVAILABLE. Numbers are source-scale values; vector lookups
+  // return a list of attribute objects. Empty matches are NO_DATA, not zero.
+  Value value = 3;
+  string unit = 4;
+  MeasurementStatus status = 5;
+  string source_id = 6;
+  string source_url = 7;
+  // Native service posting / requested WMS grid spacing, not effective resolution.
+  double pixel_spacing = 8;
+  string pixel_spacing_unit = 9;
+  repeated string quality_flags = 10;
+  string notes = 11;
+  // Error / missing-data reason; never substitutes for a numeric value.
+  string reason = 12;
+}

@@ -1,0 +1,43 @@
+{
+  "scope": "One worldwide land snapshot, 4km U16, current 25 bands; source gaps remain missing. Runtime after completing global grid/remaining importers; not an end-to-end measurement.",
+  "land_area_km2_assumption": 149000000.0,
+  "nominal_land_cells_4km": 9312500.0,
+  "thermal_source_estimated_bytes": 27626744354.0,
+  "landcover_source_bytes_cmr": 1522725225.0,
+  "terrain_source_bytes_head": 1198050360,
+  "estimated_main_sources_bytes": 30360007005.0,
+  "measured_download_bytes_per_second": 8456401.34988292,
+  "ideal_main_source_download_minutes": 59.83634123006776,
+  "measured_thermal_seconds_per_400km_tile_at_8_workers": 0.6666009044674865,
+  "ideal_area_scaled_thermal_cpu_minutes": 10.346201538089113,
+  "terrain_single_core_hours_old_processor_area_scale": 6.8049259008148155,
+  "phase_planning_ranges_minutes": {
+    "downloads": [
+      60,
+      120
+    ],
+    "thermal_cpu": [
+      15,
+      45
+    ],
+    "other_variable_preparation": [
+      60,
+      180
+    ],
+    "database_and_validation": [
+      15,
+      45
+    ]
+  },
+  "overall_planning_range_hours": [
+    4,
+    8
+  ],
+  "caveats": [
+    "Two global dates scaled to 44 composites; no full annual source inventory.",
+    "Area-only CPU scale omits coastal padding, native-tile boundaries and missing-data handling.",
+    "Only thermal currently uses the optimized tile importer; terrain/land-cover/climate global preparation remains engineering work.",
+    "Database/global end-to-end throughput has not been measured.",
+    "Ocean data and unsupported polar variables require additional sources."
+  ]
+}

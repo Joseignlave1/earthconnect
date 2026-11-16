@@ -1,0 +1,9 @@
+{
+  "bundle_sha256": "c994825c6379ec01fbb007fa550218fad9f94464b83de270aa8b97e5881aebf7",
+  "layers": 675,
+  "valid_values": 5819420,
+  "raster_datum_bytes": 6074617,
+  "reused_layers": 0,
+  "schema": "standard PostGIS 16BUI rasters; one layer/tile per feature and area",
+  "wall_seconds": 10.63955437403638
+}

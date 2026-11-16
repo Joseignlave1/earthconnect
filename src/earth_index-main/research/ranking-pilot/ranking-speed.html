@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ranking query speed</title>
+<style>
+body{margin:0;font-family:var(--font-sans);color:var(--foreground)}
+#ranking-speed{width:100%}
+#ranking-speed figcaption{margin-top:8px;color:var(--muted-foreground)}
+figure{margin:0}
+</style>
+</head>
+<body>
+<figure id="ranking-speed" data-viz-composition aria-label="Ranking is 6.2 to 7.3 times faster across four preferences, with unchanged results.">
+  <div data-viz-container></div>
+  <script type="application/json" data-viz-chart>
+  {
+    "id":"ranking-speed",
+    "title":"Ranking query time",
+    "showHeader":false,
+    "height":300,
+    "spec":{
+      "type":"horizontalBar",
+      "y":"Preference",
+      "x":["Original","Optimized"],
+      "xLabel":"Seconds · lower is faster",
+      "showValues":true,
+      "showLegend":true,
+      "startAtZero":true,
+      "sortOrder":"original",
+      "valueFormat":{"style":"decimal","minimumFractionDigits":2,"maximumFractionDigits":2}
+    },
+    "columns":["Preference","Original","Optimized"],
+    "rows":[
+      ["Hot balanced",7.763359092990868,1.1012639009859413],
+      ["Heat priority",8.236731560959015,1.1547614329610951],
+      ["Flat priority",8.178475273016375,1.1127434929949231],
+      ["Cold ground",7.964944721024949,1.2850113459862769]
+    ]
+  }
+  </script>
+  <figcaption>Median of 3 paired runs · 27 patches · all 2,700 windows · local warm cache</figcaption>
+</figure>
+<script type="module">
+import {mountChart} from 'https://persistent.oaistatic.com/plugins/visualize/charts/1.2.3/element.js';
+const root=document.getElementById('ranking-speed');
+mountChart(root.querySelector('[data-viz-container]'),JSON.parse(root.querySelector('[data-viz-chart]').textContent));
+</script>
+</body>
+</html>

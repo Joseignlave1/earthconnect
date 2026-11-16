@@ -1,0 +1,1691 @@
+{
+  "status": "passed",
+  "bundle_sha256": "a1f93b34a79e55e15d278e367817b9b6aa93219cb1a3b64626499f223a88b2dd",
+  "spec_sha256": "dfea1d43c799183e65478bb5780dcd350fd9f42baf446d90eb12a8402361fe5c",
+  "profiles": {
+    "hot_balanced": {
+      "baseline_best_window_source_support": {
+        "atacama": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "haughton": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "deathvalley": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "namib": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "sahara": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "wadi_rum": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "uyuni": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "outback": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "gobi": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "axel_heiberg": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9761600000000001,
+            "min_fraction": 0.537,
+            "pixels_with_coverage_at_least_0_9": 92
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "svalbard": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9712700000000001,
+            "min_fraction": 0.501,
+            "pixels_with_coverage_at_least_0_9": 92
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "iceland": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "amazon": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.7329300000000003,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 49
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "congo": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "borneo": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.6974200000000002,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 51
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "finland": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "iowa": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9290600000000001,
+            "min_fraction": 0.017,
+            "pixels_with_coverage_at_least_0_9": 85
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "uruguay": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.8957000000000002,
+            "min_fraction": 0.244,
+            "pixels_with_coverage_at_least_0_9": 66
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "serengeti": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "mekong": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.87262,
+            "min_fraction": 0.078,
+            "pixels_with_coverage_at_least_0_9": 68
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "tokyo": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.889,
+            "min_fraction": 0.303,
+            "pixels_with_coverage_at_least_0_9": 70
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "alps": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9859900000000001,
+            "min_fraction": 0.676,
+            "pixels_with_coverage_at_least_0_9": 94
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "himalaya": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "greenland": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "pacific": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "antarctica": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "almeria": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9848000000000002,
+            "min_fraction": 0.5630000000000001,
+            "pixels_with_coverage_at_least_0_9": 95
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        }
+      },
+      "stricter_coverage_variants": [
+        {
+          "minimum_source_coverage": 0.9,
+          "positive_windows": 1309,
+          "positive_patches": 17,
+          "top5": [
+            {
+              "site_key": "sahara",
+              "score_lower": 0.910671531774663
+            },
+            {
+              "site_key": "outback",
+              "score_lower": 0.8794649784293543
+            },
+            {
+              "site_key": "deathvalley",
+              "score_lower": 0.8609422171662138
+            },
+            {
+              "site_key": "wadi_rum",
+              "score_lower": 0.8363009004746972
+            },
+            {
+              "site_key": "gobi",
+              "score_lower": 0.8345194310307252
+            }
+          ],
+          "baseline_top5_members_retained": 5
+        },
+        {
+          "minimum_source_coverage": 0.99,
+          "positive_windows": 1304,
+          "positive_patches": 16,
+          "top5": [
+            {
+              "site_key": "sahara",
+              "score_lower": 0.910671531774663
+            },
+            {
+              "site_key": "outback",
+              "score_lower": 0.8794649784293543
+            },
+            {
+              "site_key": "deathvalley",
+              "score_lower": 0.8609422171662138
+            },
+            {
+              "site_key": "wadi_rum",
+              "score_lower": 0.8363009004746972
+            },
+            {
+              "site_key": "gobi",
+              "score_lower": 0.8345194310307252
+            }
+          ],
+          "baseline_top5_members_retained": 5
+        }
+      ]
+    },
+    "heat_priority": {
+      "baseline_best_window_source_support": {
+        "atacama": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "haughton": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "deathvalley": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "namib": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "sahara": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "wadi_rum": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9885900000000001,
+            "min_fraction": 0.363,
+            "pixels_with_coverage_at_least_0_9": 98
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "uyuni": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "outback": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "gobi": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "axel_heiberg": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9761600000000001,
+            "min_fraction": 0.537,
+            "pixels_with_coverage_at_least_0_9": 92
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "svalbard": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.97245,
+            "min_fraction": 0.626,
+            "pixels_with_coverage_at_least_0_9": 88
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "iceland": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "amazon": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.7329300000000003,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 49
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "congo": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "borneo": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.6974200000000002,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 51
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "finland": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "iowa": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9290600000000001,
+            "min_fraction": 0.017,
+            "pixels_with_coverage_at_least_0_9": 85
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "uruguay": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.8957000000000002,
+            "min_fraction": 0.244,
+            "pixels_with_coverage_at_least_0_9": 66
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "serengeti": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "mekong": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.87262,
+            "min_fraction": 0.078,
+            "pixels_with_coverage_at_least_0_9": 68
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "tokyo": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.889,
+            "min_fraction": 0.303,
+            "pixels_with_coverage_at_least_0_9": 70
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "alps": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9859900000000001,
+            "min_fraction": 0.676,
+            "pixels_with_coverage_at_least_0_9": 94
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "himalaya": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "greenland": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "pacific": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "antarctica": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "almeria": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9848000000000002,
+            "min_fraction": 0.5630000000000001,
+            "pixels_with_coverage_at_least_0_9": 95
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        }
+      },
+      "stricter_coverage_variants": [
+        {
+          "minimum_source_coverage": 0.9,
+          "positive_windows": 1309,
+          "positive_patches": 17,
+          "top5": [
+            {
+              "site_key": "outback",
+              "score_lower": 0.8621855724608107
+            },
+            {
+              "site_key": "sahara",
+              "score_lower": 0.8449507520651715
+            },
+            {
+              "site_key": "deathvalley",
+              "score_lower": 0.8416681858978062
+            },
+            {
+              "site_key": "wadi_rum",
+              "score_lower": 0.7486992097921832
+            },
+            {
+              "site_key": "gobi",
+              "score_lower": 0.7243562619686398
+            }
+          ],
+          "baseline_top5_members_retained": 5
+        },
+        {
+          "minimum_source_coverage": 0.99,
+          "positive_windows": 1304,
+          "positive_patches": 16,
+          "top5": [
+            {
+              "site_key": "outback",
+              "score_lower": 0.8621855724608107
+            },
+            {
+              "site_key": "sahara",
+              "score_lower": 0.8449507520651715
+            },
+            {
+              "site_key": "deathvalley",
+              "score_lower": 0.8416681858978062
+            },
+            {
+              "site_key": "wadi_rum",
+              "score_lower": 0.7486992097921832
+            },
+            {
+              "site_key": "gobi",
+              "score_lower": 0.7243562619686398
+            }
+          ],
+          "baseline_top5_members_retained": 5
+        }
+      ]
+    },
+    "flat_priority": {
+      "baseline_best_window_source_support": {
+        "atacama": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "haughton": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "deathvalley": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9442900000000002,
+            "min_fraction": 0.301,
+            "pixels_with_coverage_at_least_0_9": 83
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "namib": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "sahara": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "wadi_rum": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "uyuni": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "outback": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "gobi": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "axel_heiberg": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9348100000000001,
+            "min_fraction": 0.222,
+            "pixels_with_coverage_at_least_0_9": 77
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "svalbard": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9712700000000001,
+            "min_fraction": 0.501,
+            "pixels_with_coverage_at_least_0_9": 92
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "iceland": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "amazon": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.7329300000000003,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 49
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "congo": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "borneo": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.6974200000000002,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 51
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "finland": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "iowa": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9290600000000001,
+            "min_fraction": 0.017,
+            "pixels_with_coverage_at_least_0_9": 85
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "uruguay": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.8957000000000002,
+            "min_fraction": 0.244,
+            "pixels_with_coverage_at_least_0_9": 66
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "serengeti": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "mekong": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.87262,
+            "min_fraction": 0.078,
+            "pixels_with_coverage_at_least_0_9": 68
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "tokyo": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.889,
+            "min_fraction": 0.303,
+            "pixels_with_coverage_at_least_0_9": 70
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "alps": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9859900000000001,
+            "min_fraction": 0.676,
+            "pixels_with_coverage_at_least_0_9": 94
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "himalaya": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "greenland": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "pacific": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "antarctica": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "almeria": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9848000000000002,
+            "min_fraction": 0.5630000000000001,
+            "pixels_with_coverage_at_least_0_9": 95
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        }
+      },
+      "stricter_coverage_variants": [
+        {
+          "minimum_source_coverage": 0.9,
+          "positive_windows": 1309,
+          "positive_patches": 17,
+          "top5": [
+            {
+              "site_key": "sahara",
+              "score_lower": 0.932445384985002
+            },
+            {
+              "site_key": "outback",
+              "score_lower": 0.9132318520558741
+            },
+            {
+              "site_key": "gobi",
+              "score_lower": 0.9004192109635802
+            },
+            {
+              "site_key": "namib",
+              "score_lower": 0.8992599106034853
+            },
+            {
+              "site_key": "wadi_rum",
+              "score_lower": 0.8832856609065033
+            }
+          ],
+          "baseline_top5_members_retained": 4
+        },
+        {
+          "minimum_source_coverage": 0.99,
+          "positive_windows": 1304,
+          "positive_patches": 16,
+          "top5": [
+            {
+              "site_key": "sahara",
+              "score_lower": 0.932445384985002
+            },
+            {
+              "site_key": "outback",
+              "score_lower": 0.9132318520558741
+            },
+            {
+              "site_key": "gobi",
+              "score_lower": 0.9004192109635802
+            },
+            {
+              "site_key": "namib",
+              "score_lower": 0.8992599106034853
+            },
+            {
+              "site_key": "wadi_rum",
+              "score_lower": 0.8832856609065033
+            }
+          ],
+          "baseline_top5_members_retained": 4
+        }
+      ]
+    },
+    "cold_ground": {
+      "baseline_best_window_source_support": {
+        "atacama": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "haughton": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          }
+        },
+        "deathvalley": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "namib": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "sahara": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "wadi_rum": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "uyuni": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "outback": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "gobi": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "axel_heiberg": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9761600000000001,
+            "min_fraction": 0.537,
+            "pixels_with_coverage_at_least_0_9": 92
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.9980700000000001,
+            "min_fraction": 0.8280000000000001,
+            "pixels_with_coverage_at_least_0_9": 99
+          }
+        },
+        "svalbard": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9915100000000001,
+            "min_fraction": 0.843,
+            "pixels_with_coverage_at_least_0_9": 96
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.94592,
+            "min_fraction": 0.144,
+            "pixels_with_coverage_at_least_0_9": 88
+          }
+        },
+        "iceland": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.9949900000000003,
+            "min_fraction": 0.611,
+            "pixels_with_coverage_at_least_0_9": 98
+          }
+        },
+        "amazon": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.7329300000000003,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 49
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "congo": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "borneo": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.6974200000000002,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 51
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "finland": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.3725899999999999,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 9
+          }
+        },
+        "iowa": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9290600000000001,
+            "min_fraction": 0.017,
+            "pixels_with_coverage_at_least_0_9": 85
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "uruguay": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.91334,
+            "min_fraction": 0.036,
+            "pixels_with_coverage_at_least_0_9": 83
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "serengeti": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "mekong": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.7758300000000001,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 61
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "tokyo": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.41479000000000005,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 22
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "alps": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9859900000000001,
+            "min_fraction": 0.676,
+            "pixels_with_coverage_at_least_0_9": 94
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.5773199999999999,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 42
+          }
+        },
+        "himalaya": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.9240000000000002,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 88
+          }
+        },
+        "greenland": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "pacific": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "antarctica": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        },
+        "almeria": {
+          "landcover_valid_fraction": {
+            "mean_fraction": 0.9848000000000002,
+            "min_fraction": 0.5630000000000001,
+            "pixels_with_coverage_at_least_0_9": 95
+          },
+          "terrain_valid_fraction": {
+            "mean_fraction": 1.0000000000000002,
+            "min_fraction": 1.0000000000000002,
+            "pixels_with_coverage_at_least_0_9": 100
+          },
+          "permafrost_valid_fraction": {
+            "mean_fraction": 0.0,
+            "min_fraction": 0.0,
+            "pixels_with_coverage_at_least_0_9": 0
+          }
+        }
+      },
+      "stricter_coverage_variants": [
+        {
+          "minimum_source_coverage": 0.9,
+          "positive_windows": 447,
+          "positive_patches": 6,
+          "top5": [
+            {
+              "site_key": "haughton",
+              "score_lower": 0.8300746874141125
+            },
+            {
+              "site_key": "axel_heiberg",
+              "score_lower": 0.6594748703055119
+            },
+            {
+              "site_key": "svalbard",
+              "score_lower": 0.4950370869312857
+            },
+            {
+              "site_key": "himalaya",
+              "score_lower": 0.4639147238876552
+            },
+            {
+              "site_key": "iceland",
+              "score_lower": 0.28689390320282093
+            }
+          ],
+          "baseline_top5_members_retained": 5
+        },
+        {
+          "minimum_source_coverage": 0.99,
+          "positive_windows": 440,
+          "positive_patches": 6,
+          "top5": [
+            {
+              "site_key": "haughton",
+              "score_lower": 0.8300746874141125
+            },
+            {
+              "site_key": "axel_heiberg",
+              "score_lower": 0.6277594619795002
+            },
+            {
+              "site_key": "svalbard",
+              "score_lower": 0.48338036698855114
+            },
+            {
+              "site_key": "himalaya",
+              "score_lower": 0.4639147238876552
+            },
+            {
+              "site_key": "iceland",
+              "score_lower": 0.28689390320282093
+            }
+          ],
+          "baseline_top5_members_retained": 5
+        }
+      ]
+    }
+  },
+  "scope": "Offline quality-sensitivity calculation on the verified source grids; base SQL scores remain unchanged. Component evidence measures availability, not statistical reliability or within-pixel joint valid-area coverage.",
+  "limits": [
+    "High source-valid-area fractions do not establish measurement accuracy or resolve coarse climate.",
+    "Strict coverage variants test fragility, not a recommendation to discard incomplete candidate areas."
+  ]
+}

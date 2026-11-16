@@ -1,0 +1,2347 @@
+{
+  "audit_date": "2026-11-15",
+  "sources": [
+    {
+      "body": "moon",
+      "variable_id": "moon.elevation",
+      "label": "Reference-surface elevation",
+      "unit": "m",
+      "notes": "Moon heights reference a 1737.4 km sphere; Mars heights reference the MOLA areoid. Absolute elevations do not share a terrestrial sea-level datum.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "LRO_LOLA_DEM_Global_256ppd_v06",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/LRO_LOLA_DEM_Global_256ppd_v06/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.00390625,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.elevation",
+      "label": "Reference-surface elevation",
+      "unit": "m",
+      "notes": "Moon heights reference a 1737.4 km sphere; Mars heights reference the MOLA areoid. Absolute elevations do not share a terrestrial sea-level datum.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Mars_MOLA_blend200ppx_HRSC_DEM_clon0dd_200mpp_lzw",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/mars/trekarcgis/rest/services/Mars_MOLA_blend200ppx_HRSC_DEM_clon0dd_200mpp_lzw/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -89.99922395220915,
+        179.9984479044183,
+        90
+      ],
+      "pixel_spacing": 0.00337412083064107,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.surface_noon",
+      "label": "Local-noon bolometric surface temperature",
+      "unit": "K",
+      "notes": "Composite Diviner surface brightness temperature, not air temperature or current weather. Source compilation 2009-07-05 to 2015-04-01. Service spacing 0.5 degree (~15.2 km at equator); some prose inconsistently says 0.5 ppd. Absolute-temperature conversion to Celsius is K-273.15; mask source missing values before conversion.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "diviner_tbol_hour12",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/diviner_tbol_hour12/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.5,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        0.01,
+        500
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.surface_midnight",
+      "label": "Local-midnight bolometric surface temperature",
+      "unit": "K",
+      "notes": "Composite Diviner surface brightness temperature, not air temperature or current weather. Source compilation 2009-07-05 to 2015-04-01. Service spacing 0.5 degree (~15.2 km at equator); some prose inconsistently says 0.5 ppd. Absolute-temperature conversion to Celsius is K-273.15; mask source missing values before conversion.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "diviner_tbol_hour00",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/diviner_tbol_hour00/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.5,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        0.01,
+        500
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.surface_min",
+      "label": "Minimum bolometric surface temperature",
+      "unit": "K",
+      "notes": "Composite Diviner surface brightness temperature, not air temperature or current weather. Source compilation 2009-07-05 to 2015-04-01. Service spacing 0.5 degree (~15.2 km at equator); some prose inconsistently says 0.5 ppd. Absolute-temperature conversion to Celsius is K-273.15; mask source missing values before conversion.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "diviner_tbol_min",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/diviner_tbol_min/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.5,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        0.01,
+        500
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.surface_max",
+      "label": "Maximum bolometric surface temperature",
+      "unit": "K",
+      "notes": "Composite Diviner surface brightness temperature, not air temperature or current weather. Source compilation 2009-07-05 to 2015-04-01. Service spacing 0.5 degree (~15.2 km at equator); some prose inconsistently says 0.5 ppd. Absolute-temperature conversion to Celsius is K-273.15; mask source missing values before conversion.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "diviner_tbol_max",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/diviner_tbol_max/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.5,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        0.01,
+        500
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.solar_illumination",
+      "label": "Long-term sunlight visibility fraction",
+      "unit": "fraction",
+      "notes": "Polar coverage; 240/60 m service pixels. Long-term modeled visibility, typically the 18.6-year nutation cycle; specify observer height/reference and epoch. Not instantaneous insolation.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "AVGVISIB_65N_240M_201608_NP",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/AVGVISIB_65N_240M_201608_NP/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": true
+      },
+      "extent": [
+        -931069.8538596518,
+        -931090.1461403777,
+        931090.1461403482,
+        931069.8538596223
+      ],
+      "pixel_spacing": 240,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        0,
+        1
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.solar_illumination",
+      "label": "Long-term sunlight visibility fraction",
+      "unit": "fraction",
+      "notes": "Polar coverage; 240/60 m service pixels. Long-term modeled visibility, typically the 18.6-year nutation cycle; specify observer height/reference and epoch. Not instantaneous insolation.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "AVGVISIB_65S_240M_201608_SP",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/AVGVISIB_65S_240M_201608_SP/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": false
+      },
+      "extent": [
+        -931069.8538596589,
+        -931090.1461403312,
+        931090.1461403411,
+        931069.8538596688
+      ],
+      "pixel_spacing": 240,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        0,
+        1
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.solar_illumination",
+      "label": "Long-term sunlight visibility fraction",
+      "unit": "fraction",
+      "notes": "Polar coverage; 240/60 m service pixels. Long-term modeled visibility, typically the 18.6-year nutation cycle; specify observer height/reference and epoch. Not instantaneous insolation.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "AVGVISIB_85N_060M_201608_NP",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/AVGVISIB_85N_060M_201608_NP/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": true
+      },
+      "extent": [
+        -151740,
+        -151740,
+        151740,
+        151740
+      ],
+      "pixel_spacing": 60,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        0,
+        1
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.solar_illumination",
+      "label": "Long-term sunlight visibility fraction",
+      "unit": "fraction",
+      "notes": "Polar coverage; 240/60 m service pixels. Long-term modeled visibility, typically the 18.6-year nutation cycle; specify observer height/reference and epoch. Not instantaneous insolation.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "AVGVISIB_85S_060M_201608_SP",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/AVGVISIB_85S_060M_201608_SP/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": false
+      },
+      "extent": [
+        -151740,
+        -151740,
+        151740,
+        151740
+      ],
+      "pixel_spacing": 60,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        0,
+        1
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.earth_visibility",
+      "label": "Long-term Earth visibility fraction",
+      "unit": "fraction",
+      "notes": "Polar coverage; 240/60 m service pixels. Any visible part of Earth can count, so this does not establish a usable DSN/radio link.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "AVGVISIB_65N_240M_201608_EARTH_NP",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/AVGVISIB_65N_240M_201608_EARTH_NP/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": true
+      },
+      "extent": [
+        -931069.8538596533,
+        -931090.1461403762,
+        931090.1461403467,
+        931069.8538596238
+      ],
+      "pixel_spacing": 240,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        0,
+        1
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.earth_visibility",
+      "label": "Long-term Earth visibility fraction",
+      "unit": "fraction",
+      "notes": "Polar coverage; 240/60 m service pixels. Any visible part of Earth can count, so this does not establish a usable DSN/radio link.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "AVGVISIB_65S_240M_201608_EARTH_SP",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/AVGVISIB_65S_240M_201608_EARTH_SP/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": false
+      },
+      "extent": [
+        -931069.8538596589,
+        -931090.1461403312,
+        931090.1461403411,
+        931069.8538596688
+      ],
+      "pixel_spacing": 240,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        0,
+        1
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.earth_visibility",
+      "label": "Long-term Earth visibility fraction",
+      "unit": "fraction",
+      "notes": "Polar coverage; 240/60 m service pixels. Any visible part of Earth can count, so this does not establish a usable DSN/radio link.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "AVGVISIB_85N_060M_201608_EARTH_NP",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/AVGVISIB_85N_060M_201608_EARTH_NP/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": true
+      },
+      "extent": [
+        -151740,
+        -151740,
+        151740,
+        151740
+      ],
+      "pixel_spacing": 60,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        0,
+        1
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.earth_visibility",
+      "label": "Long-term Earth visibility fraction",
+      "unit": "fraction",
+      "notes": "Polar coverage; 240/60 m service pixels. Any visible part of Earth can count, so this does not establish a usable DSN/radio link.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "AVGVISIB_85S_060M_201608_EARTH_SP",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/AVGVISIB_85S_060M_201608_EARTH_SP/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": false
+      },
+      "extent": [
+        -151740,
+        -151740,
+        151740,
+        151740
+      ],
+      "pixel_spacing": 60,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        0,
+        1
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.permanent_shadow",
+      "label": "Intersection with mapped permanently shadowed region",
+      "unit": "source_attributes",
+      "notes": "Polar vector polygons; sample a point or intersect a window. Polygon quality/coverage fields matter. Value is a list of source attribute objects intersecting the exact point; no proximity search or absence inference.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "PSR_NP",
+      "kind": "trek_feature",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/PSR_NP/MapServer",
+      "projection": {
+        "kind": "polar",
+        "north": true
+      },
+      "extent": [
+        -242502.88081677552,
+        -259017.8093734037,
+        256290.375739278,
+        239346.28376782846
+      ],
+      "pixel_spacing": 0,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "layer_id": 0
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.permanent_shadow",
+      "label": "Intersection with mapped permanently shadowed region",
+      "unit": "source_attributes",
+      "notes": "Polar vector polygons; sample a point or intersect a window. Polygon quality/coverage fields matter. Value is a list of source attribute objects intersecting the exact point; no proximity search or absence inference.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "PSR_SP",
+      "kind": "trek_feature",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/PSR_SP/MapServer",
+      "projection": {
+        "kind": "polar",
+        "north": false
+      },
+      "extent": [
+        -225749.12799244872,
+        -223835.47095884525,
+        230351.246040857,
+        233170.83447786467
+      ],
+      "pixel_spacing": 0,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "layer_id": 0
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.surface_ice_detection",
+      "label": "Proximity to mapped surface-ice detection",
+      "unit": "source_attributes",
+      "notes": "Detection points on a nominal 280 m product. An empty result is not evidence of ice absence; radius must be explicit. Value is a list of source attribute objects intersecting the exact point; no proximity search or absence inference.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "NP_IceLoc_280m",
+      "kind": "trek_feature",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/NP_IceLoc_280m/MapServer",
+      "projection": {
+        "kind": "polar",
+        "north": true
+      },
+      "extent": [
+        -304853.5,
+        -382053,
+        316687,
+        309643.2
+      ],
+      "pixel_spacing": 0,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "layer_id": 0,
+      "valid_range": [
+        0.01,
+        500
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.surface_ice_detection",
+      "label": "Proximity to mapped surface-ice detection",
+      "unit": "source_attributes",
+      "notes": "Detection points on a nominal 280 m product. An empty result is not evidence of ice absence; radius must be explicit. Value is a list of source attribute objects intersecting the exact point; no proximity search or absence inference.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "SP_IceLoc_280m",
+      "kind": "trek_feature",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/SP_IceLoc_280m/MapServer",
+      "projection": {
+        "kind": "polar",
+        "north": false
+      },
+      "extent": [
+        -383180,
+        -337536.5,
+        338381.8,
+        401775.5
+      ],
+      "pixel_spacing": 0,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "layer_id": 0,
+      "valid_range": [
+        0.01,
+        500
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.geologic_unit",
+      "label": "Geologic unit and description",
+      "unit": "source_attributes",
+      "notes": "Queryable global polygons; preserve USGS unit code, description and interpretation. Codes are not interchangeable with Earth or Mars lithology codes. Value is a list of source attribute objects intersecting the exact point; no proximity search or absence inference.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Unified_Global_Geologic_Map_of_the_Moon_Geologic_Units",
+      "kind": "trek_feature",
+      "url": "https://trek.nasa.gov/moon/trekarcgis3/rest/services/Unified_Global_Geologic_Map_of_the_Moon_Geologic_Units/MapServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -179.99998351102388,
+        -89.99998351105688,
+        179.99998351102388,
+        89.99998351105688
+      ],
+      "pixel_spacing": 0,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "layer_id": 0
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.olivine",
+      "label": "Olivine abundance",
+      "unit": "raw",
+      "notes": "Coverage 50S-50N. Numeric service and samples report 0.25-degree spacing (~7.6 km at equator), despite source imagery advertised at 512 ppd (~59 m). A fine pixelSize request still returned 0.25 degree. Four mineral raw fractions sum to approximately one at all three probe locations, whereas FGDC calls them wt%. Multiply by 100 only under an explicit, reviewed normalization; do not label raw 0.066 as 0.066 wt%.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Lunar_Kaguya_MIMap_MineralDeconv_OlivinePercent_50N50S",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/Lunar_Kaguya_MIMap_MineralDeconv_OlivinePercent_50N50S/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -50,
+        180,
+        50
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.clinopyroxene",
+      "label": "Clinopyroxene abundance",
+      "unit": "raw",
+      "notes": "Coverage 50S-50N. Numeric service and samples report 0.25-degree spacing (~7.6 km at equator), despite source imagery advertised at 512 ppd (~59 m). A fine pixelSize request still returned 0.25 degree. Same fraction-versus-wt% scaling issue as olivine.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Lunar_Kaguya_MIMap_MineralDeconv_ClinopyroxenePercent_50N50S",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/Lunar_Kaguya_MIMap_MineralDeconv_ClinopyroxenePercent_50N50S/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -50,
+        180,
+        50
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.orthopyroxene",
+      "label": "Orthopyroxene abundance",
+      "unit": "raw",
+      "notes": "Coverage 50S-50N. Numeric service and samples report 0.25-degree spacing (~7.6 km at equator), despite source imagery advertised at 512 ppd (~59 m). A fine pixelSize request still returned 0.25 degree. Same fraction-versus-wt% scaling issue as olivine.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Lunar_Kaguya_MIMap_MineralDeconv_OrthopyroxenePercent_50N50S",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/Lunar_Kaguya_MIMap_MineralDeconv_OrthopyroxenePercent_50N50S/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -50,
+        180,
+        50
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.plagioclase",
+      "label": "Plagioclase abundance",
+      "unit": "raw",
+      "notes": "Coverage 50S-50N. Numeric service and samples report 0.25-degree spacing (~7.6 km at equator), despite source imagery advertised at 512 ppd (~59 m). A fine pixelSize request still returned 0.25 degree. Same scaling issue; mature soils can bias mineral interpretation, so retain OMAT and fit quality.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Lunar_Kaguya_MIMap_MineralDeconv_PlagioclasePercent_50N50S",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/Lunar_Kaguya_MIMap_MineralDeconv_PlagioclasePercent_50N50S/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -50,
+        180,
+        50
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.feo",
+      "label": "Iron oxide abundance",
+      "unit": "wt_percent_FeO",
+      "notes": "Coverage 50S-50N. Numeric service and samples report 0.25-degree spacing (~7.6 km at equator), despite source imagery advertised at 512 ppd (~59 m). A fine pixelSize request still returned 0.25 degree. FGDC explicitly defines FeO wt%; raw samples are approximately 6.8-20.4 in this audit.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Lunar_Kaguya_MIMap_MineralDeconv_FeOWeightPercent_50N50S",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/Lunar_Kaguya_MIMap_MineralDeconv_FeOWeightPercent_50N50S/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -50,
+        180,
+        50
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.smfe",
+      "label": "Submicroscopic metallic iron abundance",
+      "unit": "raw",
+      "notes": "Coverage 50S-50N. Numeric service and samples report 0.25-degree spacing (~7.6 km at equator), despite source imagery advertised at 512 ppd (~59 m). A fine pixelSize request still returned 0.25 degree. Raw 2.9-6.9; source labels do not resolve the raw service scaling. Do not publish a physical abundance yet.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Lunar_Kaguya_MIMap_MineralDeconv_AbundanceSMFe_50N50S",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/Lunar_Kaguya_MIMap_MineralDeconv_AbundanceSMFe_50N50S/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -50,
+        180,
+        50
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.optical_maturity",
+      "label": "Optical maturity index (OMAT)",
+      "unit": "1",
+      "notes": "Coverage 50S-50N. Numeric service and samples report 0.25-degree spacing (~7.6 km at equator), despite source imagery advertised at 512 ppd (~59 m). A fine pixelSize request still returned 0.25 degree. Space-weathering/composition context; not an Earth soil-maturity index.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Lunar_Kaguya_MIMap_MineralDeconv_OpticalMaturityIndex_50N50S",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/Lunar_Kaguya_MIMap_MineralDeconv_OpticalMaturityIndex_50N50S/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -50,
+        180,
+        50
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.plagioclase_grain_size",
+      "label": "Modeled plagioclase grain size",
+      "unit": "micrometre",
+      "notes": "Coverage 50S-50N. Numeric service and samples report 0.25-degree spacing (~7.6 km at equator), despite source imagery advertised at 512 ppd (~59 m). A fine pixelSize request still returned 0.25 degree. Spectral-model parameter for plagioclase; not measured bulk soil particle size.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Lunar_Kaguya_MIMap_MineralDeconv_PlagioclaseGrainSizeMicrons_50N50S",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/Lunar_Kaguya_MIMap_MineralDeconv_PlagioclaseGrainSizeMicrons_50N50S/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -50,
+        180,
+        50
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.mineral_fit_quality",
+      "label": "Mineral-model weighted fit criterion",
+      "unit": "raw",
+      "notes": "Coverage 50S-50N. Numeric service and samples report 0.25-degree spacing (~7.6 km at equator), despite source imagery advertised at 512 ppd (~59 m). A fine pixelSize request still returned 0.25 degree. Quality/provenance channel, not a resource or environmental score. NaN observed at one probe; no universal quality cutoff established.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Lunar_Kaguya_MIMap_MineralDeconv_WeightedCriteriaValue_50N50S",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/Lunar_Kaguya_MIMap_MineralDeconv_WeightedCriteriaValue_50N50S/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -50,
+        180,
+        50
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.thorium",
+      "label": "Thorium abundance",
+      "unit": "ppm",
+      "notes": "Very coarse geochemical context; tested service spacings 1 and 0.5 degree. Not a local radiation-dose estimate.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "LP_GRS_Th_Global_2ppd",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/LP_GRS_Th_Global_2ppd/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 1,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.thorium",
+      "label": "Thorium abundance",
+      "unit": "ppm",
+      "notes": "Very coarse geochemical context; tested service spacings 1 and 0.5 degree. Not a local radiation-dose estimate.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "LP_GRS_ThoriumAbundance_0_5ppd",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/LP_GRS_ThoriumAbundance_0_5ppd/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        179.5,
+        89.5
+      ],
+      "pixel_spacing": 0.5,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.titanium",
+      "label": "Elemental titanium abundance",
+      "unit": "wt_percent_Ti",
+      "notes": "FGDC defines elemental Ti wt%, not TiO2. Service spacing 2 degrees (~61 km); product name is not a reliable ppd declaration.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "LP_GRS_TitaniumAbundance_2ppd",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/LP_GRS_TitaniumAbundance_2ppd/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 2,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.potassium",
+      "label": "KPLO potassium channel",
+      "unit": "raw",
+      "notes": "Numeric samples verified; 2-degree service grid. Raw physical scaling/unit unresolved.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "KPLO_KGRS_Potassium_2ppd",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis3/rest/services/KPLO_KGRS_Potassium_2ppd/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 2,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.uranium",
+      "label": "KPLO uranium channel",
+      "unit": "raw",
+      "notes": "Numeric samples verified; 2-degree service grid. Raw physical scaling/unit unresolved.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "KPLO_KGRS_Uranium_2ppd",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis3/rest/services/KPLO_KGRS_Uranium_2ppd/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 2,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.thermal_neutron",
+      "label": "Thermal-neutron channel",
+      "unit": "raw",
+      "notes": "Numeric channel, not temperature or water abundance. Detector normalization/units unresolved.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "KPLO_KGRS_Thermal_Neutron_2ppd",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis3/rest/services/KPLO_KGRS_Thermal_Neutron_2ppd/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 2,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.water_equivalent_hydrogen",
+      "label": "Polar water-equivalent-hydrogen proxy",
+      "unit": "raw",
+      "notes": "North samples verified at 5 km spacing; south endpoint timed out. Confirm raw abundance scaling before exposing %. Hydrogen does not uniquely establish accessible water ice.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "np_weh_5km_adapt_map",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/np_weh_5km_adapt_map/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": true
+      },
+      "extent": [
+        -600000,
+        -600000,
+        600000,
+        600000
+      ],
+      "pixel_spacing": 5000,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.ice_stability_depth",
+      "label": "Modeled ice-stability depth",
+      "unit": "raw",
+      "notes": "North samples verified at 240 m spacing, some exactly 2.5; possible cap/sentinel requires source documentation. South endpoint timed out. Modeled stability, not measured depth to an ice deposit.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "np_ice_depth_new_240m_mat_today_27_Oct_2016",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/np_ice_depth_new_240m_mat_today_27_Oct_2016/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": true
+      },
+      "extent": [
+        -300000,
+        -300000,
+        300000,
+        300000
+      ],
+      "pixel_spacing": 240,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.radar_cpr",
+      "label": "Radar circular polarization ratio",
+      "unit": "ratio",
+      "notes": "Polar 118 m grid. Roughness and material properties affect CPR; elevated CPR alone is not ice confirmation.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "LRO_MiniRF_CPR_NPole70_118mp",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/LRO_MiniRF_CPR_NPole70_118mp/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": true
+      },
+      "extent": [
+        -612744.88962547,
+        -612744.8896254682,
+        612744.8896254682,
+        612744.88962547
+      ],
+      "pixel_spacing": 118.45058759433,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.radar_cpr",
+      "label": "Radar circular polarization ratio",
+      "unit": "ratio",
+      "notes": "Polar 118 m grid. Roughness and material properties affect CPR; elevated CPR alone is not ice confirmation.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "LRO_MiniRF_CPR_SPole70_118mp",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/LRO_MiniRF_CPR_SPole70_118mp/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": false
+      },
+      "extent": [
+        -612744.88962547,
+        -612744.8896254682,
+        612744.8896254682,
+        612744.88962547
+      ],
+      "pixel_spacing": 118.45058759433,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.radar_backscatter",
+      "label": "Radar S1 backscatter",
+      "unit": "raw",
+      "notes": "Polar 118 m service. Do not mix its positive linear values with the separate Malapert dB product.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "LRO_MiniRF_S1_NPole70_118mp",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/LRO_MiniRF_S1_NPole70_118mp/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": true
+      },
+      "extent": [
+        -612744.88962547,
+        -612744.8896254682,
+        612744.8896254682,
+        612744.88962547
+      ],
+      "pixel_spacing": 118.45058759433,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.radar_backscatter",
+      "label": "Radar S1 backscatter",
+      "unit": "raw",
+      "notes": "Polar 118 m service. Do not mix its positive linear values with the separate Malapert dB product.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "LRO_MiniRF_S1_SPole70_118mp",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/LRO_MiniRF_S1_SPole70_118mp/ImageServer",
+      "projection": {
+        "kind": "polar",
+        "north": false
+      },
+      "extent": [
+        -612744.88962547,
+        -612744.8896254682,
+        612744.8896254682,
+        612744.88962547
+      ],
+      "pixel_spacing": 118.45058759433,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.radar_backscatter_malapert",
+      "label": "Incidence-normalized Malapert radar backscatter",
+      "unit": "dB",
+      "notes": "Small south-polar region; FGDC defines dB. Metadata title says CPR but abstract and S1 layer describe backscatter; retain that ambiguity.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "minirf_s1_49dnorm_EQ",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/minirf_s1_49dnorm_EQ/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -19.757326707102756,
+        -86.91699310635435,
+        14.171032989141082,
+        -84.89525986334958
+      ],
+      "pixel_spacing": 0.0021622815433206192,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.christiansen_feature",
+      "label": "Christiansen-feature wavelength",
+      "unit": "micrometre",
+      "notes": "Composition proxy, 60S-60N, 1/128-degree service grid (~237 m equator). Metadata min contains invalid negative wavelengths; enforce documented masks, not a generic numeric check.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review",
+        "conservative_physical_range_mask"
+      ],
+      "source_id": "dgdr_std_cf_clc_cyl_128_jp2",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/dgdr_std_cf_clc_cyl_128_jp2/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -60,
+        180,
+        60
+      ],
+      "pixel_spacing": 0.0078125,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "valid_range": [
+        5,
+        12
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.regional_rock_count",
+      "label": "Regional detected-rock count",
+      "unit": "count_per_100m_by_100m_cell",
+      "notes": "Site B only. Exact FGDC defines detected-rock counts in each 100 m by 100 m pixel; not rock area fraction. Detection completeness and source missing mask still matter.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "LRO_NAC_RockAbundance_100mpp_SiteB",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis3/rest/services/LRO_NAC_RockAbundance_100mpp_SiteB/ImageServer",
+      "projection": {
+        "kind": "orthographic",
+        "longitude": 162.6293,
+        "latitude": -57.22227
+      },
+      "extent": [
+        -3086.7898999999743,
+        -12222.679599999916,
+        1713.2101000000257,
+        11077.320400000084
+      ],
+      "pixel_spacing": 100,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.regional_rock_abundance_unresolved",
+      "label": "Regional Site C rock channel",
+      "unit": "raw",
+      "notes": "Site C is U2 with sampled 0/1; exact FGDC was empty. Do not infer a fraction or transfer Site B encoding without confirmation.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "LRO_NAC_RockAbundance_100mpp_SiteC",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/LRO_NAC_RockAbundance_100mpp_SiteC/ImageServer",
+      "projection": {
+        "kind": "orthographic",
+        "longitude": 176.56079,
+        "latitude": -61.25954
+      },
+      "extent": [
+        -1000,
+        -1000,
+        1000,
+        1000
+      ],
+      "pixel_spacing": 100,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.regional_roughness",
+      "label": "Regional NAC terrain roughness",
+      "unit": "raw",
+      "notes": "Regional raster with 1.5 m postings; 15 m is a processing baseline in its name, not pixel spacing. Verify roughness definition and units before comparison.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "LRO_NAC_Roughness_15m_00N234E_150cmp",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/LRO_NAC_Roughness_15m_00N234E_150cmp/ImageServer",
+      "projection": {
+        "kind": "plate_carree"
+      },
+      "extent": [
+        -3819969.7500865,
+        -17003.250063818377,
+        -3793668.750086496,
+        23319.749936187
+      ],
+      "pixel_spacing": 1.5000000000002125,
+      "pixel_spacing_unit": "m",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.regional_published_slope",
+      "label": "Published regional lunar slope",
+      "unit": "degree",
+      "notes": "Only southern latitude bands for services checked; postings about119m for the working layer despite 60mpp name. Kagyua endpoint returned invalid-parameter error on sample probe; do not advertise it as working.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "LRO_LOLA_Slope_60mpp",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis3/rest/services/LRO_LOLA_Slope_60mpp/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90.0021193064401,
+        180.00035122273056,
+        -48.487550535229666
+      ],
+      "pixel_spacing": 0.003938389979243945,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.crustal_density",
+      "label": "Modeled crustal grain density",
+      "unit": "raw",
+      "notes": "Geophysical/model context, low priority for surface Earth-analogue matching. Unit/model version/normalization must be pinned before frontend exposure; grain density is not surface bulk regolith density.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "grain_density_310_eq",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/grain_density_310_eq/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.2498265093684941,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.crustal_thickness",
+      "label": "Modeled crustal thickness",
+      "unit": "raw",
+      "notes": "Geophysical/model context, low priority for surface Earth-analogue matching. Unit/model version/normalization must be pinned before frontend exposure; grain density is not surface bulk regolith density.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Model2_thick_eq",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis/rest/services/Model2_thick_eq/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.2498265093684941,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.gravity_anomaly",
+      "label": "Gravity anomaly",
+      "unit": "raw",
+      "notes": "Geophysical/model context, low priority for surface Earth-analogue matching. Unit/model version/normalization must be pinned before frontend exposure; grain density is not surface bulk regolith density.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "gggrx_1200a_anom_l180_eq",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/gggrx_1200a_anom_l180_eq/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.0625,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.bouguer_anomaly",
+      "label": "Bouguer gravity anomaly",
+      "unit": "raw",
+      "notes": "Geophysical/model context, low priority for surface Earth-analogue matching. Unit/model version/normalization must be pinned before frontend exposure; grain density is not surface bulk regolith density.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "gggrx_1200a_boug_l180_eq",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/gggrx_1200a_boug_l180_eq/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.0625,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.geoid",
+      "label": "Geoid model",
+      "unit": "raw",
+      "notes": "Geophysical/model context, low priority for surface Earth-analogue matching. Unit/model version/normalization must be pinned before frontend exposure; grain density is not surface bulk regolith density.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "gggrx_1200a_geoid_l660_eq",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis2/rest/services/gggrx_1200a_geoid_l660_eq/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.0625,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "moon",
+      "variable_id": "moon.magnetic_field",
+      "label": "Modeled total magnetic field",
+      "unit": "raw",
+      "notes": "Geophysical/model context, low priority for surface Earth-analogue matching. Unit/model version/normalization must be pinned before frontend exposure; grain density is not surface bulk regolith density.",
+      "quality_flags": [
+        "semantic_review_required",
+        "raw_source_scale",
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Ravatetal_JGR2020_LunarL1MagneticModelFields_LPgrad_Total_Field",
+      "kind": "trek_raster",
+      "url": "https://trek.nasa.gov/moon/trekarcgis3/rest/services/Ravatetal_JGR2020_LunarL1MagneticModelFields_LPgrad_Total_Field/ImageServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.5,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.modeled_surface_temperature_mean",
+      "label": "Modeled annual approximate mean surface temperature",
+      "unit": "degree_C",
+      "notes": "KRC v2.3.2 model using TES albedo; 8 ppd (~7.4 km equator). Samples at 5am/1pm and 10-degree solar-longitude increments; mean is approximate [day+night]/2. Not measured current weather, air temperature, or an exhaustive diurnal extreme.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review",
+        "modeled_surface_temperature"
+      ],
+      "source_id": "mars_yearly_avg_temperature_celsius",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 8.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.125,
+      "pixel_spacing_unit": "degree",
+      "nodata": []
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.modeled_surface_temperature_min",
+      "label": "Modeled annual minimum surface temperature",
+      "unit": "degree_C",
+      "notes": "KRC v2.3.2 model using TES albedo; 8 ppd (~7.4 km equator). Samples at 5am/1pm and 10-degree solar-longitude increments; mean is approximate [day+night]/2. Not measured current weather, air temperature, or an exhaustive diurnal extreme.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review",
+        "modeled_surface_temperature"
+      ],
+      "source_id": "mars_yearly_minimum_temperature_celsius",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 8.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.125,
+      "pixel_spacing_unit": "degree",
+      "nodata": []
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.modeled_surface_temperature_max",
+      "label": "Modeled annual maximum surface temperature",
+      "unit": "degree_C",
+      "notes": "KRC v2.3.2 model using TES albedo; 8 ppd (~7.4 km equator). Samples at 5am/1pm and 10-degree solar-longitude increments; mean is approximate [day+night]/2. Not measured current weather, air temperature, or an exhaustive diurnal extreme.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review",
+        "modeled_surface_temperature"
+      ],
+      "source_id": "mars_yearly_maximum_temperature_celsius",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 8.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.125,
+      "pixel_spacing_unit": "degree",
+      "nodata": []
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.albedo",
+      "label": "TES Lambert albedo",
+      "unit": "1",
+      "notes": "8 ppd (~7.4 km equator). Reflectance under a specific photometric convention; not a generic RGB brightness or universally interchangeable Earth albedo.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_Lambert_Albedo_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 8.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.125,
+      "pixel_spacing_unit": "degree",
+      "nodata": []
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.thermal_inertia_tes",
+      "label": "TES apparent thermal inertia",
+      "unit": "J_m-2_K-1_s-0.5",
+      "notes": "8 ppd product; preserve model/version/quality and distinguish from Putzig day/night alternatives.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_Thermal_Inertia_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 8.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.125,
+      "pixel_spacing_unit": "degree",
+      "nodata": []
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.thermal_inertia_tes_putzig_night",
+      "label": "TES Putzig nighttime apparent thermal inertia",
+      "unit": "J_m-2_K-1_s-0.5",
+      "notes": "20 ppd service grid (~3 km equator); model alternative to Christensen TES map, not an additional independent physical property.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_TI_Putzig_night_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 20.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.05,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.thermal_inertia_themis",
+      "label": "THEMIS apparent thermal inertia",
+      "unit": "J_m-2_K-1_s-0.5",
+      "notes": "Nominal100m / max593ppd. Quantitative32bit mosaic; mask-32768 and report actual valid support. Different scenes/epochs are mosaicked.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "thm_ti_100m_32bit",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 593.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.0016863406408094434,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768.0
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.surface_dust_index",
+      "label": "TES surface dust-cover index",
+      "unit": "1",
+      "notes": "16ppd (~3.7km equator). Distinct from atmospheric dust opacity and mineral-model surface-dust fraction. Source NullValue must be respected.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_dust_index_16ppd_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 16.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.0625,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        0.85000002
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.water_equivalent_hydrogen",
+      "label": "Odyssey neutron-derived water-equivalent hydrogen",
+      "unit": "wt_percent_WEH",
+      "notes": "2ppd (~29.6km equator), with much larger measurement/reconstruction support possible. Hydrogen-equivalent proxy, not direct surface ice fraction or recoverable resource mass.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "mars_odyssey_grs_mons_perc_wt",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 2.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.5,
+      "pixel_spacing_unit": "degree",
+      "nodata": []
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.tes_olivine",
+      "label": "TES Olivine spectral-model abundance",
+      "unit": "areal_fraction",
+      "notes": "4ppd (~14.8km equator); source NODATA=-1, not zero. Spectral-mixture model fraction, not elemental wt%; compare only with a compatible terrestrial measurement.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_Olivine_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 4.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -1.0,
+        -1.0,
+        -1
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.tes_feldspar",
+      "label": "TES K-feldspar spectral-model abundance",
+      "unit": "areal_fraction",
+      "notes": "4ppd (~14.8km equator); source NODATA=-1, not zero. Spectral-mixture model fraction, not elemental wt%; compare only with a compatible terrestrial measurement.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_Feldspar_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 4.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -1
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.tes_clinopyroxene",
+      "label": "TES Clinopyroxene spectral-model abundance",
+      "unit": "areal_fraction",
+      "notes": "4ppd (~14.8km equator); source NODATA=-1, not zero. Spectral-mixture model fraction, not elemental wt%; compare only with a compatible terrestrial measurement.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_Clinopyroxene_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 4.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -1
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.tes_plagioclase",
+      "label": "TES Plagioclase spectral-model abundance",
+      "unit": "areal_fraction",
+      "notes": "4ppd (~14.8km equator); source NODATA=-1, not zero. Spectral-mixture model fraction, not elemental wt%; compare only with a compatible terrestrial measurement.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_Plagioclase_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 4.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -1
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.tes_carbonate",
+      "label": "TES Carbonates spectral-model abundance",
+      "unit": "areal_fraction",
+      "notes": "4ppd (~14.8km equator); source NODATA=-1, not zero. Spectral-mixture model fraction, not elemental wt%; compare only with a compatible terrestrial measurement.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_Carbonate_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 4.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -1
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.tes_hematite",
+      "label": "TES Hematite spectral-model abundance",
+      "unit": "areal_fraction",
+      "notes": "4ppd (~14.8km equator); source NODATA=-1, not zero. Spectral-mixture model fraction, not elemental wt%; compare only with a compatible terrestrial measurement.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_Hematite_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 4.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -1
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.tes_amphibole",
+      "label": "TES Amphibole spectral-model abundance",
+      "unit": "areal_fraction",
+      "notes": "4ppd (~14.8km equator); source NODATA=-1, not zero. Spectral-mixture model fraction, not elemental wt%; compare only with a compatible terrestrial measurement.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_Amphibole_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 4.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -1
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.tes_quartz",
+      "label": "TES Quartz spectral-model abundance",
+      "unit": "areal_fraction",
+      "notes": "4ppd (~14.8km equator); source NODATA=-1, not zero. Spectral-mixture model fraction, not elemental wt%; compare only with a compatible terrestrial measurement.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_Quartz_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 4.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -1
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.tes_sulfate",
+      "label": "TES Sulfates spectral-model abundance",
+      "unit": "areal_fraction",
+      "notes": "4ppd (~14.8km equator); source NODATA=-1, not zero. Spectral-mixture model fraction, not elemental wt%; compare only with a compatible terrestrial measurement.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_Sulfate_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 4.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -1
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.tes_dust",
+      "label": "TES Surface dust spectral-model abundance",
+      "unit": "areal_fraction",
+      "notes": "4ppd (~14.8km equator); source NODATA=-1, not zero. Spectral-mixture model fraction, not elemental wt%; compare only with a compatible terrestrial measurement.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_Dust_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 4.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -1
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.tes_mineral_fit_error",
+      "label": "TES mineral-model RMS error",
+      "unit": "raw_fit_error",
+      "notes": "Quality/provenance channel, not an environmental preference. Source NODATA=-1.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "TES_RMS_Error_numeric",
+      "kind": "mars_wms",
+      "url": "https://ms-mars.mars.asu.edu/alb32",
+      "ppd": 4.0,
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -90,
+        180,
+        90
+      ],
+      "pixel_spacing": 0.25,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -1
+      ]
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.geologic_unit",
+      "label": "USGS geologic unit and description",
+      "unit": "source_attributes",
+      "notes": "Trek SIM3292_Global_Geology categorical polygons; ASU numeric map codes require a legend. Only the first non-group layer was probed; inspect all sublayer semantics and mapping completeness before aggregating. Value is a list of source attribute objects intersecting the exact point; no proximity search or absence inference.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "SIM3292_Global_Geology",
+      "kind": "trek_feature",
+      "url": "https://trek.nasa.gov/mars/trekarcgis/rest/services/SIM3292_Global_Geology/MapServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -179.99999001642675,
+        -89.99996889507656,
+        179.99999001642672,
+        89.99996889507656
+      ],
+      "pixel_spacing": 0,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "layer_id": 0
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.hydrous_mineral_detection",
+      "label": "Mapped hydrous-mineral detections",
+      "unit": "source_attributes",
+      "notes": "Trek CRISM/OMEGA detections and aqueous-mineral classes. An empty query is no observation, not absence or zero abundance. Only the first non-group layer was probed; inspect all sublayer semantics and mapping completeness before aggregating. Value is a list of source attribute objects intersecting the exact point; no proximity search or absence inference.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Hydrous_Mineral_Detections_OMEGA_CRISM_clon0",
+      "kind": "trek_feature",
+      "url": "https://trek.nasa.gov/mars/trekarcgis/rest/services/Hydrous_Mineral_Detections_OMEGA_CRISM_clon0/MapServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -179.89999389648438,
+        -60.13999938964844,
+        179.77999877929688,
+        81.5
+      ],
+      "pixel_spacing": 0,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "layer_id": 0
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.hydrous_mineral_detection",
+      "label": "Mapped hydrous-mineral detections",
+      "unit": "source_attributes",
+      "notes": "Trek CRISM/OMEGA detections and aqueous-mineral classes. An empty query is no observation, not absence or zero abundance. Only the first non-group layer was probed; inspect all sublayer semantics and mapping completeness before aggregating. Value is a list of source attribute objects intersecting the exact point; no proximity search or absence inference.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Aquieous_Mineral_Distribution_Options_clon0",
+      "kind": "trek_feature",
+      "url": "https://trek.nasa.gov/mars/trekarcgis/rest/services/Aquieous_Mineral_Distribution_Options_clon0/MapServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -178.99000549316406,
+        -65.98999786376953,
+        179.80999755859375,
+        68.05000305175781
+      ],
+      "pixel_spacing": 0,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "layer_id": 0
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.chloride_detection",
+      "label": "Mapped chloride-bearing-material detections",
+      "unit": "source_attributes",
+      "notes": "Trek THEMIS chloride detections; no concentration field established. Only the first non-group layer was probed; inspect all sublayer semantics and mapping completeness before aggregating. Value is a list of source attribute objects intersecting the exact point; no proximity search or absence inference.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Chloride_Salt_bearing_Material_THEMIS_clon0",
+      "kind": "trek_feature",
+      "url": "https://trek.nasa.gov/mars/trekarcgis/rest/services/Chloride_Salt_bearing_Material_THEMIS_clon0/MapServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -180,
+        -56.08007621765137,
+        180,
+        22.970705032348633
+      ],
+      "pixel_spacing": 0,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "layer_id": 0
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.dune_field",
+      "label": "Mapped dune-field context",
+      "unit": "source_attributes",
+      "notes": "Trek feature mapping; availability outside mapped features is unknown, not zero sand cover. Only the first non-group layer was probed; inspect all sublayer semantics and mapping completeness before aggregating. Value is a list of source attribute objects intersecting the exact point; no proximity search or absence inference.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Dune_Field",
+      "kind": "trek_feature",
+      "url": "https://trek.nasa.gov/mars/trekarcgis/rest/services/Dune_Field/MapServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -179.99978539250506,
+        -65.24211459991895,
+        179.99970470274985,
+        65.07278021727373
+      ],
+      "pixel_spacing": 0,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "layer_id": 0
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.valley_network",
+      "label": "Mapped valley-network context",
+      "unit": "source_attributes",
+      "notes": "Trek feature mapping; morphology and paleoenvironments, not present liquid water. Only the first non-group layer was probed; inspect all sublayer semantics and mapping completeness before aggregating. Value is a list of source attribute objects intersecting the exact point; no proximity search or absence inference.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Hynek_Valley_Networks",
+      "kind": "trek_feature",
+      "url": "https://trek.nasa.gov/mars/trekarcgis/rest/services/Hynek_Valley_Networks/MapServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -179.99998854156752,
+        -71.68011292895096,
+        179.96418200035038,
+        53.777444272012524
+      ],
+      "pixel_spacing": 0,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "layer_id": 0
+    },
+    {
+      "body": "mars",
+      "variable_id": "mars.fans_glaciers_gullies",
+      "label": "Mapped fans, glaciers and gullies",
+      "unit": "source_attributes",
+      "notes": "Trek feature catalog; distinguish separate classes and mapping coverage. Only the first non-group layer was probed; inspect all sublayer semantics and mapping completeness before aggregating. Value is a list of source attribute objects intersecting the exact point; no proximity search or absence inference.",
+      "quality_flags": [
+        "cross_body_comparison_requires_review"
+      ],
+      "source_id": "Mars_Fans_Glaciers_Gullies",
+      "kind": "trek_feature",
+      "url": "https://trek.nasa.gov/mars/trekarcgis/rest/services/Mars_Fans_Glaciers_Gullies/MapServer",
+      "projection": {
+        "kind": "geographic"
+      },
+      "extent": [
+        -179.99473571777344,
+        -82.6240005493164,
+        179.9929962158203,
+        71.91812133789062
+      ],
+      "pixel_spacing": 0,
+      "pixel_spacing_unit": "degree",
+      "nodata": [
+        -32768,
+        -99999
+      ],
+      "layer_id": 0
+    }
+  ]
+}

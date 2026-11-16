@@ -1,0 +1,29 @@
+{
+  "measured_at": "2026-11-14T18:07:06.548241+00:00",
+  "source_pilot_artifacts": {
+    "research/pilots/terrain": {
+      "files": 12,
+      "bytes": 3902011,
+      "csv_bytes": 2809370
+    },
+    "research/pilots/temperature-native": {
+      "files": 10,
+      "bytes": 8207553,
+      "csv_bytes": 7837436
+    }
+  },
+  "source_artifact_bytes": 12109564,
+  "source_csv_bytes": 10646806,
+  "database_bytes_at_repeat_import": 51123903,
+  "project_tables_and_indexes_bytes_at_repeat_import": 30941184,
+  "postgresql_cluster_volume_apparent_bytes": 195481628,
+  "postgresql_cluster_volume_allocated_bytes": 195559424,
+  "retained_raster_files": 0,
+  "notes": [
+    "All MB figures in documentation are decimal; MiB figures use 1024 squared.",
+    "Database includes PostgreSQL/PostGIS catalogs; project relation size includes indexes and TOAST.",
+    "Cluster volume includes WAL, all cluster databases and cluster metadata, so it is not the database-only measurement.",
+    "Docker images, Docker build cache and Docker daemon data outside the database volume are excluded.",
+    "Original CSVs and database storage coexist locally; they are separate copies of summary values, not raster archives."
+  ]
+}

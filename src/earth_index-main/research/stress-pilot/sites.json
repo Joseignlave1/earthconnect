@@ -1,0 +1,362 @@
+{
+  "status": "declared_before_processing",
+  "selection": "Purposive geographic/environmental stress sample; not random, not an unbiased global validation set.",
+  "new_patch_count": 24,
+  "reference_sites": [
+    "atacama",
+    "haughton",
+    "deathvalley"
+  ],
+  "patch_width_km": 100,
+  "pixel_spacing_m": 1000,
+  "patch_support_threshold_cells": 100,
+  "patch_support_threshold_note": "Diagnostic threshold: at least 1% of patch cells pass a frozen filter. Not a planetary-analog truth label.",
+  "sites": [
+    {
+      "key": "namib",
+      "name": "Namib dune desert",
+      "center": [
+        15.3,
+        -24.7
+      ],
+      "srid": 911001,
+      "role": "plausible_match",
+      "plausible_profiles": [
+        "dry_bare"
+      ],
+      "rationale": "Dune desert; test whether broad bare/dry screening admits dunes despite surface hazards.",
+      "context_sources": [
+        "https://whc.unesco.org/en/list/1430/"
+      ]
+    },
+    {
+      "key": "sahara",
+      "name": "Central Sahara",
+      "center": [
+        13,
+        25
+      ],
+      "srid": 911002,
+      "role": "plausible_match",
+      "plausible_profiles": [
+        "dry_bare",
+        "hot_dry_bare"
+      ],
+      "rationale": "Hot arid desert; new hot/dry candidate.",
+      "context_sources": []
+    },
+    {
+      "key": "wadi_rum",
+      "name": "Wadi Rum / southern Jordan",
+      "center": [
+        35.42,
+        29.58
+      ],
+      "srid": 911003,
+      "role": "plausible_match",
+      "plausible_profiles": [
+        "dry_bare",
+        "hot_dry_bare"
+      ],
+      "rationale": "Arid rocky desert; relief should expose limitations of mean-slope screening.",
+      "context_sources": [
+        "https://whc.unesco.org/en/list/1377/"
+      ]
+    },
+    {
+      "key": "uyuni",
+      "name": "Salar de Uyuni",
+      "center": [
+        -67.5,
+        -20.3
+      ],
+      "srid": 911004,
+      "role": "plausible_match",
+      "plausible_profiles": [
+        "dry_bare"
+      ],
+      "rationale": "High-altitude salt flat and surrounding mountains; not necessarily hot.",
+      "context_sources": [
+        "https://science.nasa.gov/photojournal/salt-playas-of-the-bolivian-altiplano/"
+      ]
+    },
+    {
+      "key": "outback",
+      "name": "Central Australian desert",
+      "center": [
+        137,
+        -27
+      ],
+      "srid": 911005,
+      "role": "plausible_match",
+      "plausible_profiles": [
+        "dry_bare",
+        "hot_dry_bare"
+      ],
+      "rationale": "Hot dry interior; land-cover classification may be sparse vegetation rather than barren.",
+      "context_sources": []
+    },
+    {
+      "key": "gobi",
+      "name": "Gobi desert",
+      "center": [
+        103,
+        43
+      ],
+      "srid": 911006,
+      "role": "plausible_match",
+      "plausible_profiles": [
+        "dry_bare"
+      ],
+      "rationale": "Dry continental desert with cold winters; cold alone should not imply permafrost.",
+      "context_sources": []
+    },
+    {
+      "key": "axel_heiberg",
+      "name": "Axel Heiberg Island",
+      "center": [
+        -90.5,
+        79.4
+      ],
+      "srid": 911007,
+      "role": "plausible_match",
+      "plausible_profiles": [
+        "cold_bare_frozen"
+      ],
+      "rationale": "Independent High Arctic patch; includes rock, ice and coastal water.",
+      "context_sources": [
+        "https://www.nri.nu.ca/sites/default/files/documents/2022%20Compendium%20of%20Nunavut%20Research.pdf"
+      ]
+    },
+    {
+      "key": "svalbard",
+      "name": "Central Svalbard",
+      "center": [
+        16,
+        78.2
+      ],
+      "srid": 911008,
+      "role": "plausible_match",
+      "plausible_profiles": [
+        "cold_bare_frozen"
+      ],
+      "rationale": "Arctic bare/permafrost terrain; maritime winter threshold may reject it.",
+      "context_sources": [
+        "https://coat.no/en/Svalbard"
+      ]
+    },
+    {
+      "key": "iceland",
+      "name": "Central Iceland",
+      "center": [
+        -18.3,
+        65
+      ],
+      "srid": 911009,
+      "role": "borderline",
+      "plausible_profiles": [],
+      "rationale": "Volcanic bare terrain with wetter/milder climate; visually plausible analog that broad climate filters may reject.",
+      "context_sources": []
+    },
+    {
+      "key": "amazon",
+      "name": "Amazon / Manaus vicinity",
+      "center": [
+        -60,
+        -3
+      ],
+      "srid": 911010,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Warm wet tropical forest; should fail dry/bare filters.",
+      "context_sources": []
+    },
+    {
+      "key": "congo",
+      "name": "Congo Basin",
+      "center": [
+        24,
+        0
+      ],
+      "srid": 911011,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Warm wet tropical forest.",
+      "context_sources": []
+    },
+    {
+      "key": "borneo",
+      "name": "Central Borneo",
+      "center": [
+        114,
+        0
+      ],
+      "srid": 911012,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Warm wet tropical forest and mountain context.",
+      "context_sources": []
+    },
+    {
+      "key": "finland",
+      "name": "Finnish Lapland",
+      "center": [
+        26,
+        67
+      ],
+      "srid": 911013,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Cold forested terrain; should not be classified as bare polar desert.",
+      "context_sources": []
+    },
+    {
+      "key": "iowa",
+      "name": "Central Iowa",
+      "center": [
+        -93,
+        42
+      ],
+      "srid": 911014,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Temperate agricultural landscape; hot summers alone should not suffice.",
+      "context_sources": []
+    },
+    {
+      "key": "uruguay",
+      "name": "Central Uruguay",
+      "center": [
+        -56,
+        -33
+      ],
+      "srid": 911015,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Humid grassland/agricultural landscape.",
+      "context_sources": []
+    },
+    {
+      "key": "serengeti",
+      "name": "Serengeti region",
+      "center": [
+        34.8,
+        -2.4
+      ],
+      "srid": 911016,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Warm seasonal savanna; sparse tree cover alone should not count as barren.",
+      "context_sources": []
+    },
+    {
+      "key": "mekong",
+      "name": "Mekong Delta",
+      "center": [
+        105.5,
+        10.5
+      ],
+      "srid": 911017,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Warm wet low-slope agriculture and water; tests flat/hot confounders.",
+      "context_sources": []
+    },
+    {
+      "key": "tokyo",
+      "name": "Tokyo region",
+      "center": [
+        139.7,
+        35.7
+      ],
+      "srid": 911018,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Warm built-up/coastal landscape; tests hot urban surface confounders.",
+      "context_sources": []
+    },
+    {
+      "key": "alps",
+      "name": "Central Alps",
+      "center": [
+        8,
+        46.5
+      ],
+      "srid": 911019,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Cold rocky mountainous terrain with ice; tests steep/wet confounders.",
+      "context_sources": []
+    },
+    {
+      "key": "himalaya",
+      "name": "Everest / central Himalaya",
+      "center": [
+        86.9,
+        28
+      ],
+      "srid": 911020,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Very high rocky/icy mountains; cold bare areas need not provide a low-slope usable footprint.",
+      "context_sources": []
+    },
+    {
+      "key": "greenland",
+      "name": "Greenland interior ice sheet",
+      "center": [
+        -42,
+        74
+      ],
+      "srid": 911021,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Cold dry ice sheet; should fail the bare-ground requirement.",
+      "context_sources": []
+    },
+    {
+      "key": "pacific",
+      "name": "Equatorial central Pacific",
+      "center": [
+        -140,
+        0
+      ],
+      "srid": 911022,
+      "role": "negative_control",
+      "plausible_profiles": [],
+      "rationale": "Open ocean; missing land-cover coverage must not become a barren zero.",
+      "context_sources": []
+    },
+    {
+      "key": "antarctica",
+      "name": "McMurdo Dry Valleys vicinity",
+      "center": [
+        162,
+        -77.5
+      ],
+      "srid": 911023,
+      "role": "coverage_challenge",
+      "plausible_profiles": [
+        "cold_bare_frozen"
+      ],
+      "rationale": "Plausible cold-desert setting outside EarthEnv terrain and northern permafrost domains; expected data-driven rejection, not evidence of unsuitability.",
+      "context_sources": []
+    },
+    {
+      "key": "almeria",
+      "name": "Almeria / southeast Spain",
+      "center": [
+        -2.4,
+        37.1
+      ],
+      "srid": 911024,
+      "role": "borderline",
+      "plausible_profiles": [
+        "dry_bare",
+        "hot_dry_bare"
+      ],
+      "rationale": "Semiarid region with agriculture, coast and hills; tests threshold boundaries and mixed landscapes.",
+      "context_sources": []
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "datasourceId": "earth-ed5bc9904a5f",
+  "query": "SELECT site_key, x, y, bare_fraction * exp(-slope_mean_deg / :scale) AS score FROM cells WHERE site_key = :site ORDER BY y, x LIMIT :limit",
+  "params": {
+    "site": { "stringValue": "h11v11" },
+    "scale": { "integerValue": "8" },
+    "limit": { "integerValue": "10" }
+  }
+}

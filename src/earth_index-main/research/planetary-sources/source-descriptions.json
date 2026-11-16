@@ -1,0 +1,114 @@
+[
+  {
+    "label": "dgdr_nen_cf_clc_cyl_032_jp2",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=dgdr_nen_cf_clc_cyl_032_jp2",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "df17661d4ce7a8ee0a2f582b461f768d2ba28ea98761bed2883e6293c1a6c10f",
+    "audit_interpretation": "FGDC identifies equatorial-noon-normalized Christiansen-feature wavelength."
+  },
+  {
+    "label": "diviner_tbol_max_sub_min_anom",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=diviner_tbol_max_sub_min_anom",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "562f76ce611a6670d607fcc07617c2df01b8aa69f3f8eb1475e5d132e29c628f",
+    "audit_interpretation": "FGDC describes a zonal-mean-subtracted temperature-range anomaly, not the absolute range."
+  },
+  {
+    "label": "diviner_tbol_max_div_min_anom",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=diviner_tbol_max_div_min_anom",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "3eec6b62bd98af7292cfcde3cbfbe1a6fc8d6df180ce567904e0398b4dc9278c",
+    "audit_interpretation": "FGDC describes a zonal-mean-subtracted ratio anomaly; do not confuse it with a direct temperature ratio."
+  },
+  {
+    "label": "diviner_tbol_max_anom",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=diviner_tbol_max_anom",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "ea996e9749d9a3e9e66d9c007d9b338e8c285ccd5c9c9b41e6d432f5e7bd40e2",
+    "audit_interpretation": "FGDC describes latitude/zonal-mean-subtracted maximum-temperature anomaly."
+  },
+  {
+    "label": "dgdr_std_cf_clc_cyl_128_jp2",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=dgdr_std_cf_clc_cyl_128_jp2",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "170cb266e7d9ed43a2fae36cec9ce05813b8bee98371279b66028b5f2db14f22",
+    "audit_interpretation": "FGDC identifies standard Christiansen-feature wavelength near8micrometres as a composition proxy."
+  },
+  {
+    "label": "Lunar_Kaguya_MIMap_MineralDeconv_AbundanceSMFe_50N50S",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=Lunar_Kaguya_MIMap_MineralDeconv_AbundanceSMFe_50N50S",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "5a4ed6d35c9fe079ca4c8ceb007eb4e343fa0ab6babb65aae5b41c0a350d1ce7",
+    "audit_interpretation": "FGDC identifies submicroscopic metallic iron; raw service scaling not resolved by the description."
+  },
+  {
+    "label": "diviner_tbol_max",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=diviner_tbol_max",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "cf326563d07d0ba1e75c561b2984b5a9a5701cbb2d2a369cfef3bf4b0214b684",
+    "audit_interpretation": "FGDC identifies maximum composite surface temperature, not live weather."
+  },
+  {
+    "label": "Lunar_Kaguya_MIMap_MineralDeconv_FeOWeightPercent_50N50S",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=Lunar_Kaguya_MIMap_MineralDeconv_FeOWeightPercent_50N50S",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "775f4d195ac8eb10dcff6d829d9de000ff86dc4cbd77b6dcfe7b7f611786654c",
+    "audit_interpretation": "FGDC defines FeO wt%, \u00b150 degrees coverage and512ppd source imagery; numeric service reports0.25degree spacing."
+  },
+  {
+    "label": "diviner_tbol_hour12",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=diviner_tbol_hour12",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "0088835dc41fe0f6b241dc9d357d467ca25d4751289b1fb2775cd0d059ce6dd2",
+    "audit_interpretation": "FGDC gives2009-07-05 through2015-04-01 source compilation; local-noon composite, with inconsistent0.5ppd versus0.5degree wording."
+  },
+  {
+    "label": "Lunar_Kaguya_MIMap_MineralDeconv_PlagioclaseGrainSizeMicrons_50N50S",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=Lunar_Kaguya_MIMap_MineralDeconv_PlagioclaseGrainSizeMicrons_50N50S",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "84740cd32153175c89b098440dcd6436c55af6f105d94a68630f5020b1995b95",
+    "audit_interpretation": "FGDC unit is micrometre; spectral-model grain size for plagioclase."
+  },
+  {
+    "label": "LP_GRS_TitaniumAbundance_2ppd",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=LP_GRS_TitaniumAbundance_2ppd",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "f882c627d0df8eb44840eff8e5f4c7213410cea5b31af0cb3a4bb582e88c198f",
+    "audit_interpretation": "FGDC defines elemental Ti wt%; described source bins60km."
+  },
+  {
+    "label": "minirf_s1_49dnorm_EQ",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=minirf_s1_49dnorm_EQ",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "45f1b280bb296055f61d9bd5a7b6eca6d984d655a66e8ba21f45a62a0f1e7fea",
+    "audit_interpretation": "FGDC abstract defines normalized radar backscatter in dB; title uses CPR, so preserve label conflict."
+  },
+  {
+    "label": "LOLA_PA_310.eq",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=LOLA_PA_310.eq",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "6e5ef25a7857fc271f286a963c4996a40dc9c9f1cb21be08fad29d2e558a81f7",
+    "audit_interpretation": "FGDC title identifies surface relief in a geophysical model context; not local terrain roughness."
+  },
+  {
+    "label": "grain_density_310.eq",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=grain_density_310.eq",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "79121c42d9ef021bb6e0f52ddc3f4391125deb7bf1dfcb38bb7df9839e9c3566",
+    "audit_interpretation": "GRAIL modeled grain-density context; this is not measured surface regolith bulk density."
+  },
+  {
+    "label": "Lunar_Kaguya_MIMap_MineralDeconv_OlivinePercent_50N50S",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=Lunar_Kaguya_MIMap_MineralDeconv_OlivinePercent_50N50S",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "5c66885b10d1047159a448a7b60eaf85baa1bb14846f564d4386205f1b95d29e",
+    "audit_interpretation": "FGDC declares wt%; numeric service range0..1 and compositional sums require explicit scaling review."
+  },
+  {
+    "label": "diviner_c3_c7_hour_10_14",
+    "url": "https://trek.nasa.gov/moon/TrekWS/rest/cat/metadata/fgdc/html?label=diviner_c3_c7_hour_10_14",
+    "retrieval": "read earlier in this audit",
+    "normalized_source_text_sha256": "81efe27afb31f7b75878970fe653fb21fb746219230fcd83aae4a8c613225701",
+    "audit_interpretation": "FGDC describes a channel3-minus7 brightness-temperature difference over local-time10\u201314; not an absolute temperature."
+  }
+]

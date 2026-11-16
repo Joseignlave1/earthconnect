@@ -1,0 +1,1602 @@
+{
+  "status": "passed",
+  "bundle_sha256": "a1f93b34a79e55e15d278e367817b9b6aa93219cb1a3b64626499f223a88b2dd",
+  "layers_verified": 432,
+  "pixel_codes_verified": 4320000,
+  "sql_profile_coordinate_sets_verified": 3,
+  "invalid_grid_updates_rejected": 2,
+  "geometry_point_values_verified": 1296,
+  "wide_reference_cells_verified": 27,
+  "wall_seconds": 24.251734859019052,
+  "profiles": {
+    "dry_bare": {
+      "label": "Dry, bare, low mean slope",
+      "query_wall_seconds": 6.052542902994901,
+      "sites": {
+        "atacama": {
+          "matching_cells": 9782,
+          "eligible_fraction_of_10000_cells": 0.9782,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 80
+        },
+        "haughton": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "deathvalley": {
+          "matching_cells": 5153,
+          "eligible_fraction_of_10000_cells": 0.5153,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 77
+        },
+        "namib": {
+          "matching_cells": 9531,
+          "eligible_fraction_of_10000_cells": 0.9531,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 80
+        },
+        "sahara": {
+          "matching_cells": 10000,
+          "eligible_fraction_of_10000_cells": 1.0,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 80
+        },
+        "wadi_rum": {
+          "matching_cells": 8070,
+          "eligible_fraction_of_10000_cells": 0.807,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 24
+        },
+        "uyuni": {
+          "matching_cells": 1785,
+          "eligible_fraction_of_10000_cells": 0.1785,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "outback": {
+          "matching_cells": 5229,
+          "eligible_fraction_of_10000_cells": 0.5229,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 34
+        },
+        "gobi": {
+          "matching_cells": 9988,
+          "eligible_fraction_of_10000_cells": 0.9988,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 80
+        },
+        "axel_heiberg": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "svalbard": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "iceland": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "amazon": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "congo": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "borneo": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "finland": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "iowa": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "uruguay": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "serengeti": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "mekong": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "tokyo": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "alps": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "himalaya": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "greenland": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "pacific": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "antarctica": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "almeria": {
+          "matching_cells": 84,
+          "eligible_fraction_of_10000_cells": 0.0084,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        }
+      }
+    },
+    "hot_dry_bare": {
+      "label": "Hot, dry, bare, low mean slope",
+      "query_wall_seconds": 5.683937349007465,
+      "sites": {
+        "atacama": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "haughton": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "deathvalley": {
+          "matching_cells": 5153,
+          "eligible_fraction_of_10000_cells": 0.5153,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 77
+        },
+        "namib": {
+          "matching_cells": 4667,
+          "eligible_fraction_of_10000_cells": 0.4667,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 30
+        },
+        "sahara": {
+          "matching_cells": 10000,
+          "eligible_fraction_of_10000_cells": 1.0,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 80
+        },
+        "wadi_rum": {
+          "matching_cells": 8070,
+          "eligible_fraction_of_10000_cells": 0.807,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 24
+        },
+        "uyuni": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "outback": {
+          "matching_cells": 5229,
+          "eligible_fraction_of_10000_cells": 0.5229,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 34
+        },
+        "gobi": {
+          "matching_cells": 2286,
+          "eligible_fraction_of_10000_cells": 0.2286,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "axel_heiberg": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "svalbard": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "iceland": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "amazon": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "congo": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "borneo": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "finland": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "iowa": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "uruguay": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "serengeti": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "mekong": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "tokyo": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "alps": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "himalaya": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "greenland": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "pacific": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "antarctica": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "almeria": {
+          "matching_cells": 84,
+          "eligible_fraction_of_10000_cells": 0.0084,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        }
+      }
+    },
+    "cold_bare_frozen": {
+      "label": "Cold, bare, low mean slope, modeled frozen ground",
+      "query_wall_seconds": 4.333368254010566,
+      "sites": {
+        "atacama": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "haughton": {
+          "matching_cells": 7865,
+          "eligible_fraction_of_10000_cells": 0.7865,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 59
+        },
+        "deathvalley": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "namib": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "sahara": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "wadi_rum": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "uyuni": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "outback": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "gobi": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "axel_heiberg": {
+          "matching_cells": 1608,
+          "eligible_fraction_of_10000_cells": 0.1608,
+          "reference_point_cell_matches": true,
+          "matches_within_5km_of_reference": 39
+        },
+        "svalbard": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "iceland": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "amazon": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "congo": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "borneo": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "finland": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "iowa": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "uruguay": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "serengeti": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "mekong": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "tokyo": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "alps": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "himalaya": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "greenland": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "pacific": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "antarctica": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        },
+        "almeria": {
+          "matching_cells": 0,
+          "eligible_fraction_of_10000_cells": 0.0,
+          "reference_point_cell_matches": false,
+          "matches_within_5km_of_reference": 0
+        }
+      }
+    }
+  },
+  "reference_cells": {
+    "atacama": {
+      "elevation_median_m": 2304.0,
+      "slope_mean_deg": 0.1,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 5.0,
+      "tpi_5km_m": -0.5,
+      "relief_21km_m": 145.0,
+      "tpi_21km_m": -18.75,
+      "coldest_month_air_c": 10.060000000000002,
+      "warmest_month_air_c": 17.319999999999993,
+      "annual_precip_mm": 14.600000000000001,
+      "bare_fraction": 1.0000000000000002,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 14.0
+    },
+    "haughton": {
+      "elevation_median_m": 157.0,
+      "slope_mean_deg": 1.8,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 110.0,
+      "tpi_5km_m": -16.25,
+      "relief_21km_m": 228.0,
+      "tpi_21km_m": -53.75,
+      "coldest_month_air_c": -32.480000000000004,
+      "warmest_month_air_c": 6.230000000000004,
+      "annual_precip_mm": 321.4,
+      "bare_fraction": 0.8130000000000001,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": 1.0000000000000002,
+      "permafrost_valid_fraction": 1.0000000000000002,
+      "dominant_lithology_code": 5.0
+    },
+    "deathvalley": {
+      "elevation_median_m": -80.0,
+      "slope_mean_deg": 0.1,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 1.0,
+      "tpi_5km_m": 0.0,
+      "relief_21km_m": 1625.0,
+      "tpi_21km_m": -347.5,
+      "coldest_month_air_c": 7.269999999999996,
+      "warmest_month_air_c": 32.2,
+      "annual_precip_mm": 138.8,
+      "bare_fraction": 1.0000000000000002,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 3.0
+    },
+    "namib": {
+      "elevation_median_m": 610.0,
+      "slope_mean_deg": 0.0,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 15.0,
+      "tpi_5km_m": 1.25,
+      "relief_21km_m": 230.0,
+      "tpi_21km_m": 4.75,
+      "coldest_month_air_c": 17.129999999999995,
+      "warmest_month_air_c": 24.179999999999993,
+      "annual_precip_mm": 54.800000000000004,
+      "bare_fraction": 1.0000000000000002,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 1.0
+    },
+    "sahara": {
+      "elevation_median_m": 715.0,
+      "slope_mean_deg": 3.6,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 72.0,
+      "tpi_5km_m": 31.0,
+      "relief_21km_m": 133.0,
+      "tpi_21km_m": 29.25,
+      "coldest_month_air_c": 9.439999999999998,
+      "warmest_month_air_c": 30.219999999999985,
+      "annual_precip_mm": 25.6,
+      "bare_fraction": 1.0000000000000002,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 1.0
+    },
+    "wadi_rum": {
+      "elevation_median_m": 965.0,
+      "slope_mean_deg": 8.5,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 550.0,
+      "tpi_5km_m": -196.75,
+      "relief_21km_m": 782.0,
+      "tpi_21km_m": -56.25,
+      "coldest_month_air_c": 7.179999999999993,
+      "warmest_month_air_c": 27.230000000000004,
+      "annual_precip_mm": 40.2,
+      "bare_fraction": 1.0000000000000002,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 1.0
+    },
+    "uyuni": {
+      "elevation_median_m": 3660.0,
+      "slope_mean_deg": 0.1,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 1.0,
+      "tpi_5km_m": 0.5,
+      "relief_21km_m": 4.0,
+      "tpi_21km_m": 0.75,
+      "coldest_month_air_c": 2.0900000000000034,
+      "warmest_month_air_c": 11.969999999999999,
+      "annual_precip_mm": 252.00000000000003,
+      "bare_fraction": 1.0000000000000002,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 14.0
+    },
+    "outback": {
+      "elevation_median_m": 34.0,
+      "slope_mean_deg": 0.7000000000000001,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 13.0,
+      "tpi_5km_m": 2.25,
+      "relief_21km_m": 39.0,
+      "tpi_21km_m": 1.5,
+      "coldest_month_air_c": 12.939999999999998,
+      "warmest_month_air_c": 32.969999999999985,
+      "annual_precip_mm": 135.10000000000002,
+      "bare_fraction": 0.848,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 1.0
+    },
+    "gobi": {
+      "elevation_median_m": 1243.0,
+      "slope_mean_deg": 0.30000000000000004,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 24.0,
+      "tpi_5km_m": -0.25,
+      "relief_21km_m": 415.0,
+      "tpi_21km_m": -27.5,
+      "coldest_month_air_c": -12.64,
+      "warmest_month_air_c": 24.86,
+      "annual_precip_mm": 98.60000000000001,
+      "bare_fraction": 1.0000000000000002,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 5.0
+    },
+    "axel_heiberg": {
+      "elevation_median_m": 393.0,
+      "slope_mean_deg": 3.2,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 712.0,
+      "tpi_5km_m": -54.25,
+      "relief_21km_m": 1394.0,
+      "tpi_21km_m": -185.75,
+      "coldest_month_air_c": -32.900000000000006,
+      "warmest_month_air_c": 2.3900000000000006,
+      "annual_precip_mm": 299.5,
+      "bare_fraction": 0.9470000000000001,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": 1.0000000000000002,
+      "permafrost_valid_fraction": 1.0000000000000002,
+      "dominant_lithology_code": 5.0
+    },
+    "svalbard": {
+      "elevation_median_m": 50.0,
+      "slope_mean_deg": 7.4,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 812.0,
+      "tpi_5km_m": -135.0,
+      "relief_21km_m": 855.0,
+      "tpi_21km_m": -335.0,
+      "coldest_month_air_c": -14.710000000000008,
+      "warmest_month_air_c": 3.7099999999999937,
+      "annual_precip_mm": 686.7,
+      "bare_fraction": 0.005,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": 1.0000000000000002,
+      "permafrost_valid_fraction": 1.0000000000000002,
+      "dominant_lithology_code": 5.0
+    },
+    "iceland": {
+      "elevation_median_m": 783.0,
+      "slope_mean_deg": 1.6,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 88.0,
+      "tpi_5km_m": 5.25,
+      "relief_21km_m": 384.0,
+      "tpi_21km_m": -19.0,
+      "coldest_month_air_c": -7.420000000000002,
+      "warmest_month_air_c": 3.519999999999996,
+      "annual_precip_mm": 946.0,
+      "bare_fraction": 1.0000000000000002,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": 0.0,
+      "permafrost_valid_fraction": 1.0000000000000002,
+      "dominant_lithology_code": 2.0
+    },
+    "amazon": {
+      "elevation_median_m": 58.0,
+      "slope_mean_deg": 1.9,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 38.0,
+      "tpi_5km_m": 0.5,
+      "relief_21km_m": 103.0,
+      "tpi_21km_m": -7.25,
+      "coldest_month_air_c": 26.0,
+      "warmest_month_air_c": 29.16000000000001,
+      "annual_precip_mm": 1957.7000000000003,
+      "bare_fraction": 0.0,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 1.0
+    },
+    "congo": {
+      "elevation_median_m": 425.0,
+      "slope_mean_deg": 1.5,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 35.0,
+      "tpi_5km_m": 14.75,
+      "relief_21km_m": 60.0,
+      "tpi_21km_m": 9.0,
+      "coldest_month_air_c": 24.14999999999999,
+      "warmest_month_air_c": 25.599999999999994,
+      "annual_precip_mm": 1749.5000000000002,
+      "bare_fraction": 0.0,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 1.0
+    },
+    "borneo": {
+      "elevation_median_m": 347.0,
+      "slope_mean_deg": 7.9,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 364.0,
+      "tpi_5km_m": -97.0,
+      "relief_21km_m": 736.0,
+      "tpi_21km_m": -74.25,
+      "coldest_month_air_c": 23.409999999999997,
+      "warmest_month_air_c": 24.269999999999996,
+      "annual_precip_mm": 3349.3,
+      "bare_fraction": 0.0,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 3.0
+    },
+    "finland": {
+      "elevation_median_m": 242.0,
+      "slope_mean_deg": 0.8,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 50.0,
+      "tpi_5km_m": 11.5,
+      "relief_21km_m": 152.0,
+      "tpi_21km_m": 15.0,
+      "coldest_month_air_c": -13.320000000000007,
+      "warmest_month_air_c": 14.969999999999999,
+      "annual_precip_mm": 807.2,
+      "bare_fraction": 0.0,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": 0.0,
+      "permafrost_valid_fraction": 0.5640000000000001,
+      "dominant_lithology_code": 9.0
+    },
+    "iowa": {
+      "elevation_median_m": 303.0,
+      "slope_mean_deg": 1.5,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 24.0,
+      "tpi_5km_m": -0.5,
+      "relief_21km_m": 56.0,
+      "tpi_21km_m": 3.25,
+      "coldest_month_air_c": -6.6000000000000085,
+      "warmest_month_air_c": 23.789999999999992,
+      "annual_precip_mm": 898.5,
+      "bare_fraction": 0.0,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 6.0
+    },
+    "uruguay": {
+      "elevation_median_m": 111.0,
+      "slope_mean_deg": 0.7000000000000001,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 33.0,
+      "tpi_5km_m": -4.5,
+      "relief_21km_m": 78.0,
+      "tpi_21km_m": -2.75,
+      "coldest_month_air_c": 10.209999999999994,
+      "warmest_month_air_c": 24.539999999999992,
+      "annual_precip_mm": 1351.4,
+      "bare_fraction": 0.0,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 3.0
+    },
+    "serengeti": {
+      "elevation_median_m": 1489.0,
+      "slope_mean_deg": 2.2,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 194.0,
+      "tpi_5km_m": -16.25,
+      "relief_21km_m": 258.0,
+      "tpi_21km_m": -10.0,
+      "coldest_month_air_c": 18.840000000000003,
+      "warmest_month_air_c": 21.980000000000004,
+      "annual_precip_mm": 953.3000000000001,
+      "bare_fraction": 0.0,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 8.0
+    },
+    "mekong": {
+      "elevation_median_m": 4.0,
+      "slope_mean_deg": 0.5000000000000001,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 5.0,
+      "tpi_5km_m": -0.75,
+      "relief_21km_m": 8.0,
+      "tpi_21km_m": 0.25,
+      "coldest_month_air_c": 26.060000000000002,
+      "warmest_month_air_c": 30.999999999999986,
+      "annual_precip_mm": 1263.7000000000003,
+      "bare_fraction": 0.0,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 0.8250000000000001,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 1.0
+    },
+    "tokyo": {
+      "elevation_median_m": 42.0,
+      "slope_mean_deg": 1.0,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 28.0,
+      "tpi_5km_m": 7.0,
+      "relief_21km_m": 54.0,
+      "tpi_21km_m": 16.0,
+      "coldest_month_air_c": 4.659999999999997,
+      "warmest_month_air_c": 26.86,
+      "annual_precip_mm": 1694.7000000000003,
+      "bare_fraction": 0.0,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 1.0
+    },
+    "alps": {
+      "elevation_median_m": 2839.0,
+      "slope_mean_deg": 5.4,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 737.0,
+      "tpi_5km_m": -202.25,
+      "relief_21km_m": 2720.0,
+      "tpi_21km_m": 98.5,
+      "coldest_month_air_c": -8.079999999999998,
+      "warmest_month_air_c": 12.099999999999994,
+      "annual_precip_mm": 1380.6000000000001,
+      "bare_fraction": 0.0,
+      "permanent_snow_ice_fraction": 1.0000000000000002,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 1.0
+    },
+    "himalaya": {
+      "elevation_median_m": 7331.0,
+      "slope_mean_deg": 35.1,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 2636.0,
+      "tpi_5km_m": 243.25,
+      "relief_21km_m": 4198.0,
+      "tpi_21km_m": 1315.75,
+      "coldest_month_air_c": -12.210000000000008,
+      "warmest_month_air_c": 5.679999999999993,
+      "annual_precip_mm": 562.5,
+      "bare_fraction": 0.0,
+      "permanent_snow_ice_fraction": 1.0000000000000002,
+      "landcover_valid_fraction": 0.027,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 9.0
+    },
+    "greenland": {
+      "elevation_median_m": 2985.0,
+      "slope_mean_deg": 0.0,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 7.0,
+      "tpi_5km_m": 0.25,
+      "relief_21km_m": 31.0,
+      "tpi_21km_m": 0.0,
+      "coldest_month_air_c": -38.400000000000006,
+      "warmest_month_air_c": -12.100000000000009,
+      "annual_precip_mm": 200.9,
+      "bare_fraction": null,
+      "permanent_snow_ice_fraction": null,
+      "landcover_valid_fraction": 0.0,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 16.0
+    },
+    "pacific": {
+      "elevation_median_m": 0.0,
+      "slope_mean_deg": 0.0,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 0.0,
+      "tpi_5km_m": 0.0,
+      "relief_21km_m": 0.0,
+      "tpi_21km_m": 0.0,
+      "coldest_month_air_c": 25.159999999999997,
+      "warmest_month_air_c": 26.590000000000003,
+      "annual_precip_mm": 200.9,
+      "bare_fraction": null,
+      "permanent_snow_ice_fraction": null,
+      "landcover_valid_fraction": 0.0,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": null
+    },
+    "antarctica": {
+      "elevation_median_m": null,
+      "slope_mean_deg": null,
+      "terrain_valid_fraction": 0.0,
+      "relief_5km_m": null,
+      "tpi_5km_m": null,
+      "relief_21km_m": null,
+      "tpi_21km_m": null,
+      "coldest_month_air_c": -35.620000000000005,
+      "warmest_month_air_c": -13.719999999999999,
+      "annual_precip_mm": 80.4,
+      "bare_fraction": null,
+      "permanent_snow_ice_fraction": null,
+      "landcover_valid_fraction": 0.0,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 5.0
+    },
+    "almeria": {
+      "elevation_median_m": 529.0,
+      "slope_mean_deg": 1.7,
+      "terrain_valid_fraction": 1.0000000000000002,
+      "relief_5km_m": 190.0,
+      "tpi_5km_m": -7.5,
+      "relief_21km_m": 1012.0,
+      "tpi_21km_m": -145.0,
+      "coldest_month_air_c": 8.409999999999997,
+      "warmest_month_air_c": 25.679999999999993,
+      "annual_precip_mm": 237.4,
+      "bare_fraction": 0.0,
+      "permanent_snow_ice_fraction": 0.0,
+      "landcover_valid_fraction": 1.0000000000000002,
+      "permafrost_fraction": null,
+      "permafrost_valid_fraction": 0.0,
+      "dominant_lithology_code": 8.0
+    }
+  },
+  "matching_examples": {
+    "dry_bare--atacama": {
+      "site_key": "atacama",
+      "profile": "dry_bare",
+      "x": 50,
+      "y": 50,
+      "center_lon_lat": [
+        -68.50489502546334,
+        -23.495485292152967
+      ],
+      "values": {
+        "elevation_median_m": 2305.0,
+        "slope_mean_deg": 0.1,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 91.0,
+        "tpi_5km_m": -7.0,
+        "relief_21km_m": 145.0,
+        "tpi_21km_m": -23.25,
+        "coldest_month_air_c": 10.060000000000002,
+        "warmest_month_air_c": 17.319999999999993,
+        "annual_precip_mm": 14.600000000000001,
+        "bare_fraction": 1.0000000000000002,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 1.0
+      }
+    },
+    "dry_bare--deathvalley": {
+      "site_key": "deathvalley",
+      "profile": "dry_bare",
+      "x": 50,
+      "y": 50,
+      "center_lon_lat": [
+        -116.82556269165983,
+        36.244505856979714
+      ],
+      "values": {
+        "elevation_median_m": -80.0,
+        "slope_mean_deg": 0.1,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 1.0,
+        "tpi_5km_m": -0.25,
+        "relief_21km_m": 1625.0,
+        "tpi_21km_m": -314.0,
+        "coldest_month_air_c": 7.269999999999996,
+        "warmest_month_air_c": 32.2,
+        "annual_precip_mm": 138.8,
+        "bare_fraction": 1.0000000000000002,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 3.0
+      }
+    },
+    "dry_bare--namib": {
+      "site_key": "namib",
+      "profile": "dry_bare",
+      "x": 50,
+      "y": 50,
+      "center_lon_lat": [
+        15.29505916528091,
+        -24.695485996167765
+      ],
+      "values": {
+        "elevation_median_m": 611.0,
+        "slope_mean_deg": 0.0,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 10.0,
+        "tpi_5km_m": 2.75,
+        "relief_21km_m": 223.0,
+        "tpi_21km_m": 13.0,
+        "coldest_month_air_c": 17.129999999999995,
+        "warmest_month_air_c": 24.179999999999993,
+        "annual_precip_mm": 54.800000000000004,
+        "bare_fraction": 1.0000000000000002,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 1.0
+      }
+    },
+    "dry_bare--sahara": {
+      "site_key": "sahara",
+      "profile": "dry_bare",
+      "x": 50,
+      "y": 50,
+      "center_lon_lat": [
+        12.995046876464217,
+        25.004513656109292
+      ],
+      "values": {
+        "elevation_median_m": 665.0,
+        "slope_mean_deg": 3.8000000000000003,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 83.0,
+        "tpi_5km_m": -26.75,
+        "relief_21km_m": 137.0,
+        "tpi_21km_m": -21.75,
+        "coldest_month_air_c": 9.439999999999998,
+        "warmest_month_air_c": 30.219999999999985,
+        "annual_precip_mm": 25.6,
+        "bare_fraction": 1.0000000000000002,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 1.0
+      }
+    },
+    "dry_bare--wadi_rum": {
+      "site_key": "wadi_rum",
+      "profile": "dry_bare",
+      "x": 51,
+      "y": 50,
+      "center_lon_lat": [
+        35.42516072180445,
+        29.584510685491388
+      ],
+      "values": {
+        "elevation_median_m": 940.0,
+        "slope_mean_deg": 5.300000000000001,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 550.0,
+        "tpi_5km_m": -223.5,
+        "relief_21km_m": 785.0,
+        "tpi_21km_m": -71.25,
+        "coldest_month_air_c": 7.179999999999993,
+        "warmest_month_air_c": 27.230000000000004,
+        "annual_precip_mm": 40.2,
+        "bare_fraction": 1.0000000000000002,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 1.0
+      }
+    },
+    "dry_bare--uyuni": {
+      "site_key": "uyuni",
+      "profile": "dry_bare",
+      "x": 18,
+      "y": 50,
+      "center_lon_lat": [
+        -67.81115199962998,
+        -20.29520708608239
+      ],
+      "values": {
+        "elevation_median_m": 3660.0,
+        "slope_mean_deg": 0.1,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 4.0,
+        "tpi_5km_m": 0.5,
+        "relief_21km_m": 43.0,
+        "tpi_21km_m": 0.25,
+        "coldest_month_air_c": 2.319999999999993,
+        "warmest_month_air_c": 11.829999999999998,
+        "annual_precip_mm": 196.9,
+        "bare_fraction": 1.0000000000000002,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 14.0
+      }
+    },
+    "dry_bare--outback": {
+      "site_key": "outback",
+      "profile": "dry_bare",
+      "x": 50,
+      "y": 50,
+      "center_lon_lat": [
+        136.9949626658931,
+        -26.99548741649273
+      ],
+      "values": {
+        "elevation_median_m": 35.0,
+        "slope_mean_deg": 0.7000000000000001,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 14.0,
+        "tpi_5km_m": 2.0,
+        "relief_21km_m": 37.0,
+        "tpi_21km_m": 2.0,
+        "coldest_month_air_c": 12.939999999999998,
+        "warmest_month_air_c": 32.969999999999985,
+        "annual_precip_mm": 135.10000000000002,
+        "bare_fraction": 0.745,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 1.0
+      }
+    },
+    "dry_bare--gobi": {
+      "site_key": "gobi",
+      "profile": "dry_bare",
+      "x": 50,
+      "y": 50,
+      "center_lon_lat": [
+        102.99386766540994,
+        43.00450057826289
+      ],
+      "values": {
+        "elevation_median_m": 1248.0,
+        "slope_mean_deg": 0.30000000000000004,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 29.0,
+        "tpi_5km_m": -0.5,
+        "relief_21km_m": 390.0,
+        "tpi_21km_m": -29.75,
+        "coldest_month_air_c": -12.64,
+        "warmest_month_air_c": 24.86,
+        "annual_precip_mm": 98.60000000000001,
+        "bare_fraction": 1.0000000000000002,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 5.0
+      }
+    },
+    "dry_bare--almeria": {
+      "site_key": "almeria",
+      "profile": "dry_bare",
+      "x": 48,
+      "y": 60,
+      "center_lon_lat": [
+        -2.428091490705292,
+        37.0143946704113
+      ],
+      "values": {
+        "elevation_median_m": 331.0,
+        "slope_mean_deg": 4.6000000000000005,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 535.0,
+        "tpi_5km_m": -77.5,
+        "relief_21km_m": 1155.0,
+        "tpi_21km_m": -176.5,
+        "coldest_month_air_c": 8.409999999999997,
+        "warmest_month_air_c": 25.679999999999993,
+        "annual_precip_mm": 237.4,
+        "bare_fraction": 0.517,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 8.0
+      }
+    },
+    "hot_dry_bare--deathvalley": {
+      "site_key": "deathvalley",
+      "profile": "hot_dry_bare",
+      "x": 50,
+      "y": 50,
+      "center_lon_lat": [
+        -116.82556269165983,
+        36.244505856979714
+      ],
+      "values": {
+        "elevation_median_m": -80.0,
+        "slope_mean_deg": 0.1,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 1.0,
+        "tpi_5km_m": -0.25,
+        "relief_21km_m": 1625.0,
+        "tpi_21km_m": -314.0,
+        "coldest_month_air_c": 7.269999999999996,
+        "warmest_month_air_c": 32.2,
+        "annual_precip_mm": 138.8,
+        "bare_fraction": 1.0000000000000002,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 3.0
+      }
+    },
+    "hot_dry_bare--namib": {
+      "site_key": "namib",
+      "profile": "hot_dry_bare",
+      "x": 52,
+      "y": 50,
+      "center_lon_lat": [
+        15.314822504105962,
+        -24.695485345580938
+      ],
+      "values": {
+        "elevation_median_m": 610.0,
+        "slope_mean_deg": 0.1,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 12.0,
+        "tpi_5km_m": 0.75,
+        "relief_21km_m": 231.0,
+        "tpi_21km_m": -0.5,
+        "coldest_month_air_c": 16.86999999999999,
+        "warmest_month_air_c": 25.89999999999999,
+        "annual_precip_mm": 73.60000000000001,
+        "bare_fraction": 1.0000000000000002,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 1.0
+      }
+    },
+    "hot_dry_bare--sahara": {
+      "site_key": "sahara",
+      "profile": "hot_dry_bare",
+      "x": 50,
+      "y": 50,
+      "center_lon_lat": [
+        12.995046876464217,
+        25.004513656109292
+      ],
+      "values": {
+        "elevation_median_m": 665.0,
+        "slope_mean_deg": 3.8000000000000003,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 83.0,
+        "tpi_5km_m": -26.75,
+        "relief_21km_m": 137.0,
+        "tpi_21km_m": -21.75,
+        "coldest_month_air_c": 9.439999999999998,
+        "warmest_month_air_c": 30.219999999999985,
+        "annual_precip_mm": 25.6,
+        "bare_fraction": 1.0000000000000002,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 1.0
+      }
+    },
+    "hot_dry_bare--wadi_rum": {
+      "site_key": "wadi_rum",
+      "profile": "hot_dry_bare",
+      "x": 51,
+      "y": 50,
+      "center_lon_lat": [
+        35.42516072180445,
+        29.584510685491388
+      ],
+      "values": {
+        "elevation_median_m": 940.0,
+        "slope_mean_deg": 5.300000000000001,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 550.0,
+        "tpi_5km_m": -223.5,
+        "relief_21km_m": 785.0,
+        "tpi_21km_m": -71.25,
+        "coldest_month_air_c": 7.179999999999993,
+        "warmest_month_air_c": 27.230000000000004,
+        "annual_precip_mm": 40.2,
+        "bare_fraction": 1.0000000000000002,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 1.0
+      }
+    },
+    "hot_dry_bare--outback": {
+      "site_key": "outback",
+      "profile": "hot_dry_bare",
+      "x": 50,
+      "y": 50,
+      "center_lon_lat": [
+        136.9949626658931,
+        -26.99548741649273
+      ],
+      "values": {
+        "elevation_median_m": 35.0,
+        "slope_mean_deg": 0.7000000000000001,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 14.0,
+        "tpi_5km_m": 2.0,
+        "relief_21km_m": 37.0,
+        "tpi_21km_m": 2.0,
+        "coldest_month_air_c": 12.939999999999998,
+        "warmest_month_air_c": 32.969999999999985,
+        "annual_precip_mm": 135.10000000000002,
+        "bare_fraction": 0.745,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 1.0
+      }
+    },
+    "hot_dry_bare--gobi": {
+      "site_key": "gobi",
+      "profile": "hot_dry_bare",
+      "x": 50,
+      "y": 78,
+      "center_lon_lat": [
+        102.9938925925492,
+        42.752453527507306
+      ],
+      "values": {
+        "elevation_median_m": 1216.0,
+        "slope_mean_deg": 0.20000000000000004,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 20.0,
+        "tpi_5km_m": -1.75,
+        "relief_21km_m": 65.0,
+        "tpi_21km_m": -6.0,
+        "coldest_month_air_c": -12.460000000000008,
+        "warmest_month_air_c": 25.25,
+        "annual_precip_mm": 95.30000000000001,
+        "bare_fraction": 1.0000000000000002,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 3.0
+      }
+    },
+    "hot_dry_bare--almeria": {
+      "site_key": "almeria",
+      "profile": "hot_dry_bare",
+      "x": 48,
+      "y": 60,
+      "center_lon_lat": [
+        -2.428091490705292,
+        37.0143946704113
+      ],
+      "values": {
+        "elevation_median_m": 331.0,
+        "slope_mean_deg": 4.6000000000000005,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 535.0,
+        "tpi_5km_m": -77.5,
+        "relief_21km_m": 1155.0,
+        "tpi_21km_m": -176.5,
+        "coldest_month_air_c": 8.409999999999997,
+        "warmest_month_air_c": 25.679999999999993,
+        "annual_precip_mm": 237.4,
+        "bare_fraction": 0.517,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": null,
+        "permafrost_valid_fraction": 0.0,
+        "dominant_lithology_code": 8.0
+      }
+    },
+    "cold_bare_frozen--haughton": {
+      "site_key": "haughton",
+      "profile": "cold_bare_frozen",
+      "x": 51,
+      "y": 50,
+      "center_lon_lat": [
+        -89.80220795793669,
+        75.42447871106444
+      ],
+      "values": {
+        "elevation_median_m": 177.0,
+        "slope_mean_deg": 2.0,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 110.0,
+        "tpi_5km_m": -11.75,
+        "relief_21km_m": 226.0,
+        "tpi_21km_m": -33.0,
+        "coldest_month_air_c": -32.480000000000004,
+        "warmest_month_air_c": 6.230000000000004,
+        "annual_precip_mm": 321.4,
+        "bare_fraction": 0.647,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": 1.0000000000000002,
+        "permafrost_valid_fraction": 1.0000000000000002,
+        "dominant_lithology_code": 5.0
+      }
+    },
+    "cold_bare_frozen--axel_heiberg": {
+      "site_key": "axel_heiberg",
+      "profile": "cold_bare_frozen",
+      "x": 50,
+      "y": 50,
+      "center_lon_lat": [
+        -90.52434827055536,
+        79.40447711252189
+      ],
+      "values": {
+        "elevation_median_m": 262.0,
+        "slope_mean_deg": 8.9,
+        "terrain_valid_fraction": 1.0000000000000002,
+        "relief_5km_m": 528.0,
+        "tpi_5km_m": -28.75,
+        "relief_21km_m": 1316.0,
+        "tpi_21km_m": -308.75,
+        "coldest_month_air_c": -32.900000000000006,
+        "warmest_month_air_c": 2.3900000000000006,
+        "annual_precip_mm": 299.5,
+        "bare_fraction": 0.543,
+        "permanent_snow_ice_fraction": 0.0,
+        "landcover_valid_fraction": 1.0000000000000002,
+        "permafrost_fraction": 1.0000000000000002,
+        "permafrost_valid_fraction": 1.0000000000000002,
+        "dominant_lithology_code": 5.0
+      }
+    }
+  },
+  "storage": {
+    "raster_layers_relation_bytes": 1474560,
+    "raster_tiles_relation_bytes": 3710976,
+    "whole_database_bytes": 57136831
+  },
+  "limitations": [
+    "27 selected regions only; not a blind/global recovery or ranking benchmark.",
+    "Climate remains native 0.5x0.625 degree modeled climatology; no 1km climate detail.",
+    "Mean slope and bare fraction do not prove a fully flat, connected, traversable footprint.",
+    "Permafrost missingness is not observed absence. No crater, basalt, mineral or dune recognition claim."
+  ],
+  "profile_definitions": {
+    "dry_bare": {
+      "label": "Dry, bare, low mean slope",
+      "conditions": {
+        "annual_precip_mm": {
+          "max": 250
+        },
+        "warmest_month_air_c": {
+          "min": 10
+        },
+        "bare_fraction": {
+          "min": 0.5
+        },
+        "slope_mean_deg": {
+          "max": 10
+        },
+        "landcover_valid_fraction": {
+          "min": 0.8
+        },
+        "terrain_valid_fraction": {
+          "min": 0.9
+        }
+      }
+    },
+    "hot_dry_bare": {
+      "label": "Hot, dry, bare, low mean slope",
+      "conditions": {
+        "annual_precip_mm": {
+          "max": 250
+        },
+        "warmest_month_air_c": {
+          "min": 25
+        },
+        "bare_fraction": {
+          "min": 0.5
+        },
+        "slope_mean_deg": {
+          "max": 10
+        },
+        "landcover_valid_fraction": {
+          "min": 0.8
+        },
+        "terrain_valid_fraction": {
+          "min": 0.9
+        }
+      }
+    },
+    "cold_bare_frozen": {
+      "label": "Cold, bare, low mean slope, modeled frozen ground",
+      "conditions": {
+        "annual_precip_mm": {
+          "max": 500
+        },
+        "coldest_month_air_c": {
+          "max": -20
+        },
+        "warmest_month_air_c": {
+          "max": 10
+        },
+        "bare_fraction": {
+          "min": 0.5
+        },
+        "slope_mean_deg": {
+          "max": 10
+        },
+        "landcover_valid_fraction": {
+          "min": 0.8
+        },
+        "terrain_valid_fraction": {
+          "min": 0.9
+        },
+        "permafrost_fraction": {
+          "min": 0.5
+        },
+        "permafrost_valid_fraction": {
+          "min": 0.8
+        }
+      }
+    }
+  }
+}

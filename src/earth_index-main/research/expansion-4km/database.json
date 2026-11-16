@@ -1,0 +1,13 @@
+{
+  "bundle_sha256": "8a7e289743ea9a7e0a2bf4106d7a05201c5b670d741fce7ec1007b9dde9c3d39",
+  "layers": 950,
+  "valid_values": 8053312,
+  "raster_datum_bytes": 8901447,
+  "reused_layers": 0,
+  "schema": "standard PostGIS 16BUI rasters; one layer/tile per feature and area",
+  "wall_seconds": 14.823003155994229,
+  "schema_name": "raster_8a7e289743ea9a7e0a2bf4106d7a0520",
+  "datasource_id": "earth-8a7e289743ea",
+  "published": false,
+  "access_note": "Use fully qualified schema.cells through the existing SQL driver while staged; Metadata/demo datasource selection unchanged."
+}

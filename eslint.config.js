@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'src/ExploradorDeAnLogosPlanetarios-main']),
+  globalIgnores(['dist', 'src/ExploradorDeAnLogosPlanetarios-main', 'src/earth_index-main']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

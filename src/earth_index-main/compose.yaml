@@ -1,0 +1,118 @@
+name: earth-index
+
+services:
+  db:
+    profiles: [legacy, tools]
+    image: postgis/postgis:18-3.6@sha256:4a43e3c3e5d55b9208240fc71db543b79c638766280c625a425bd0a2390989c4
+    environment:
+      POSTGRES_DB: earth_index
+      POSTGRES_USER: earth_index_owner
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U earth_index_owner -d earth_index"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    shm_size: 256mb
+
+  migrate:
+    profiles: [legacy, tools]
+    build:
+      context: .
+      dockerfile: db/loader.Dockerfile
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: earth_index
+      PGUSER: earth_index_owner
+      PGPASSWORD: ${POSTGRES_PASSWORD:-}
+      API_DB_PASSWORD: ${API_DB_PASSWORD:-}
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - .:/workspace:ro
+    working_dir: /workspace
+    entrypoint: [python, db/migrate.py]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DUCKDB_PATH: /data/earth.duckdb
+      DUCKDB_THREADS: "${DUCKDB_THREADS:-8}"
+      DUCKDB_MEMORY_LIMIT: "${DUCKDB_MEMORY_LIMIT:-8GB}"
+      API_LISTEN: "0.0.0.0:8080"
+      STATEMENT_TIMEOUT_MS: "0"
+      MAX_RESPONSE_BYTES: "134217728"
+      GRPCUI_URL: "http://localhost:${GRPCUI_PORT:-8081}"
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    volumes:
+      - type: bind
+        source: ${DUCKDB_PATH:-./db/runtime/earth.duckdb}
+        target: /data/earth.duckdb
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://127.0.0.1:8080/healthz]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  grpcui:
+    image: fullstorydev/grpcui:v1.5.2@sha256:a528a3e36e075bba4b3f34b42fa437bb6eb9682be99f28c1095438d24bcfa587
+    command: ["-plaintext", "-bind", "0.0.0.0", "-port", "8080", "-max-msg-sz", "134217728", "api:8080"]
+    ports:
+      - "127.0.0.1:${GRPCUI_PORT:-8081}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  importer:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: db/importer.Dockerfile
+    user: "${IMPORT_UID:-0}:${IMPORT_GID:-0}"
+    volumes:
+      - .:/workspace:ro
+      - ./research:/workspace/research
+    working_dir: /workspace
+
+  loader:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: db/loader.Dockerfile
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: earth_index
+      PGUSER: earth_index_owner
+      PGPASSWORD: ${POSTGRES_PASSWORD:-}
+      API_DB_PASSWORD: ${API_DB_PASSWORD:-}
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - .:/workspace:ro
+      - ./research/pilots/database:/reports
+    working_dir: /workspace
+    entrypoint: [python, scripts/load_pilots.py]
+    command: [--report, /reports/load.json]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

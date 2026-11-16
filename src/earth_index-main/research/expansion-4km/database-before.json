@@ -1,0 +1,50 @@
+{
+  "datasources": [
+    [
+      "earth-3a3634580f2e",
+      "3a3634580f2ee7e5f4a5b1b7a53b9a0dd56027508775a2e2758f8c4245d66264",
+      "Earth pilot \u2014 3 patches"
+    ],
+    [
+      "earth-7a08d4fc9e93",
+      "7a08d4fc9e939a6ee7cd911446d6f76b5052172462ba796ddccc5e5ea06fd88c",
+      "Earth pilot \u2014 3 patches"
+    ],
+    [
+      "earth-a1f93b34a79e",
+      "a1f93b34a79e55e15d278e367817b9b6aa93219cb1a3b64626499f223a88b2dd",
+      "Earth pilot \u2014 27 patches"
+    ],
+    [
+      "earth-c994825c6379",
+      "c994825c6379ec01fbb007fa550218fad9f94464b83de270aa8b97e5881aebf7",
+      "Earth pilot \u2014 27 patches"
+    ]
+  ],
+  "bundles": [
+    [
+      "3a3634580f2ee7e5f4a5b1b7a53b9a0dd56027508775a2e2758f8c4245d66264",
+      48,
+      457818,
+      "c599f0e233df986bad59be2227678623"
+    ],
+    [
+      "7a08d4fc9e939a6ee7cd911446d6f76b5052172462ba796ddccc5e5ea06fd88c",
+      45,
+      428928,
+      "4c38c6b913273af1d300298cd602bb95"
+    ],
+    [
+      "a1f93b34a79e55e15d278e367817b9b6aa93219cb1a3b64626499f223a88b2dd",
+      432,
+      3954698,
+      "290cdcb7b578d94bc6321c8b02aa3909"
+    ],
+    [
+      "c994825c6379ec01fbb007fa550218fad9f94464b83de270aa8b97e5881aebf7",
+      675,
+      5819420,
+      "322fde23d07e90af2506d61d4df8cef8"
+    ]
+  ]
+}

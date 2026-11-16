@@ -1,0 +1,98 @@
+{
+  "datasource": "earth-c994825c6379",
+  "target": {
+    "body": "mars",
+    "longitude": 23.47,
+    "latitude": 0.67
+  },
+  "evidence": {
+    "measured": 5,
+    "preferences": 1,
+    "approximate": 3
+  },
+  "queryMs": 2403.643411,
+  "criteria": [
+    {
+      "key": "bare_fraction",
+      "target": 1,
+      "enabled": true,
+      "tolerance": 0.2,
+      "weight": 1,
+      "origin": "Analogue preference: favour Earth bare land (IGBP class 16). Not a planetary measurement or a land mask.",
+      "kind": "preference"
+    },
+    {
+      "key": "relief_21km_m",
+      "target": 347,
+      "enabled": true,
+      "tolerance": 150,
+      "weight": 1,
+      "origin": "Measured terrain; 1 km sample spacing. Earth uses aggregated cells.",
+      "kind": "measured"
+    },
+    {
+      "key": "relief_5km_m",
+      "target": 190,
+      "enabled": true,
+      "tolerance": 66.5,
+      "weight": 1,
+      "origin": "Measured terrain; 1 km sample spacing. Earth uses aggregated cells.",
+      "kind": "measured"
+    },
+    {
+      "key": "slope_mean_deg",
+      "target": 2.2843671293949592,
+      "enabled": true,
+      "tolerance": 2,
+      "weight": 1,
+      "origin": "Measured terrain; 1 km sample spacing. Earth uses aggregated cells.",
+      "kind": "measured"
+    },
+    {
+      "key": "surface_high_c",
+      "target": 25.657012939453125,
+      "enabled": true,
+      "tolerance": 30,
+      "weight": 0.5,
+      "kind": "approximate",
+      "origin": "Approximate thermal comparison: MODIS clear-sky 2023 composite summaries versus planetary model/composite temperatures. Overpass times and temporal definitions differ; all thermal variables share one weight family."
+    },
+    {
+      "key": "surface_low_c",
+      "target": -117.27299499511719,
+      "enabled": true,
+      "tolerance": 30,
+      "weight": 0.5,
+      "kind": "approximate",
+      "origin": "Approximate thermal comparison: MODIS clear-sky 2023 composite summaries versus planetary model/composite temperatures. Overpass times and temporal definitions differ; all thermal variables share one weight family."
+    },
+    {
+      "key": "surface_mean_c",
+      "target": -48.7542724609375,
+      "enabled": true,
+      "tolerance": 30,
+      "weight": 0.5,
+      "kind": "approximate",
+      "origin": "Approximate thermal comparison: MODIS clear-sky 2023 composite summaries versus planetary model/composite temperatures. Overpass times and temporal definitions differ; all thermal variables share one weight family."
+    },
+    {
+      "key": "tpi_21km_m",
+      "target": -25.696145124716566,
+      "enabled": true,
+      "tolerance": 75,
+      "weight": 1,
+      "origin": "Measured terrain; 1 km sample spacing. Earth uses aggregated cells.",
+      "kind": "measured"
+    },
+    {
+      "key": "tpi_5km_m",
+      "target": 16.80000000000001,
+      "enabled": true,
+      "tolerance": 25,
+      "weight": 1,
+      "origin": "Measured terrain; 1 km sample spacing. Earth uses aggregated cells.",
+      "kind": "measured"
+    }
+  ],
+  "bytes": 540000
+}

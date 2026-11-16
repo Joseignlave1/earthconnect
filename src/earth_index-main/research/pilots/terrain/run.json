@@ -1,0 +1,652 @@
+{
+  "status": "research_pilot_not_published_release",
+  "generated_at": "2026-11-14T16:44:31.980375+00:00",
+  "method_version": "native-post-support-fractional-spherical-area-horn3x3-v1",
+  "h3_resolution": 6,
+  "script_sha256": "fb7cfe080a40fb0068c31a411b79fe79476731f3da879b05dc80218ec5767a70",
+  "inventory_sha256": "4457f91b10d63a74ba8525b48d93ca91b4fa99f6396a53293265e4f75e34339a",
+  "dependencies": {
+    "rasterio": "1.5.2",
+    "gdal": "3.12.2",
+    "numpy": "2.5.4",
+    "h3": "4.5.0",
+    "exactextract": "0.3.0"
+  },
+  "total_wall_seconds": 96.55659768002806,
+  "peak_process_rss_mib": 1612.171875,
+  "sites": [
+    {
+      "site": "atacama",
+      "cells": 317,
+      "observation_rows": 3804,
+      "wall_seconds": 25.492639969976153,
+      "assets": [
+        {
+          "asset_id": "Copernicus_DSM_COG_10_S24_00_W069_00_DEM",
+          "uri": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S24_00_W069_00_DEM/Copernicus_DSM_COG_10_S24_00_W069_00_DEM.tif",
+          "etag": "\"f49d4cf92889db40b3c2a5bc6f68e695\"",
+          "etag_is_content_checksum": false,
+          "last_modified": "Mon, 09 May 2022 15:01:24 GMT",
+          "s3_version_id": "null",
+          "upstream_file_bytes": 35043329,
+          "source_shape": [
+            3600,
+            3600
+          ],
+          "block_shapes": [
+            [
+              1024,
+              1024
+            ]
+          ],
+          "source_transform": [
+            0.0002777777777777778,
+            0.0,
+            -69.00013888888888,
+            0.0,
+            -0.0002777777777777778,
+            -22.999861111111112,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "source_tags": {
+            "AREA_OR_POINT": "Point"
+          },
+          "source_nodata": null,
+          "read_window": [
+            31,
+            171,
+            3539,
+            3256
+          ],
+          "read_shape": [
+            3256,
+            3539
+          ],
+          "decoded_window_bytes": 46091936,
+          "decoded_float32_window_sha256": "b3444abd3490f1c5a8882749ef69d75382d168a9b0eb948b3bde271fd7081599",
+          "window_transform": [
+            0.0002777777777777778,
+            0.0,
+            -68.99152777777778,
+            0.0,
+            -0.0002777777777777778,
+            -23.047361111111112,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "retrieved_at": "2026-11-14T16:43:13.138859+00:00"
+        }
+      ],
+      "csv_bytes": 924987,
+      "csv_sha256": "48fd9916c46f79fb874bc508063e2964a6d1da7ca0dfb2252b87b3af7569f458",
+      "missing_observation_rows": 0,
+      "minimum_valid_area_fraction": 0.5106135311204021
+    },
+    {
+      "site": "iceland",
+      "cells": 361,
+      "observation_rows": 4332,
+      "wall_seconds": 55.318225810013246,
+      "assets": [
+        {
+          "asset_id": "Copernicus_DSM_COG_10_N64_00_W017_00_DEM",
+          "uri": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N64_00_W017_00_DEM/Copernicus_DSM_COG_10_N64_00_W017_00_DEM.tif",
+          "etag": "\"1905a35c9588b63fef3213f45bc02cb1\"",
+          "etag_is_content_checksum": false,
+          "last_modified": "Mon, 09 May 2022 14:41:24 GMT",
+          "s3_version_id": "null",
+          "upstream_file_bytes": 19059689,
+          "source_shape": [
+            3600,
+            1800
+          ],
+          "block_shapes": [
+            [
+              1024,
+              1024
+            ]
+          ],
+          "source_transform": [
+            0.0005555555555555556,
+            0.0,
+            -17.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            65.00013888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "source_tags": {
+            "AREA_OR_POINT": "Point"
+          },
+          "source_nodata": null,
+          "read_window": [
+            0,
+            0,
+            110,
+            2530
+          ],
+          "read_shape": [
+            2530,
+            110
+          ],
+          "decoded_window_bytes": 1113200,
+          "decoded_float32_window_sha256": "5b26882401fc47755c8b141a3c8fa8f16a02b5ec0989c65069d11b02432ac3c4",
+          "window_transform": [
+            0.0005555555555555556,
+            0.0,
+            -17.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            65.00013888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "retrieved_at": "2026-11-14T16:43:28.198096+00:00"
+        },
+        {
+          "asset_id": "Copernicus_DSM_COG_10_N64_00_W018_00_DEM",
+          "uri": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N64_00_W018_00_DEM/Copernicus_DSM_COG_10_N64_00_W018_00_DEM.tif",
+          "etag": "\"4b7defe01461aa22e907fb551c467f65\"",
+          "etag_is_content_checksum": false,
+          "last_modified": "Mon, 09 May 2022 14:41:24 GMT",
+          "s3_version_id": "null",
+          "upstream_file_bytes": 19512755,
+          "source_shape": [
+            3600,
+            1800
+          ],
+          "block_shapes": [
+            [
+              1024,
+              1024
+            ]
+          ],
+          "source_transform": [
+            0.0005555555555555556,
+            0.0,
+            -18.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            65.00013888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "source_tags": {
+            "AREA_OR_POINT": "Point"
+          },
+          "source_nodata": null,
+          "read_window": [
+            0,
+            0,
+            1800,
+            2529
+          ],
+          "read_shape": [
+            2529,
+            1800
+          ],
+          "decoded_window_bytes": 18208800,
+          "decoded_float32_window_sha256": "4ca493efc634caad93bbc3ca0f9fbd90bed8393d0575d3d35232731d9b40e7c1",
+          "window_transform": [
+            0.0005555555555555556,
+            0.0,
+            -18.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            65.00013888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "retrieved_at": "2026-11-14T16:43:38.339252+00:00"
+        },
+        {
+          "asset_id": "Copernicus_DSM_COG_10_N64_00_W019_00_DEM",
+          "uri": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N64_00_W019_00_DEM/Copernicus_DSM_COG_10_N64_00_W019_00_DEM.tif",
+          "etag": "\"6c2be994b49a856ea3001c0ae64d5462\"",
+          "etag_is_content_checksum": false,
+          "last_modified": "Mon, 09 May 2022 14:41:24 GMT",
+          "s3_version_id": "null",
+          "upstream_file_bytes": 19784395,
+          "source_shape": [
+            3600,
+            1800
+          ],
+          "block_shapes": [
+            [
+              1024,
+              1024
+            ]
+          ],
+          "source_transform": [
+            0.0005555555555555556,
+            0.0,
+            -19.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            65.00013888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "source_tags": {
+            "AREA_OR_POINT": "Point"
+          },
+          "source_nodata": null,
+          "read_window": [
+            0,
+            0,
+            1800,
+            2529
+          ],
+          "read_shape": [
+            2529,
+            1800
+          ],
+          "decoded_window_bytes": 18208800,
+          "decoded_float32_window_sha256": "2bebb58fcacf7fef4fe8f1a9113dbe790d0b656a5d5aff6249b666b5c67d6c79",
+          "window_transform": [
+            0.0005555555555555556,
+            0.0,
+            -19.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            65.00013888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "retrieved_at": "2026-11-14T16:43:45.956957+00:00"
+        },
+        {
+          "asset_id": "Copernicus_DSM_COG_10_N64_00_W020_00_DEM",
+          "uri": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N64_00_W020_00_DEM/Copernicus_DSM_COG_10_N64_00_W020_00_DEM.tif",
+          "etag": "\"cb7f85f0df7af3134538fc6d875e52f2\"",
+          "etag_is_content_checksum": false,
+          "last_modified": "Mon, 09 May 2022 14:41:24 GMT",
+          "s3_version_id": "null",
+          "upstream_file_bytes": 20523182,
+          "source_shape": [
+            3600,
+            1800
+          ],
+          "block_shapes": [
+            [
+              1024,
+              1024
+            ]
+          ],
+          "source_transform": [
+            0.0005555555555555556,
+            0.0,
+            -20.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            65.00013888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "source_tags": {
+            "AREA_OR_POINT": "Point"
+          },
+          "source_nodata": null,
+          "read_window": [
+            1691,
+            0,
+            109,
+            2530
+          ],
+          "read_shape": [
+            2530,
+            109
+          ],
+          "decoded_window_bytes": 1103080,
+          "decoded_float32_window_sha256": "12abe851074c904509e5eb85ea983f5ffe9de5c5858287ba25ac13b0dcef9b2e",
+          "window_transform": [
+            0.0005555555555555556,
+            0.0,
+            -19.060833333333335,
+            0.0,
+            -0.0002777777777777778,
+            65.00013888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "retrieved_at": "2026-11-14T16:43:55.309451+00:00"
+        },
+        {
+          "asset_id": "Copernicus_DSM_COG_10_N65_00_W017_00_DEM",
+          "uri": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N65_00_W017_00_DEM/Copernicus_DSM_COG_10_N65_00_W017_00_DEM.tif",
+          "etag": "\"57f21751b10a3f8634001c50a2856172\"",
+          "etag_is_content_checksum": false,
+          "last_modified": "Mon, 09 May 2022 14:42:24 GMT",
+          "s3_version_id": "null",
+          "upstream_file_bytes": 20729649,
+          "source_shape": [
+            3600,
+            1800
+          ],
+          "block_shapes": [
+            [
+              1024,
+              1024
+            ]
+          ],
+          "source_transform": [
+            0.0005555555555555556,
+            0.0,
+            -17.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            66.00013888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "source_tags": {
+            "AREA_OR_POINT": "Point"
+          },
+          "source_nodata": null,
+          "read_window": [
+            0,
+            2897,
+            124,
+            703
+          ],
+          "read_shape": [
+            703,
+            124
+          ],
+          "decoded_window_bytes": 348688,
+          "decoded_float32_window_sha256": "09e09c1e565d3cc64a16ba668e42a00db3a90c7e8f56ded345059d842890c32f",
+          "window_transform": [
+            0.0005555555555555556,
+            0.0,
+            -17.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            65.19541666666666,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "retrieved_at": "2026-11-14T16:43:59.890107+00:00"
+        },
+        {
+          "asset_id": "Copernicus_DSM_COG_10_N65_00_W018_00_DEM",
+          "uri": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N65_00_W018_00_DEM/Copernicus_DSM_COG_10_N65_00_W018_00_DEM.tif",
+          "etag": "\"20789045a7a86c151657eaf7425fcc79\"",
+          "etag_is_content_checksum": false,
+          "last_modified": "Mon, 09 May 2022 14:42:24 GMT",
+          "s3_version_id": "null",
+          "upstream_file_bytes": 21440612,
+          "source_shape": [
+            3600,
+            1800
+          ],
+          "block_shapes": [
+            [
+              1024,
+              1024
+            ]
+          ],
+          "source_transform": [
+            0.0005555555555555556,
+            0.0,
+            -18.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            66.00013888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "source_tags": {
+            "AREA_OR_POINT": "Point"
+          },
+          "source_nodata": null,
+          "read_window": [
+            0,
+            2885,
+            1800,
+            715
+          ],
+          "read_shape": [
+            715,
+            1800
+          ],
+          "decoded_window_bytes": 5148000,
+          "decoded_float32_window_sha256": "4567df2e30bc13a672060710c51a04c7d10886a43370c77c7421f69ceca8d5b5",
+          "window_transform": [
+            0.0005555555555555556,
+            0.0,
+            -18.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            65.19874999999999,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "retrieved_at": "2026-11-14T16:44:05.474253+00:00"
+        },
+        {
+          "asset_id": "Copernicus_DSM_COG_10_N65_00_W019_00_DEM",
+          "uri": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N65_00_W019_00_DEM/Copernicus_DSM_COG_10_N65_00_W019_00_DEM.tif",
+          "etag": "\"6cfb0e71f051291ce16a3aa66ecfa87d\"",
+          "etag_is_content_checksum": false,
+          "last_modified": "Mon, 09 May 2022 14:42:25 GMT",
+          "s3_version_id": "null",
+          "upstream_file_bytes": 21125058,
+          "source_shape": [
+            3600,
+            1800
+          ],
+          "block_shapes": [
+            [
+              1024,
+              1024
+            ]
+          ],
+          "source_transform": [
+            0.0005555555555555556,
+            0.0,
+            -19.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            66.00013888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "source_tags": {
+            "AREA_OR_POINT": "Point"
+          },
+          "source_nodata": null,
+          "read_window": [
+            0,
+            2885,
+            1800,
+            715
+          ],
+          "read_shape": [
+            715,
+            1800
+          ],
+          "decoded_window_bytes": 5148000,
+          "decoded_float32_window_sha256": "af4764a704119e736851c3c23f72347c8cd9a9578cbcaab28d2c3998afd607e7",
+          "window_transform": [
+            0.0005555555555555556,
+            0.0,
+            -19.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            65.19874999999999,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "retrieved_at": "2026-11-14T16:44:10.097720+00:00"
+        },
+        {
+          "asset_id": "Copernicus_DSM_COG_10_N65_00_W020_00_DEM",
+          "uri": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N65_00_W020_00_DEM/Copernicus_DSM_COG_10_N65_00_W020_00_DEM.tif",
+          "etag": "\"5e2497fc76af5a83e7090b09019a6183\"",
+          "etag_is_content_checksum": false,
+          "last_modified": "Mon, 09 May 2022 14:42:25 GMT",
+          "s3_version_id": "null",
+          "upstream_file_bytes": 20135642,
+          "source_shape": [
+            3600,
+            1800
+          ],
+          "block_shapes": [
+            [
+              1024,
+              1024
+            ]
+          ],
+          "source_transform": [
+            0.0005555555555555556,
+            0.0,
+            -20.00027777777778,
+            0.0,
+            -0.0002777777777777778,
+            66.00013888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "source_tags": {
+            "AREA_OR_POINT": "Point"
+          },
+          "source_nodata": null,
+          "read_window": [
+            1677,
+            2897,
+            123,
+            703
+          ],
+          "read_shape": [
+            703,
+            123
+          ],
+          "decoded_window_bytes": 345876,
+          "decoded_float32_window_sha256": "234d53f3ca26c943470d55559de8340d36e9193b97a12a423427b28f4708c3b8",
+          "window_transform": [
+            0.0005555555555555556,
+            0.0,
+            -19.06861111111111,
+            0.0,
+            -0.0002777777777777778,
+            65.19541666666666,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "retrieved_at": "2026-11-14T16:44:16.148238+00:00"
+        }
+      ],
+      "csv_bytes": 1064495,
+      "csv_sha256": "b5134391129b2d4c4b750c09d396e769b60a78b641c05aca4a1121ba3f276776",
+      "missing_observation_rows": 0,
+      "minimum_valid_area_fraction": 0.5215981537825565
+    },
+    {
+      "site": "sahara",
+      "cells": 281,
+      "observation_rows": 3372,
+      "wall_seconds": 15.73622439801693,
+      "assets": [
+        {
+          "asset_id": "Copernicus_DSM_COG_10_N24_00_E010_00_DEM",
+          "uri": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N24_00_E010_00_DEM/Copernicus_DSM_COG_10_N24_00_E010_00_DEM.tif",
+          "etag": "\"8697eaf90e073c96c30f7cd86eeb05e5\"",
+          "etag_is_content_checksum": false,
+          "last_modified": "Mon, 09 May 2022 14:10:14 GMT",
+          "s3_version_id": "null",
+          "upstream_file_bytes": 41439542,
+          "source_shape": [
+            3600,
+            3600
+          ],
+          "block_shapes": [
+            [
+              1024,
+              1024
+            ]
+          ],
+          "source_transform": [
+            0.0002777777777777778,
+            0.0,
+            9.99986111111111,
+            0.0,
+            -0.0002777777777777778,
+            25.000138888888888,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "source_tags": {
+            "AREA_OR_POINT": "Point"
+          },
+          "source_nodata": null,
+          "read_window": [
+            17,
+            174,
+            3567,
+            3256
+          ],
+          "read_shape": [
+            3256,
+            3567
+          ],
+          "decoded_window_bytes": 46456608,
+          "decoded_float32_window_sha256": "4e5999cb6ea157484f4d6f92fd5c7b34dc84343913ab26a3073f44d48f59620a",
+          "window_transform": [
+            0.0002777777777777778,
+            0.0,
+            10.004583333333333,
+            0.0,
+            -0.0002777777777777778,
+            24.951805555555556,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "retrieved_at": "2026-11-14T16:44:24.724766+00:00"
+        }
+      ],
+      "csv_bytes": 819888,
+      "csv_sha256": "78cd73a1372d2d334210518f3bc83e7a6e8dc9a4cbfb291dc255f73a9b32afcf",
+      "missing_observation_rows": 0,
+      "minimum_valid_area_fraction": 0.9499021032507381
+    }
+  ],
+  "source_raster_files_retained": 0,
+  "raster_scratch_bytes": 0,
+  "network_bytes": null,
+  "notes": [
+    "HTTP range reads; decoded window bytes are not measured network transfer.",
+    "Native elevation postings are treated as representative pixel-area supports; no elevation resampling.",
+    "Exact planar polygon-pixel fractions with spherical pixel-area weights, not exact ellipsoidal integration.",
+    "H3 boundary cells are summarized only over their pilot-region intersection, not the full H3 cell.",
+    "Overlapping asset supports are assigned in lexicographic asset-ID order to avoid double counting.",
+    "Horn 3x3 slope uses geodesic horizontal posting distances; asset seams/nodata neighborhoods are excluded.",
+    "Aspect components are downhill eastness/northness; slopes below 0.1 degree are excluded.",
+    "Roughness is 3x3 population height standard deviation; TPI is center minus 3x3 mean; relief is 3x3 range.",
+    "Elevation is a mixed-epoch digital surface model, metres relative to EGM2008, not a 2024 observation.",
+    "Only nodata/finite checks applied; editing/filling/error/water quality layers were not supplied by these assets.",
+    "Decoded window hashes do not authenticate the whole upstream file; full-asset checksums remain unknown.",
+    "Recomputation depends on continued availability of the provider assets."
+  ]
+}

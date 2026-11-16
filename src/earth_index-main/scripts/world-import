@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""Control the detached global import: start, status, logs, pause, resume, stop."""
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+import shutil
+
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT / 'research/world-4km'
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('action', choices=['start', 'status', 'logs', 'pause', 'resume', 'stop'])
+    parser.add_argument('--token-file', type=Path, help='Existing NASA token file; contents never appear in commands/logs')
+    args = parser.parse_args()
+    OUT.mkdir(parents=True, exist_ok=True)
+    config = OUT / 'host.json'
+    if args.token_file:
+        config.write_text(json.dumps(dict(token_file=str(args.token_file.resolve()))) + '\n')
+        config.chmod(0o600)
+    if args.action == 'pause':
+        (OUT / 'PAUSE').touch()
+        print('Pause requested. In-flight regions finish and checkpoint; new regions wait.')
+        return
+    if args.action == 'status':
+        path = OUT / 'status.json'
+        print(path.read_text() if path.exists() else 'Not started')
+        return
+    env = os.environ.copy()
+    if config.exists():
+        env['EARTHDATA_TOKEN_FILE'] = json.loads(config.read_text())['token_file']
+    compose = ['docker', 'compose', '-f', str(ROOT / 'compose.yaml'), '-f', str(ROOT / 'compose.world.yaml'), '--profile', 'world']
+    if args.action == 'logs':
+        subprocess.run(compose + ['logs', '--tail', '40', '-f', 'world-import'], cwd=ROOT, env=env, check=True)
+    elif args.action == 'stop':
+        subprocess.run(compose + ['stop', 'world-import'], cwd=ROOT, env=env, check=True)
+    else:
+        if not env.get('EARTHDATA_TOKEN_FILE') or not Path(env['EARTHDATA_TOKEN_FILE']).is_file():
+            raise SystemExit('Provide the existing NASA token file with --token-file on first start.')
+        if args.action == 'resume':
+            (OUT / 'PAUSE').unlink(missing_ok=True)
+        subprocess.run(compose + ['up', '-d', '--no-deps', 'world-import'], cwd=ROOT, env=env, check=True)
+        # Keep automatic suspend from interrupting this explicitly overnight job.
+        # The inhibitor is released when the container exits or is stopped.
+        if shutil.which('systemd-inhibit'):
+            pidfile = OUT / 'awake.pid'
+            alive = False
+            try:
+                os.kill(int(pidfile.read_text()), 0)
+                alive = True
+            except (OSError, ValueError):
+                pass
+            if not alive:
+                with (OUT / 'awake.log').open('a') as log:
+                    process = subprocess.Popen(['systemd-inhibit', '--what=sleep', '--mode=block',
+                        '--who=Earth Index', '--why=Global 4 km import',
+                        'docker', 'wait', 'earth-index-world-import-1'],
+                        stdout=log, stderr=log, start_new_session=True, cwd=ROOT)
+                pidfile.write_text(str(process.pid))
+
+
+if __name__ == '__main__':
+    main()

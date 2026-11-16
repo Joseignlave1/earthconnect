@@ -1,0 +1,26 @@
+services:
+  world-import:
+    profiles: [world]
+    image: earth-index-world-importer:latest
+    build:
+      context: .
+      dockerfile: db/world-importer.Dockerfile
+    volumes:
+      - ./research:/workspace/research
+    secrets:
+      - earthdata_token
+    working_dir: /workspace
+    init: true
+    mem_limit: 12g
+    cpus: 10
+    stop_grace_period: 3m
+    restart: on-failure:5
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"
+
+secrets:
+  earthdata_token:
+    file: ${EARTHDATA_TOKEN_FILE:-/dev/null}

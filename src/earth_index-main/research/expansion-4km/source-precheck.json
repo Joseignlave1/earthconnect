@@ -1,0 +1,314 @@
+{
+  "atacama": {
+    "stage_seconds": {
+      "terrain": 19.202995234983973,
+      "cover": 0.6470876130042598,
+      "climate": 0.4112944229855202,
+      "permafrost": 0.423485109989997,
+      "lithology": 0.010835861030500382
+    },
+    "valid": {
+      "elevation_median_m": 10000,
+      "slope_mean_deg": 10000,
+      "terrain_valid_fraction": 10000,
+      "relief_5km_m": 10000,
+      "tpi_5km_m": 10000,
+      "relief_21km_m": 10000,
+      "tpi_21km_m": 10000,
+      "bare_fraction": 9894,
+      "permanent_snow_ice_fraction": 9894,
+      "landcover_valid_fraction": 10000,
+      "coldest_month_air_c": 10000,
+      "warmest_month_air_c": 10000,
+      "annual_precip_mm": 10000,
+      "permafrost_fraction": 0,
+      "permafrost_valid_fraction": 10000,
+      "dominant_lithology_code": 9901
+    },
+    "shared_differences": {
+      "elevation_median_m": {
+        "shared": 576,
+        "p95": 0.1344702329681695,
+        "max": 0.2210405094460839
+      },
+      "slope_mean_deg": {
+        "shared": 576,
+        "p95": 0.019257695580620866,
+        "max": 0.030332322184099356
+      },
+      "terrain_valid_fraction": {
+        "shared": 576,
+        "p95": 2.220446049250313e-16,
+        "max": 2.220446049250313e-16
+      },
+      "relief_5km_m": {
+        "shared": 576,
+        "p95": 0.18002271682668436,
+        "max": 0.4646572900397814
+      },
+      "tpi_5km_m": {
+        "shared": 576,
+        "p95": 0.03532815452136617,
+        "max": 0.059305280427537355
+      },
+      "relief_21km_m": {
+        "shared": 576,
+        "p95": 0.2544585393783052,
+        "max": 0.43220376223553103
+      },
+      "tpi_21km_m": {
+        "shared": 576,
+        "p95": 0.035456355842725884,
+        "max": 0.09774614674870463
+      },
+      "coldest_month_air_c": {
+        "shared": 576,
+        "p95": 0.00041903396176801166,
+        "max": 0.0013568460184938402
+      },
+      "warmest_month_air_c": {
+        "shared": 576,
+        "p95": 0.0004350554224856751,
+        "max": 0.0010639564257424183
+      },
+      "annual_precip_mm": {
+        "shared": 576,
+        "p95": 0.037600000000011846,
+        "max": 0.037600000000011846
+      },
+      "bare_fraction": {
+        "shared": 576,
+        "p95": 2.220446049250313e-16,
+        "max": 0.00782268543847986
+      },
+      "permanent_snow_ice_fraction": {
+        "shared": 576,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "landcover_valid_fraction": {
+        "shared": 576,
+        "p95": 9.439390519228041e-09,
+        "max": 3.4189761475289515e-05
+      },
+      "permafrost_fraction": {
+        "shared": 0,
+        "p95": null,
+        "max": null
+      },
+      "permafrost_valid_fraction": {
+        "shared": 576,
+        "p95": 0.0,
+        "max": 0.0
+      }
+    }
+  },
+  "haughton": {
+    "stage_seconds": {
+      "terrain": 20.348166898009367,
+      "cover": 1.057530396967195,
+      "climate": 0.4190462420228869,
+      "permafrost": 0.5529988639755175,
+      "lithology": 0.010975760989822447
+    },
+    "valid": {
+      "elevation_median_m": 10000,
+      "slope_mean_deg": 10000,
+      "terrain_valid_fraction": 10000,
+      "relief_5km_m": 10000,
+      "tpi_5km_m": 10000,
+      "relief_21km_m": 10000,
+      "tpi_21km_m": 10000,
+      "bare_fraction": 7571,
+      "permanent_snow_ice_fraction": 7571,
+      "landcover_valid_fraction": 10000,
+      "coldest_month_air_c": 10000,
+      "warmest_month_air_c": 10000,
+      "annual_precip_mm": 10000,
+      "permafrost_fraction": 5520,
+      "permafrost_valid_fraction": 10000,
+      "dominant_lithology_code": 5175
+    },
+    "shared_differences": {
+      "elevation_median_m": {
+        "shared": 576,
+        "p95": 0.13964713800913842,
+        "max": 0.21537744303350337
+      },
+      "slope_mean_deg": {
+        "shared": 576,
+        "p95": 0.014467615999055106,
+        "max": 0.021256156602099008
+      },
+      "terrain_valid_fraction": {
+        "shared": 576,
+        "p95": 2.220446049250313e-16,
+        "max": 2.220446049250313e-16
+      },
+      "relief_5km_m": {
+        "shared": 576,
+        "p95": 0.19429109849562032,
+        "max": 0.3106732263808425
+      },
+      "tpi_5km_m": {
+        "shared": 576,
+        "p95": 0.032093796674808495,
+        "max": 0.05018142441184814
+      },
+      "relief_21km_m": {
+        "shared": 576,
+        "p95": 0.29348289092742874,
+        "max": 0.4497285681354697
+      },
+      "tpi_21km_m": {
+        "shared": 576,
+        "p95": 0.03565148943796004,
+        "max": 0.07286381041385326
+      },
+      "coldest_month_air_c": {
+        "shared": 576,
+        "p95": 0.004917340267160064,
+        "max": 0.018781495103485923
+      },
+      "warmest_month_air_c": {
+        "shared": 576,
+        "p95": 0.001826217123338969,
+        "max": 0.00656873593698748
+      },
+      "annual_precip_mm": {
+        "shared": 576,
+        "p95": 0.17141203899407742,
+        "max": 0.4003798387898314
+      },
+      "bare_fraction": {
+        "shared": 576,
+        "p95": 0.011505914083917539,
+        "max": 0.14460623913618664
+      },
+      "permanent_snow_ice_fraction": {
+        "shared": 576,
+        "p95": 0.00015550074470767165,
+        "max": 0.015189464992164316
+      },
+      "landcover_valid_fraction": {
+        "shared": 576,
+        "p95": 3.475976697536742e-05,
+        "max": 0.00013706636925903126
+      },
+      "permafrost_fraction": {
+        "shared": 535,
+        "p95": 2.220446049250313e-16,
+        "max": 4.440892098500626e-16
+      },
+      "permafrost_valid_fraction": {
+        "shared": 576,
+        "p95": 2.2244703823698364e-05,
+        "max": 0.00010344153665914346
+      }
+    }
+  },
+  "antarctica": {
+    "stage_seconds": {
+      "terrain": 21.05313037399901,
+      "cover": 1.471202037006151,
+      "climate": 0.415174126974307,
+      "permafrost": 0.5162072099628858,
+      "lithology": 0.010503051977138966
+    },
+    "valid": {
+      "elevation_median_m": 0,
+      "slope_mean_deg": 0,
+      "terrain_valid_fraction": 10000,
+      "relief_5km_m": 0,
+      "tpi_5km_m": 0,
+      "relief_21km_m": 0,
+      "tpi_21km_m": 0,
+      "bare_fraction": 179,
+      "permanent_snow_ice_fraction": 179,
+      "landcover_valid_fraction": 10000,
+      "coldest_month_air_c": 10000,
+      "warmest_month_air_c": 10000,
+      "annual_precip_mm": 10000,
+      "permafrost_fraction": 0,
+      "permafrost_valid_fraction": 10000,
+      "dominant_lithology_code": 7169
+    },
+    "shared_differences": {
+      "elevation_median_m": {
+        "shared": 0,
+        "p95": null,
+        "max": null
+      },
+      "slope_mean_deg": {
+        "shared": 0,
+        "p95": null,
+        "max": null
+      },
+      "terrain_valid_fraction": {
+        "shared": 576,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "relief_5km_m": {
+        "shared": 0,
+        "p95": null,
+        "max": null
+      },
+      "tpi_5km_m": {
+        "shared": 0,
+        "p95": null,
+        "max": null
+      },
+      "relief_21km_m": {
+        "shared": 0,
+        "p95": null,
+        "max": null
+      },
+      "tpi_21km_m": {
+        "shared": 0,
+        "p95": null,
+        "max": null
+      },
+      "coldest_month_air_c": {
+        "shared": 576,
+        "p95": 0.0012025649392510829,
+        "max": 0.023515400012506404
+      },
+      "warmest_month_air_c": {
+        "shared": 576,
+        "p95": 0.0008407315341907307,
+        "max": 0.022200414339748065
+      },
+      "annual_precip_mm": {
+        "shared": 576,
+        "p95": 0.04799999999998761,
+        "max": 0.2545867185968689
+      },
+      "bare_fraction": {
+        "shared": 11,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "permanent_snow_ice_fraction": {
+        "shared": 11,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "landcover_valid_fraction": {
+        "shared": 576,
+        "p95": 0.0,
+        "max": 0.0001390625330993378
+      },
+      "permafrost_fraction": {
+        "shared": 0,
+        "p95": null,
+        "max": null
+      },
+      "permafrost_valid_fraction": {
+        "shared": 576,
+        "p95": 0.0,
+        "max": 0.0
+      }
+    }
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "scope": "Three 100 x 100 km pilot regions only; not global ingestion",
+  "candidate_registry": "../variables/candidates.json",
+  "candidate_definitions": 91,
+  "terrain_pilot": {
+    "status": "extracted_pending_scientific_review",
+    "manifest": "terrain/run.json",
+    "candidate_to_output_mapping": {
+      "terrain.elevation": [
+        "terrain.elevation.min",
+        "terrain.elevation.mean",
+        "terrain.elevation.max",
+        "terrain.elevation.stddev"
+      ],
+      "terrain.slope": [
+        "terrain.slope.mean",
+        "terrain.slope.stddev",
+        "terrain.slope.max"
+      ],
+      "terrain.roughness": [
+        "terrain.roughness_3x3.mean"
+      ],
+      "terrain.topographic_position": [
+        "terrain.topographic_position_3x3.mean"
+      ],
+      "terrain.local_relief": [
+        "terrain.local_relief_3x3.mean"
+      ],
+      "terrain.aspect": [
+        "terrain.aspect_eastness.mean",
+        "terrain.aspect_northness.mean"
+      ]
+    },
+    "aspect_note": "Components available; no mean angle in degrees has been published.",
+    "deferred_terrain_candidates": [
+      "terrain.plan_curvature",
+      "terrain.potential_solar_exposure",
+      "terrain.profile_curvature",
+      "terrain.sky_view_factor"
+    ]
+  },
+  "temperature": {
+    "status": "extracted_pending_scientific_review",
+    "source": "MOD11A2.061",
+    "method": "native HDF4 with eight concurrent downloads and serial bounded-window decoding",
+    "manifest": "temperature-native/run.json",
+    "validation": "temperature-native/validation.json",
+    "consumer_script": "../../scripts/process_native_temperature.py",
+    "cells": 959,
+    "windows": 46,
+    "cell_window_rows": 44114,
+    "valid_feature_values": 118703,
+    "missing_feature_values": 13639,
+    "candidate_to_output_mapping": {
+      "temperature.surface.day": "day_k",
+      "temperature.surface.night": "night_k",
+      "temperature.surface.composite_day_night_difference": "paired_day_minus_night_k"
+    },
+    "optional_appeears_requests": {
+      "directory": "nasa-subsets",
+      "submitted_requests": 3,
+      "note": "Independent of completed native processing; first subset bundle lacked two daytime QA exports. No missing QA was inferred."
+    }
+  },
+  "other_candidates": {
+    "status": "catalog_discovery_only",
+    "count": 82,
+    "note": "Excludes six terrain quantities with pilot outputs/components and three processed temperature quantities; includes deferred EVI. Catalog presence is not extracted data."
+  },
+  "postgresql": {
+    "status": "loaded_verified_research_pilot",
+    "deployment": "Docker Compose with rootless Docker on this workstation",
+    "schema": "../../migrations/001_pilot_store.sql",
+    "loader": "../../scripts/load_pilots.py",
+    "report": "database/load.json",
+    "repeat_import_report": "database/reload.json",
+    "counts": {
+      "observation_rows": 143850,
+      "valid_values": 130211,
+      "explicit_missing_values": 13639,
+      "cells": 959,
+      "series": 45,
+      "time_windows": 47
+    },
+    "database_bytes_at_repeat_import": 51123903,
+    "project_tables_and_indexes_bytes_at_repeat_import": 30941184,
+    "remaining": "Rust API, published releases and remaining DESIGN.md schema capabilities"
+  },
+  "all_91_variables_processed": false,
+  "frontend_catalog": {
+    "definitions": "../../catalog/variables.json",
+    "human_list": "../../docs/VARIABLES.md",
+    "types": "../../catalog/types.ts",
+    "production_API_available": false
+  }
+}

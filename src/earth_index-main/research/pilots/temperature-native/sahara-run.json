@@ -1,0 +1,6319 @@
+{
+  "site": "sahara",
+  "status": "processed_research_pilot",
+  "input_kind": "native_hdf4",
+  "script_sha256": "982e8094a1fbe6f5e83f7b493513d66262ab993cce5ae69c489a767ce9f30526",
+  "cells_sha256": "7569a7c25d9ccf8d6e650d303d1469ab8ab68fdaf9a03f4746a8a97047a5f1ba",
+  "method_version": "mod11a2-native-hdf4-strict-qc0-fractional-area-v1",
+  "windows": 46,
+  "cells": 281,
+  "cell_window_rows": 12926,
+  "numeric_feature_slots": 38778,
+  "missing_feature_values": 71,
+  "csv_bytes": 2407965,
+  "csv_sha256": "9386ba9a09bbcc45ada8eed1096ad88d0cc194e0ec3077fed016555ed4566cfd",
+  "source_files": [
+    {
+      "nominal_date": "2024001",
+      "files": [
+        {
+          "granule_id": "G2834200830-LPCLOUD",
+          "title": "MOD11A2.A2024001.h18v06.061.2024011193907",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024001.h18v06.061.2024011193907/MOD11A2.A2024001.h18v06.061.2024011193907.hdf",
+          "file_size": 6615881,
+          "sha256": "4ba18983c893ac62828dea2cdf3b27414224c7ad11ea79591b193148e13ea9e1",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:36:54.076622+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2834205217-LPCLOUD",
+          "title": "MOD11A2.A2024001.h19v06.061.2024011194325",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024001.h19v06.061.2024011194325/MOD11A2.A2024001.h19v06.061.2024011194325.hdf",
+          "file_size": 6505413,
+          "sha256": "9fbb3a011dd5724dc6ced66341a1cc94675754ce62665efa8d72457a5d23edba",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:36:54.085985+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024009",
+      "files": [
+        {
+          "granule_id": "G2842023430-LPCLOUD",
+          "title": "MOD11A2.A2024009.h18v06.061.2024022174321",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024009.h18v06.061.2024022174321/MOD11A2.A2024009.h18v06.061.2024022174321.hdf",
+          "file_size": 6511281,
+          "sha256": "d653696b3b7bdef43a8414406b52292278694779b938bcd42cf29a8a1b7fe34e",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:36:54.075786+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2844598834-LPCLOUD",
+          "title": "MOD11A2.A2024009.h19v06.061.2024022175901",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024009.h19v06.061.2024022175901/MOD11A2.A2024009.h19v06.061.2024022175901.hdf",
+          "file_size": 6345078,
+          "sha256": "a79f06c014f05b9373c7e14d19db6f9f0ace82772ed0c754561ea43b73abfcb7",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:36:53.759179+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024017",
+      "files": [
+        {
+          "granule_id": "G2846014048-LPCLOUD",
+          "title": "MOD11A2.A2024017.h18v06.061.2024027224908",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024017.h18v06.061.2024027224908/MOD11A2.A2024017.h18v06.061.2024027224908.hdf",
+          "file_size": 6900431,
+          "sha256": "0a4b910f9770466787cc0ab6f34004ec5f311da7453ab5df9ad3539ad1362da0",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:36:58.144329+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2846008058-LPCLOUD",
+          "title": "MOD11A2.A2024017.h19v06.061.2024027224617",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024017.h19v06.061.2024027224617/MOD11A2.A2024017.h19v06.061.2024027224617.hdf",
+          "file_size": 6965107,
+          "sha256": "03ad73a1ad8f07dcce011fb915d9542dc53f0425989bc6e9811273ed21773c89",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:00.189882+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024025",
+      "files": [
+        {
+          "granule_id": "G2855997877-LPCLOUD",
+          "title": "MOD11A2.A2024025.h18v06.061.2024038091255",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024025.h18v06.061.2024038091255/MOD11A2.A2024025.h18v06.061.2024038091255.hdf",
+          "file_size": 6013545,
+          "sha256": "c965234422027d761929540d79846b81f731b1eae6ff4e47ac6bc0f985210ab3",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:36:59.565539+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2855987515-LPCLOUD",
+          "title": "MOD11A2.A2024025.h19v06.061.2024038090901",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024025.h19v06.061.2024038090901/MOD11A2.A2024025.h19v06.061.2024038090901.hdf",
+          "file_size": 6492848,
+          "sha256": "2c97e211409e09edab57a8701c2c39b6e0c9055d502695ba9a7a171cfe830aea",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:36:59.885161+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024033",
+      "files": [
+        {
+          "granule_id": "G2863968749-LPCLOUD",
+          "title": "MOD11A2.A2024033.h18v06.061.2024044095150",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024033.h18v06.061.2024044095150/MOD11A2.A2024033.h18v06.061.2024044095150.hdf",
+          "file_size": 6412996,
+          "sha256": "43c83e43a18b7e83cbd3f01b2eeedf845f45a9e151ef3eca21a29cc18e5031e8",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:02.435504+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2863780915-LPCLOUD",
+          "title": "MOD11A2.A2024033.h19v06.061.2024044083147",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024033.h19v06.061.2024044083147/MOD11A2.A2024033.h19v06.061.2024044083147.hdf",
+          "file_size": 6216512,
+          "sha256": "619e07ec43314fd49d086c1f0408868044afdf716bde6f45f960741637c1bbc5",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:05.660950+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024041",
+      "files": [
+        {
+          "granule_id": "G2871716132-LPCLOUD",
+          "title": "MOD11A2.A2024041.h18v06.061.2024051155510",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024041.h18v06.061.2024051155510/MOD11A2.A2024041.h18v06.061.2024051155510.hdf",
+          "file_size": 6268755,
+          "sha256": "574dd796ab7213c851c64f6ecc52e3f81e52003066136df36331b0cfdf434281",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:05.543891+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2871716083-LPCLOUD",
+          "title": "MOD11A2.A2024041.h19v06.061.2024051155502",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024041.h19v06.061.2024051155502/MOD11A2.A2024041.h19v06.061.2024051155502.hdf",
+          "file_size": 6290923,
+          "sha256": "10af3bab618643aba115b4cef472bd7ecedd8e92c81b1e9da563a5e54a3219e6",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:05.527362+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024049",
+      "files": [
+        {
+          "granule_id": "G2882702340-LPCLOUD",
+          "title": "MOD11A2.A2024049.h18v06.061.2024061081406",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024049.h18v06.061.2024061081406/MOD11A2.A2024049.h18v06.061.2024061081406.hdf",
+          "file_size": 5994883,
+          "sha256": "f4b637043810a627bc271b6a6f3cd3996fbde75bf0697070902ee1180d25a98e",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:06.820237+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2882718779-LPCLOUD",
+          "title": "MOD11A2.A2024049.h19v06.061.2024061081417",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024049.h19v06.061.2024061081417/MOD11A2.A2024049.h19v06.061.2024061081417.hdf",
+          "file_size": 6234606,
+          "sha256": "c11d34689a30c346f4bd06d5511046da79fae90bdccedefc7f28bb6c80fd918e",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:09.930317+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024057",
+      "files": [
+        {
+          "granule_id": "G2887406510-LPCLOUD",
+          "title": "MOD11A2.A2024057.h18v06.061.2024066120013",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024057.h18v06.061.2024066120013/MOD11A2.A2024057.h18v06.061.2024066120013.hdf",
+          "file_size": 6240826,
+          "sha256": "2c7f5c4e43c85712e248c9d26fa71bbf95c8506bc55cec0ca22c8f8525451b58",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:09.778982+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2887406396-LPCLOUD",
+          "title": "MOD11A2.A2024057.h19v06.061.2024066120138",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024057.h19v06.061.2024066120138/MOD11A2.A2024057.h19v06.061.2024066120138.hdf",
+          "file_size": 5987527,
+          "sha256": "4630e4c89196a2fabc4353f47bd55cf6cecab2309f514f1cb5058df89dce4e98",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:11.102440+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024065",
+      "files": [
+        {
+          "granule_id": "G2896383567-LPCLOUD",
+          "title": "MOD11A2.A2024065.h18v06.061.2024074032846",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024065.h18v06.061.2024074032846/MOD11A2.A2024065.h18v06.061.2024074032846.hdf",
+          "file_size": 6296248,
+          "sha256": "82313a9445132f242da8d4b993cc81e8a23fb6aa1f0b447966e346a1426558f3",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:12.224586+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2896415459-LPCLOUD",
+          "title": "MOD11A2.A2024065.h19v06.061.2024074033141",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024065.h19v06.061.2024074033141/MOD11A2.A2024065.h19v06.061.2024074033141.hdf",
+          "file_size": 6333313,
+          "sha256": "af0645734adf832b44cb65cb17378bdc19c411d5770cbcb7c516aa066896184e",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:13.982931+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024073",
+      "files": [
+        {
+          "granule_id": "G2910019471-LPCLOUD",
+          "title": "MOD11A2.A2024073.h18v06.061.2024085211827",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024073.h18v06.061.2024085211827/MOD11A2.A2024073.h18v06.061.2024085211827.hdf",
+          "file_size": 6049715,
+          "sha256": "9fd49b25fb881aebb3dd690fe97271ac79af5642cf2b1a5fe3c35a3e3a32773f",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:14.935518+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2910027214-LPCLOUD",
+          "title": "MOD11A2.A2024073.h19v06.061.2024085213645",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024073.h19v06.061.2024085213645/MOD11A2.A2024073.h19v06.061.2024085213645.hdf",
+          "file_size": 6366477,
+          "sha256": "88c4d3c6f5a740349a0c91d91b1e0cfde946119d1d63de690f4df925e0859e53",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:15.381488+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024081",
+      "files": [
+        {
+          "granule_id": "G2919424996-LPCLOUD",
+          "title": "MOD11A2.A2024081.h18v06.061.2024094201748",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024081.h18v06.061.2024094201748/MOD11A2.A2024081.h18v06.061.2024094201748.hdf",
+          "file_size": 6557433,
+          "sha256": "aa8a2130e679767d61e24be9527432166c21307f70043103c042edf6f14714e7",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:16.573950+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2919424999-LPCLOUD",
+          "title": "MOD11A2.A2024081.h19v06.061.2024094202005",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024081.h19v06.061.2024094202005/MOD11A2.A2024081.h19v06.061.2024094202005.hdf",
+          "file_size": 6428674,
+          "sha256": "26800c811b768a431cece107fb952fc1369dabb1dba9f1f10e43e707892ce30e",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:17.484797+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024089",
+      "files": [
+        {
+          "granule_id": "G2926426031-LPCLOUD",
+          "title": "MOD11A2.A2024089.h18v06.061.2024099144143",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024089.h18v06.061.2024099144143/MOD11A2.A2024089.h18v06.061.2024099144143.hdf",
+          "file_size": 6226885,
+          "sha256": "7a1166c53a5422d0a565326205aabcfed27a59262c609acd15adc2e77e2f26c0",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:19.142594+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2926792179-LPCLOUD",
+          "title": "MOD11A2.A2024089.h19v06.061.2024099145248",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024089.h19v06.061.2024099145248/MOD11A2.A2024089.h19v06.061.2024099145248.hdf",
+          "file_size": 5973331,
+          "sha256": "3b78c628e01b909a0de5542e940f1a9cb060ed58fcbaea10685a6580a6520209",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:19.668493+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024097",
+      "files": [
+        {
+          "granule_id": "G2935357407-LPCLOUD",
+          "title": "MOD11A2.A2024097.h18v06.061.2024106140451",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024097.h18v06.061.2024106140451/MOD11A2.A2024097.h18v06.061.2024106140451.hdf",
+          "file_size": 6498807,
+          "sha256": "523957924455ce6ad46982e624654ae5a24e5ee2a941b0e7f5b937767ef006c6",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:21.294870+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2935352150-LPCLOUD",
+          "title": "MOD11A2.A2024097.h19v06.061.2024106140402",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024097.h19v06.061.2024106140402/MOD11A2.A2024097.h19v06.061.2024106140402.hdf",
+          "file_size": 6551469,
+          "sha256": "21fc6027a265013a82d1b74008d2f17d67bf9d1a6851baa5368f6071fdce1e4b",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:21.751569+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024105",
+      "files": [
+        {
+          "granule_id": "G2951028899-LPCLOUD",
+          "title": "MOD11A2.A2024105.h18v06.061.2024115215731",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024105.h18v06.061.2024115215731/MOD11A2.A2024105.h18v06.061.2024115215731.hdf",
+          "file_size": 6311803,
+          "sha256": "04e225f64ef07972b2bdf3189e63fe900f461341b71c199157bc238b8608f030",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:23.924230+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2951034394-LPCLOUD",
+          "title": "MOD11A2.A2024105.h19v06.061.2024115213731",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024105.h19v06.061.2024115213731/MOD11A2.A2024105.h19v06.061.2024115213731.hdf",
+          "file_size": 6224696,
+          "sha256": "a93b2e133fa2f49fe358b51c19c636cf2acef7cada5392607c5a6605eac9c55b",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:24.127020+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024113",
+      "files": [
+        {
+          "granule_id": "G2964301316-LPCLOUD",
+          "title": "MOD11A2.A2024113.h18v06.061.2024122115132",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024113.h18v06.061.2024122115132/MOD11A2.A2024113.h18v06.061.2024122115132.hdf",
+          "file_size": 6469586,
+          "sha256": "287b82e91641458c2b1f13f1cf672b6d6974489087102413a4fb75719e2fb9cd",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:25.894338+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2964308300-LPCLOUD",
+          "title": "MOD11A2.A2024113.h19v06.061.2024122115100",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024113.h19v06.061.2024122115100/MOD11A2.A2024113.h19v06.061.2024122115100.hdf",
+          "file_size": 6453319,
+          "sha256": "d86a3c48f55ad9fecac0177541dac6da8d340d3c7f862495f9da253509546113",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:25.382348+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024121",
+      "files": [
+        {
+          "granule_id": "G2994989304-LPCLOUD",
+          "title": "MOD11A2.A2024121.h18v06.061.2024132012133",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024121.h18v06.061.2024132012133/MOD11A2.A2024121.h18v06.061.2024132012133.hdf",
+          "file_size": 7274460,
+          "sha256": "7611e24066f911db20165c249ef2262946eeeb875419aaabf9791df459369e59",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:27.898534+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G2994977261-LPCLOUD",
+          "title": "MOD11A2.A2024121.h19v06.061.2024132011649",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024121.h19v06.061.2024132011649/MOD11A2.A2024121.h19v06.061.2024132011649.hdf",
+          "file_size": 6869780,
+          "sha256": "11a3205ea44e771e46ac0599dde06e07ee55dfb0a5e7b15b5c43274965b88610",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:28.451457+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024129",
+      "files": [
+        {
+          "granule_id": "G3059196040-LPCLOUD",
+          "title": "MOD11A2.A2024129.h18v06.061.2024154010749",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024129.h18v06.061.2024154010749/MOD11A2.A2024129.h18v06.061.2024154010749.hdf",
+          "file_size": 6349948,
+          "sha256": "051ee61d12c0d4810b970efc8eaba4ad4ab0c7fecb479a11301605ede93ecac3",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:29.428826+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3055201120-LPCLOUD",
+          "title": "MOD11A2.A2024129.h19v06.061.2024154010808",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024129.h19v06.061.2024154010808/MOD11A2.A2024129.h19v06.061.2024154010808.hdf",
+          "file_size": 6147541,
+          "sha256": "301368548115c820830d5d32f585259ec2689d02d38146a7e415ff7263f415d2",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:30.515377+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024137",
+      "files": [
+        {
+          "granule_id": "G3038918175-LPCLOUD",
+          "title": "MOD11A2.A2024137.h18v06.061.2024148190237",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024137.h18v06.061.2024148190237/MOD11A2.A2024137.h18v06.061.2024148190237.hdf",
+          "file_size": 7030757,
+          "sha256": "b7353fe79dd3bb96718f993cb842c6cca67f4b3153486d64c9987530e08057c3",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:31.631616+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3038929168-LPCLOUD",
+          "title": "MOD11A2.A2024137.h19v06.061.2024148190603",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024137.h19v06.061.2024148190603/MOD11A2.A2024137.h19v06.061.2024148190603.hdf",
+          "file_size": 6278101,
+          "sha256": "8c1543ae12d37aeb7af8e4c2cc5148931f2a2dcf83110e8383f94c5062341850",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:32.396806+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024145",
+      "files": [
+        {
+          "granule_id": "G3068985361-LPCLOUD",
+          "title": "MOD11A2.A2024145.h18v06.061.2024157203755",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024145.h18v06.061.2024157203755/MOD11A2.A2024145.h18v06.061.2024157203755.hdf",
+          "file_size": 6617747,
+          "sha256": "3506076f78182770db019ea1e85c2d2838189c32deaaa90292a6b9cbb62e3afd",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:33.626220+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3068985052-LPCLOUD",
+          "title": "MOD11A2.A2024145.h19v06.061.2024157203733",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024145.h19v06.061.2024157203733/MOD11A2.A2024145.h19v06.061.2024157203733.hdf",
+          "file_size": 6822046,
+          "sha256": "83d73628ca922cd35ccd20acba3f83db1684a65c67d9013e16275f0c782a7b7f",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:34.196126+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024153",
+      "files": [
+        {
+          "granule_id": "G3082687849-LPCLOUD",
+          "title": "MOD11A2.A2024153.h18v06.061.2024162202827",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024153.h18v06.061.2024162202827/MOD11A2.A2024153.h18v06.061.2024162202827.hdf",
+          "file_size": 6934944,
+          "sha256": "83ac5c5fb1f67189fcbf843f264dea56ee5e799ac3654d2be7a06ff273d02d32",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:36.703847+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3082675463-LPCLOUD",
+          "title": "MOD11A2.A2024153.h19v06.061.2024162202646",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024153.h19v06.061.2024162202646/MOD11A2.A2024153.h19v06.061.2024162202646.hdf",
+          "file_size": 6403807,
+          "sha256": "5158bdbbb91b6607b89164b34a14a8f671ac8595af904f912df40f850646c230",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:36.997870+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024161",
+      "files": [
+        {
+          "granule_id": "G3123398823-LPCLOUD",
+          "title": "MOD11A2.A2024161.h18v06.061.2024175161253",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024161.h18v06.061.2024175161253/MOD11A2.A2024161.h18v06.061.2024175161253.hdf",
+          "file_size": 6497145,
+          "sha256": "13c475228f316a7bbd4f42a993fa32af85a2803d54161c8bbb29e535ddc87073",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:37.869519+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3123446420-LPCLOUD",
+          "title": "MOD11A2.A2024161.h19v06.061.2024175162023",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024161.h19v06.061.2024175162023/MOD11A2.A2024161.h19v06.061.2024175162023.hdf",
+          "file_size": 5673948,
+          "sha256": "af6ee009990eaace0ce3a0088c81b6f1e234d4789f5c89b5cc50032e1242f3fc",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:38.152475+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024169",
+      "files": [
+        {
+          "granule_id": "G3137706487-LPCLOUD",
+          "title": "MOD11A2.A2024169.h18v06.061.2024181125949",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024169.h18v06.061.2024181125949/MOD11A2.A2024169.h18v06.061.2024181125949.hdf",
+          "file_size": 6738170,
+          "sha256": "9267b94a25b403580de8d1a9f472a55286f36588a7960e8e0dea55da34cb1f86",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:40.763699+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3137705957-LPCLOUD",
+          "title": "MOD11A2.A2024169.h19v06.061.2024181130610",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024169.h19v06.061.2024181130610/MOD11A2.A2024169.h19v06.061.2024181130610.hdf",
+          "file_size": 5691818,
+          "sha256": "c050bbd65646bcd5601d3d52b2e12cc9cb4eaebb92c2f584511fd8a5a789401d",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:41.045743+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024177",
+      "files": [
+        {
+          "granule_id": "G3145217381-LPCLOUD",
+          "title": "MOD11A2.A2024177.h18v06.061.2024186043446",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024177.h18v06.061.2024186043446/MOD11A2.A2024177.h18v06.061.2024186043446.hdf",
+          "file_size": 6264127,
+          "sha256": "971e62cf4f82fdd00cd7a7ac5e94e23b77b18e04bfa3ea77f49d9d5b418b7a0c",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:41.613459+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3145221139-LPCLOUD",
+          "title": "MOD11A2.A2024177.h19v06.061.2024186043728",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024177.h19v06.061.2024186043728/MOD11A2.A2024177.h19v06.061.2024186043728.hdf",
+          "file_size": 5666293,
+          "sha256": "7bd4d31d9ea128ae12f793ba485546e5e33a2cd0eabe31f0c3a365c560c02255",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:42.310593+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024185",
+      "files": [
+        {
+          "granule_id": "G3157390365-LPCLOUD",
+          "title": "MOD11A2.A2024185.h18v06.061.2024195062407",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024185.h18v06.061.2024195062407/MOD11A2.A2024185.h18v06.061.2024195062407.hdf",
+          "file_size": 6183047,
+          "sha256": "ba3b7e65c832994d450110ebebff29bf44df22bd488849ac4fe5f91e50cdf7e0",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:44.551892+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3157361931-LPCLOUD",
+          "title": "MOD11A2.A2024185.h19v06.061.2024195060917",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024185.h19v06.061.2024195060917/MOD11A2.A2024185.h19v06.061.2024195060917.hdf",
+          "file_size": 5679977,
+          "sha256": "ed61a688dc024ceaeafdc7e015c6935d093aa836544ec86fd2d1d8b1dec2d376",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:45.256551+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024193",
+      "files": [
+        {
+          "granule_id": "G3167861149-LPCLOUD",
+          "title": "MOD11A2.A2024193.h18v06.061.2024202041829",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024193.h18v06.061.2024202041829/MOD11A2.A2024193.h18v06.061.2024202041829.hdf",
+          "file_size": 6419022,
+          "sha256": "5d211542dab555db78f9397f1fd9aa8789958d84305bea809c4436cb1bc86f19",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:47.312495+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3167866726-LPCLOUD",
+          "title": "MOD11A2.A2024193.h19v06.061.2024202043126",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024193.h19v06.061.2024202043126/MOD11A2.A2024193.h19v06.061.2024202043126.hdf",
+          "file_size": 5832150,
+          "sha256": "f7558953753eb95ea4294c2e7223c0d948fede1c748b1cbe69284efd8535a9c0",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:47.238944+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024201",
+      "files": [
+        {
+          "granule_id": "G3177872464-LPCLOUD",
+          "title": "MOD11A2.A2024201.h18v06.061.2024211133250",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024201.h18v06.061.2024211133250/MOD11A2.A2024201.h18v06.061.2024211133250.hdf",
+          "file_size": 6107626,
+          "sha256": "b252c38099a2236510b0aed44299a484d15bc938db5e8e70ebf0ab05e02c3846",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:48.814121+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3177870905-LPCLOUD",
+          "title": "MOD11A2.A2024201.h19v06.061.2024211133143",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024201.h19v06.061.2024211133143/MOD11A2.A2024201.h19v06.061.2024211133143.hdf",
+          "file_size": 5874894,
+          "sha256": "7885d35563d415ad3f7a3298ad744427df198ad2d118ef6db4d4ee039dd7f4cb",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:49.015329+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024209",
+      "files": [
+        {
+          "granule_id": "G3189244152-LPCLOUD",
+          "title": "MOD11A2.A2024209.h18v06.061.2024222024429",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024209.h18v06.061.2024222024429/MOD11A2.A2024209.h18v06.061.2024222024429.hdf",
+          "file_size": 6297511,
+          "sha256": "d3adf67ce24b18348690580a78ddffc2d5774591807b17532deaef7a11626007",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:50.922693+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3189253808-LPCLOUD",
+          "title": "MOD11A2.A2024209.h19v06.061.2024222024758",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024209.h19v06.061.2024222024758/MOD11A2.A2024209.h19v06.061.2024222024758.hdf",
+          "file_size": 5869590,
+          "sha256": "8203426b2b8955c26eecc18d677bf08cae3ac504d3d750f489cf3e7b78623cfc",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:51.174293+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024217",
+      "files": [
+        {
+          "granule_id": "G3197472047-LPCLOUD",
+          "title": "MOD11A2.A2024217.h18v06.061.2024228063418",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024217.h18v06.061.2024228063418/MOD11A2.A2024217.h18v06.061.2024228063418.hdf",
+          "file_size": 6137811,
+          "sha256": "61d987b2aca82500bcd936152ab881aed602774d7ca146e65d0fb09763f5ec39",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:52.504026+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3197477258-LPCLOUD",
+          "title": "MOD11A2.A2024217.h19v06.061.2024228063405",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024217.h19v06.061.2024228063405/MOD11A2.A2024217.h19v06.061.2024228063405.hdf",
+          "file_size": 6221698,
+          "sha256": "3f75851eabde583961807d7800bbef50d0856ce15c8002f211c3d335a8e51f33",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:52.938727+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024225",
+      "files": [
+        {
+          "granule_id": "G3214216857-LPCLOUD",
+          "title": "MOD11A2.A2024225.h18v06.061.2024240011535",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024225.h18v06.061.2024240011535/MOD11A2.A2024225.h18v06.061.2024240011535.hdf",
+          "file_size": 6862825,
+          "sha256": "a8e357579b0c780dfc34effdbaef47378fffcbec07641a821b6b8de859ed23d8",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:55.417114+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3214222072-LPCLOUD",
+          "title": "MOD11A2.A2024225.h19v06.061.2024240011912",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024225.h19v06.061.2024240011912/MOD11A2.A2024225.h19v06.061.2024240011912.hdf",
+          "file_size": 6645828,
+          "sha256": "bbd3f5e47bf866d3ad973452113b51c4ffe9334c8ff2f8dd5cc0e435b1f14c2c",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:54.891894+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024233",
+      "files": [
+        {
+          "granule_id": "G3232469452-LPCLOUD",
+          "title": "MOD11A2.A2024233.h18v06.061.2024247153147",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024233.h18v06.061.2024247153147/MOD11A2.A2024233.h18v06.061.2024247153147.hdf",
+          "file_size": 6253546,
+          "sha256": "582e2cff4cd42ad3a6abfed705c731f0c9c3b8a5670a39d9e7be1fe0c361c884",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:56.752474+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3232472543-LPCLOUD",
+          "title": "MOD11A2.A2024233.h19v06.061.2024247153546",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024233.h19v06.061.2024247153546/MOD11A2.A2024233.h19v06.061.2024247153546.hdf",
+          "file_size": 6040982,
+          "sha256": "c7d4982cac0314abc1f85c350561657172a6de7320c54cd69b3ce9daa94159b2",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:57.116309+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024241",
+      "files": [
+        {
+          "granule_id": "G3229649687-LPCLOUD",
+          "title": "MOD11A2.A2024241.h18v06.061.2024250053138",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024241.h18v06.061.2024250053138/MOD11A2.A2024241.h18v06.061.2024250053138.hdf",
+          "file_size": 6792209,
+          "sha256": "0377ce1a590685f4a9a2098635f4d8887ab7a1398ea4b0fa73e9d6a194ed8f8c",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:59.063473+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3229657187-LPCLOUD",
+          "title": "MOD11A2.A2024241.h19v06.061.2024250060738",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024241.h19v06.061.2024250060738/MOD11A2.A2024241.h19v06.061.2024250060738.hdf",
+          "file_size": 7095397,
+          "sha256": "94728eea8b6f22576e5ed40c3df5e5d3fd717490b60b522bf954a9a011890cc8",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:37:59.818148+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024249",
+      "files": [
+        {
+          "granule_id": "G3238438088-LPCLOUD",
+          "title": "MOD11A2.A2024249.h18v06.061.2024258082507",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024249.h18v06.061.2024258082507/MOD11A2.A2024249.h18v06.061.2024258082507.hdf",
+          "file_size": 7312882,
+          "sha256": "2e6d23e73232f9cbc29d0715d849111a3eb5fd588e15b95eb6921183a3eb742a",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:01.159329+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3238448274-LPCLOUD",
+          "title": "MOD11A2.A2024249.h19v06.061.2024258083739",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024249.h19v06.061.2024258083739/MOD11A2.A2024249.h19v06.061.2024258083739.hdf",
+          "file_size": 6932717,
+          "sha256": "e74acc944f3b17f5ca2726e98436df9c1253d7485ce6b6b5507939be1230d788",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:00.951307+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024257",
+      "files": [
+        {
+          "granule_id": "G3247980896-LPCLOUD",
+          "title": "MOD11A2.A2024257.h18v06.061.2024268161247",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024257.h18v06.061.2024268161247/MOD11A2.A2024257.h18v06.061.2024268161247.hdf",
+          "file_size": 7224788,
+          "sha256": "f00c808ecb9aab993b3952dd58c14e2ee67999d09c8b902dd0a45c78f212d9a5",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:02.870401+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3247983020-LPCLOUD",
+          "title": "MOD11A2.A2024257.h19v06.061.2024268161420",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024257.h19v06.061.2024268161420/MOD11A2.A2024257.h19v06.061.2024268161420.hdf",
+          "file_size": 6541069,
+          "sha256": "b17a5cbab11be10d4a90d997eaf72e8c8da5a120afa26e93331f8c63dce989f3",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:04.181191+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024265",
+      "files": [
+        {
+          "granule_id": "G3254901721-LPCLOUD",
+          "title": "MOD11A2.A2024265.h18v06.061.2024275155212",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024265.h18v06.061.2024275155212/MOD11A2.A2024265.h18v06.061.2024275155212.hdf",
+          "file_size": 6861016,
+          "sha256": "204573e4426a226a2dd4cf8a4544739fe09a0c6ba195a92f40fba5df3992a6f2",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:05.117129+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3254902537-LPCLOUD",
+          "title": "MOD11A2.A2024265.h19v06.061.2024275155310",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024265.h19v06.061.2024275155310/MOD11A2.A2024265.h19v06.061.2024275155310.hdf",
+          "file_size": 6019222,
+          "sha256": "13e5cafd69f02bb9719984299be71f419f9c765ba9f0537b732dc8fd91518701",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:05.414597+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024273",
+      "files": [
+        {
+          "granule_id": "G3263619162-LPCLOUD",
+          "title": "MOD11A2.A2024273.h18v06.061.2024283221209",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024273.h18v06.061.2024283221209/MOD11A2.A2024273.h18v06.061.2024283221209.hdf",
+          "file_size": 6246275,
+          "sha256": "e7e3500f74ab14280fde611ed03db15b95ec5cd574461c78c7c1ae1f144a3168",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:06.846164+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3263762812-LPCLOUD",
+          "title": "MOD11A2.A2024273.h19v06.061.2024283221305",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024273.h19v06.061.2024283221305/MOD11A2.A2024273.h19v06.061.2024283221305.hdf",
+          "file_size": 5816564,
+          "sha256": "a501d4095484ce9773aa3cf83004536a337efc5d1027788fc6da8d7a84345ade",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:08.079223+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024281",
+      "files": [
+        {
+          "granule_id": "G3268126681-LPCLOUD",
+          "title": "MOD11A2.A2024281.h18v06.061.2024290062945",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024281.h18v06.061.2024290062945/MOD11A2.A2024281.h18v06.061.2024290062945.hdf",
+          "file_size": 6837816,
+          "sha256": "5f47265340d05eaaabfe0266993e4307fbe485cba61d7b5bc0673b3cea7005ac",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:09.703889+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3268132115-LPCLOUD",
+          "title": "MOD11A2.A2024281.h19v06.061.2024290063757",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024281.h19v06.061.2024290063757/MOD11A2.A2024281.h19v06.061.2024290063757.hdf",
+          "file_size": 5810361,
+          "sha256": "a9ec54db105929d43613f4d5ec9e350c168799572bcade69f0f8f7f8d68acbfc",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:10.001397+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024289",
+      "files": [
+        {
+          "granule_id": "G3274657412-LPCLOUD",
+          "title": "MOD11A2.A2024289.h18v06.061.2024298145333",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024289.h18v06.061.2024298145333/MOD11A2.A2024289.h18v06.061.2024298145333.hdf",
+          "file_size": 6752163,
+          "sha256": "ba8a7416bdfbf10824f714e941d464a71346edb7e3534d382204697515f1333e",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:10.917897+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3274657235-LPCLOUD",
+          "title": "MOD11A2.A2024289.h19v06.061.2024298145550",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024289.h19v06.061.2024298145550/MOD11A2.A2024289.h19v06.061.2024298145550.hdf",
+          "file_size": 5966654,
+          "sha256": "7c3fe8a22c7c1d43b0c8aeedd8ab236783fe37d399e6dd60a289ab3e16372c71",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:11.803913+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024297",
+      "files": [
+        {
+          "granule_id": "G3284278248-LPCLOUD",
+          "title": "MOD11A2.A2024297.h18v06.061.2024306220916",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024297.h18v06.061.2024306220916/MOD11A2.A2024297.h18v06.061.2024306220916.hdf",
+          "file_size": 6822652,
+          "sha256": "911fd29239311347fa3ad2e4796a5953b1c4064522deba69d6c3201120c03f9c",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:13.222569+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3284261821-LPCLOUD",
+          "title": "MOD11A2.A2024297.h19v06.061.2024306220033",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024297.h19v06.061.2024306220033/MOD11A2.A2024297.h19v06.061.2024306220033.hdf",
+          "file_size": 5870955,
+          "sha256": "6b466ce46401f96d5aa28af9017f5d457e08cc65c63829a0ebb8c7526f5c8011",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:13.821853+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024305",
+      "files": [
+        {
+          "granule_id": "G3292179640-LPCLOUD",
+          "title": "MOD11A2.A2024305.h18v06.061.2024317192711",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024305.h18v06.061.2024317192711/MOD11A2.A2024305.h18v06.061.2024317192711.hdf",
+          "file_size": 6457528,
+          "sha256": "c990ccf2a4e6f623b661fd6cdf78352d80558cef77f11f9788a5eb803a26c0ae",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:15.086487+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3292175965-LPCLOUD",
+          "title": "MOD11A2.A2024305.h19v06.061.2024317192246",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024305.h19v06.061.2024317192246/MOD11A2.A2024305.h19v06.061.2024317192246.hdf",
+          "file_size": 6075840,
+          "sha256": "018e4581090bda86895d7a20a9f72d452b211ca2002dafedeaae78256d5abe2a",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:16.490024+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024313",
+      "files": [
+        {
+          "granule_id": "G3303759100-LPCLOUD",
+          "title": "MOD11A2.A2024313.h18v06.061.2024327015423",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024313.h18v06.061.2024327015423/MOD11A2.A2024313.h18v06.061.2024327015423.hdf",
+          "file_size": 6302093,
+          "sha256": "9d0545b096b6998e41f5999d11e707723a68e011c2e64c9ec15a143e8a51b66d",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:16.816719+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3303759047-LPCLOUD",
+          "title": "MOD11A2.A2024313.h19v06.061.2024327020019",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024313.h19v06.061.2024327020019/MOD11A2.A2024313.h19v06.061.2024327020019.hdf",
+          "file_size": 6074860,
+          "sha256": "c0d2ced47484a283177a7e5f604fda3e25a15cb7afcfac89a6fe65032fe2e91a",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:17.819235+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024321",
+      "files": [
+        {
+          "granule_id": "G3313931772-LPCLOUD",
+          "title": "MOD11A2.A2024321.h18v06.061.2024337170753",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024321.h18v06.061.2024337170753/MOD11A2.A2024321.h18v06.061.2024337170753.hdf",
+          "file_size": 6481094,
+          "sha256": "390287cc673b1f01221a56ce1f3fd4148c2b4524b15e2a79b44864c752aed734",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:19.046423+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3313932403-LPCLOUD",
+          "title": "MOD11A2.A2024321.h19v06.061.2024337170711",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024321.h19v06.061.2024337170711/MOD11A2.A2024321.h19v06.061.2024337170711.hdf",
+          "file_size": 6003199,
+          "sha256": "4ed4b8e0f28e912add564a3d2aaea296f5c03bb968e883d99b69a3829c7d63ed",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:19.995347+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024329",
+      "files": [
+        {
+          "granule_id": "G3314391999-LPCLOUD",
+          "title": "MOD11A2.A2024329.h18v06.061.2024338044005",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024329.h18v06.061.2024338044005/MOD11A2.A2024329.h18v06.061.2024338044005.hdf",
+          "file_size": 6319908,
+          "sha256": "b7b3c815dd08f32c69421f231d36679d1793256fb81b053d4466cecebcb3ef13",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:21.296418+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3314397685-LPCLOUD",
+          "title": "MOD11A2.A2024329.h19v06.061.2024338044759",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024329.h19v06.061.2024338044759/MOD11A2.A2024329.h19v06.061.2024338044759.hdf",
+          "file_size": 6449692,
+          "sha256": "9baf42512f3232c9a744c0184a5e1548d831356c3450df2771bff43e012032ca",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:21.994527+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024337",
+      "files": [
+        {
+          "granule_id": "G3327106026-LPCLOUD",
+          "title": "MOD11A2.A2024337.h18v06.061.2024347150937",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024337.h18v06.061.2024347150937/MOD11A2.A2024337.h18v06.061.2024347150937.hdf",
+          "file_size": 6689175,
+          "sha256": "9b1c340be451b4b2e04c96dc53a1e1453b5794e7093cc2b824d270584c3f07ee",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:23.117500+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3327106942-LPCLOUD",
+          "title": "MOD11A2.A2024337.h19v06.061.2024347150717",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024337.h19v06.061.2024347150717/MOD11A2.A2024337.h19v06.061.2024347150717.hdf",
+          "file_size": 6844180,
+          "sha256": "2e46376d971c5b30a3da702c8550bbfcf7ad78a26c565f37c756b142abac28c0",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:24.153919+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024345",
+      "files": [
+        {
+          "granule_id": "G3342932612-LPCLOUD",
+          "title": "MOD11A2.A2024345.h18v06.061.2024359030908",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024345.h18v06.061.2024359030908/MOD11A2.A2024345.h18v06.061.2024359030908.hdf",
+          "file_size": 7054541,
+          "sha256": "919a8a75bd45f50bf00e791cb42608dbea5c41421e90d32eae1c4017ad46218e",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:27.116284+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3342917137-LPCLOUD",
+          "title": "MOD11A2.A2024345.h19v06.061.2024359025546",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024345.h19v06.061.2024359025546/MOD11A2.A2024345.h19v06.061.2024359025546.hdf",
+          "file_size": 6865753,
+          "sha256": "d0cbf8bb287d6769b4953d9f53fc6982115b0c8f1645ad793787efdb72b70314",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:27.417223+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024353",
+      "files": [
+        {
+          "granule_id": "G3353639612-LPCLOUD",
+          "title": "MOD11A2.A2024353.h18v06.061.2024366032348",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024353.h18v06.061.2024366032348/MOD11A2.A2024353.h18v06.061.2024366032348.hdf",
+          "file_size": 6683903,
+          "sha256": "b0e13ee48cbb0013b9750d11f139ae82f9cf8d00e9228553716b51e25c18b9fc",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:28.306973+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3353639656-LPCLOUD",
+          "title": "MOD11A2.A2024353.h19v06.061.2024366032450",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024353.h19v06.061.2024366032450/MOD11A2.A2024353.h19v06.061.2024366032450.hdf",
+          "file_size": 6410509,
+          "sha256": "7e9b880566f4337e31474a16573cdc7948034bb293f0dcd07fd6c01314f7be90",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:28.308272+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "nominal_date": "2024361",
+      "files": [
+        {
+          "granule_id": "G3358991140-LPCLOUD",
+          "title": "MOD11A2.A2024361.h18v06.061.2025004055712",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024361.h18v06.061.2025004055712/MOD11A2.A2024361.h18v06.061.2025004055712.hdf",
+          "file_size": 6699721,
+          "sha256": "a102c0a565a8837064472409cf7041e432797e3515edb1ad713f4155fce38cfc",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:30.599458+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331391667,
+            0.0,
+            0.0,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            1088,
+            605,
+            112,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        },
+        {
+          "granule_id": "G3359044372-LPCLOUD",
+          "title": "MOD11A2.A2024361.h19v06.061.2025004063035",
+          "uri": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/MOD11A2.061/MOD11A2.A2024361.h19v06.061.2025004063035/MOD11A2.A2024361.h19v06.061.2025004063035.hdf",
+          "file_size": 6847556,
+          "sha256": "fef6b3d2ad39d1291aa66bf09e845bbbaf8bc9c41d1334085814e2cb1a2ca233",
+          "checksum_provenance": "computed_on_downloaded_original_bytes",
+          "retrieved_at": "2026-11-14T17:38:30.879765+00:00",
+          "source_shape": [
+            1200,
+            1200
+          ],
+          "source_transform": [
+            926.6254331383333,
+            0.0,
+            1111950.519767,
+            0.0,
+            -926.6254331391666,
+            3335851.5593,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "read_window": [
+            0,
+            605,
+            5,
+            110
+          ],
+          "source_field_attributes": {
+            "LST_Day_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "LST_Night_1km": {
+              "units": "K",
+              "valid_range": [
+                7500,
+                65535
+              ],
+              "_FillValue": 0,
+              "scale_factor": 0.02,
+              "add_offset": 0.0
+            },
+            "QC_Day": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            },
+            "QC_Night": {
+              "valid_range": [
+                0,
+                255
+              ],
+              "_FillValue": "NA\u0000"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

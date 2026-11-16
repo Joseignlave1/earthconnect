@@ -1,0 +1,107 @@
+{
+  "status": "frozen_before_expanded_patch_processing",
+  "sites": [
+    "atacama",
+    "haughton",
+    "deathvalley"
+  ],
+  "p0": [
+    "published terrain elevation and mean slope, with coverage",
+    "coldest and warmest monthly mean air temperature",
+    "long-term annual precipitation",
+    "classified bare-ground fraction and accepted classification coverage"
+  ],
+  "p1": [
+    "modeled permafrost fraction with an explicit valid-data mask",
+    "coarse-grid relative elevation and relief across 5 km and 21 km neighbourhoods",
+    "GLiM coarse dominant lithology with a categorical dictionary"
+  ],
+  "pending": [
+    "seasonal snow persistence; annual permanent snow/ice land-cover fraction is a distinct available quantity",
+    "detailed geology, minerals and sub-kilometre dune/rock textures",
+    "validated recognition of impact-crater morphology"
+  ],
+  "profiles": {
+    "dry_bare": {
+      "label": "Dry, bare, low mean slope",
+      "conditions": {
+        "annual_precip_mm": {
+          "max": 250
+        },
+        "warmest_month_air_c": {
+          "min": 10
+        },
+        "bare_fraction": {
+          "min": 0.5
+        },
+        "slope_mean_deg": {
+          "max": 10
+        },
+        "landcover_valid_fraction": {
+          "min": 0.8
+        },
+        "terrain_valid_fraction": {
+          "min": 0.9
+        }
+      }
+    },
+    "hot_dry_bare": {
+      "label": "Hot, dry, bare, low mean slope",
+      "conditions": {
+        "annual_precip_mm": {
+          "max": 250
+        },
+        "warmest_month_air_c": {
+          "min": 25
+        },
+        "bare_fraction": {
+          "min": 0.5
+        },
+        "slope_mean_deg": {
+          "max": 10
+        },
+        "landcover_valid_fraction": {
+          "min": 0.8
+        },
+        "terrain_valid_fraction": {
+          "min": 0.9
+        }
+      }
+    },
+    "cold_bare_frozen": {
+      "label": "Cold, bare, low mean slope, modeled frozen ground",
+      "conditions": {
+        "annual_precip_mm": {
+          "max": 500
+        },
+        "coldest_month_air_c": {
+          "max": -20
+        },
+        "warmest_month_air_c": {
+          "max": 10
+        },
+        "bare_fraction": {
+          "min": 0.5
+        },
+        "slope_mean_deg": {
+          "max": 10
+        },
+        "landcover_valid_fraction": {
+          "min": 0.8
+        },
+        "terrain_valid_fraction": {
+          "min": 0.9
+        },
+        "permafrost_fraction": {
+          "min": 0.5
+        },
+        "permafrost_valid_fraction": {
+          "min": 0.8
+        }
+      }
+    }
+  },
+  "profile_caveat": "Exploratory Earth environmental filters chosen while developing these examples, not blind validation, calibrated planetary similarity or proof of trafficability/crater geology. No site names or coordinates enter the predicates. Missing required measurements fail eligibility. Comparisons allow 1e-9 floating-point arithmetic tolerance.",
+  "baseline_file": "research/priority-pilot/priorities.json",
+  "baseline_sha256": "292b11e38d3845777c626c1807c85c6e89f3397d6ad726450bc69cd097a08f3d"
+}

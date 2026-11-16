@@ -1,0 +1,70 @@
+{
+  "site": "sahara",
+  "cells": 281,
+  "observation_rows": 3372,
+  "wall_seconds": 15.73622439801693,
+  "assets": [
+    {
+      "asset_id": "Copernicus_DSM_COG_10_N24_00_E010_00_DEM",
+      "uri": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N24_00_E010_00_DEM/Copernicus_DSM_COG_10_N24_00_E010_00_DEM.tif",
+      "etag": "\"8697eaf90e073c96c30f7cd86eeb05e5\"",
+      "etag_is_content_checksum": false,
+      "last_modified": "Mon, 09 May 2022 14:10:14 GMT",
+      "s3_version_id": "null",
+      "upstream_file_bytes": 41439542,
+      "source_shape": [
+        3600,
+        3600
+      ],
+      "block_shapes": [
+        [
+          1024,
+          1024
+        ]
+      ],
+      "source_transform": [
+        0.0002777777777777778,
+        0.0,
+        9.99986111111111,
+        0.0,
+        -0.0002777777777777778,
+        25.000138888888888,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "source_tags": {
+        "AREA_OR_POINT": "Point"
+      },
+      "source_nodata": null,
+      "read_window": [
+        17,
+        174,
+        3567,
+        3256
+      ],
+      "read_shape": [
+        3256,
+        3567
+      ],
+      "decoded_window_bytes": 46456608,
+      "decoded_float32_window_sha256": "4e5999cb6ea157484f4d6f92fd5c7b34dc84343913ab26a3073f44d48f59620a",
+      "window_transform": [
+        0.0002777777777777778,
+        0.0,
+        10.004583333333333,
+        0.0,
+        -0.0002777777777777778,
+        24.951805555555556,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "retrieved_at": "2026-11-14T16:44:24.724766+00:00"
+    }
+  ],
+  "csv_bytes": 819888,
+  "csv_sha256": "78cd73a1372d2d334210518f3bc83e7a6e8dc9a4cbfb291dc255f73a9b32afcf",
+  "missing_observation_rows": 0,
+  "minimum_valid_area_fraction": 0.9499021032507381
+}

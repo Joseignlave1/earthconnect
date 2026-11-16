@@ -1,0 +1,15 @@
+.git
+.env
+.env.*
+__pycache__
+research
+catalog
+docs
+
+backend/target
+work
+
+demo/node_modules
+demo/dist
+
+db/runtime

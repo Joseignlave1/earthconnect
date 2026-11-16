@@ -8,46 +8,15 @@ const starPositions = Array.from({ length: 48 }, (_, index) => ({
 
 function NasaMark() {
   return (
-    <div className="nasa-signature">
+    <a className="nasa-signature" href="https://www.spaceappschallenge.org/" rel="noreferrer" target="_blank">
       <span>Created for</span>
-      <img src="/nasa-logo.svg" alt="NASA" />
-    </div>
-  )
-}
-
-function Orbit() {
-  return (
-    <div className="orbit-scene" aria-label="Earth, Mars and the Moon orbiting in space">
-      <div className="orbit-glow" aria-hidden="true" />
-      <div className="orbit-ring orbit-ring--outer" aria-hidden="true" />
-      <div className="orbit-ring orbit-ring--inner" aria-hidden="true" />
-      <div className="orbit-axis">
-        <div className="planet-slot planet-slot--mars">
-          <div className="planet-lock">
-            <div className="planet mars" role="img" aria-label="Mars" />
-            <span className="planet-name">Mars</span>
-          </div>
-        </div>
-        <div className="planet-slot planet-slot--moon">
-          <div className="planet-lock">
-            <div className="planet moon" role="img" aria-label="The Moon" />
-            <span className="planet-name">Moon</span>
-          </div>
-        </div>
-        <div className="planet-slot planet-slot--earth">
-          <div className="planet-lock">
-            <div className="planet earth" role="img" aria-label="Earth" />
-            <span className="planet-name">Earth</span>
-          </div>
-        </div>
-      </div>
-      <div className="orbit-center" aria-hidden="true"><span /></div>
-    </div>
+      <img src="https://assets.spaceappschallenge.org/media/images/Space_Apps_Logo_Color_and_White.width-440.jpegquality-60.png" alt="NASA International Space Apps Challenge" />
+    </a>
   )
 }
 
 function App() {
-  if (window.location.pathname === '/find') {
+  if (window.location.pathname.startsWith('/find')) {
     return <PlanetViewer />
   }
 
@@ -65,10 +34,12 @@ function App() {
       </header>
 
       <section className="hero" id="top">
-        <h1>Find your best<br /><em>spot on Earth</em></h1>
+        <div className="hero-halo" aria-hidden="true"><i /><i /><i /></div>
+        <p className="hero-eyebrow"><span />Moon and Mars site finder<span /></p>
+        <h1>Find your best<br /><em>spot on Earth.</em></h1>
         <p>
-          Compare worlds. Understand environments. Discover the place on our
-          planet that feels made for you.
+          Pick a point on the Moon or Mars. We’ll rank the closest matches on
+          Earth.
         </p>
         <a className="find-button" href="/find">
           <span>Find your spot</span>
@@ -76,7 +47,13 @@ function App() {
             <path d="M5 12h13M14 7l5 5-5 5" />
           </svg>
         </a>
-        <Orbit />
+        <div className="hero-data" aria-label="Earth Connect capabilities">
+          <span><strong>Moon + Mars</strong><small>Reference worlds</small></span>
+          <i aria-hidden="true" />
+          <span><strong>19 variables</strong><small>Compared fields</small></span>
+          <i aria-hidden="true" />
+          <span><strong>35.5M cells</strong><small>Earth coverage</small></span>
+        </div>
       </section>
 
       <footer className="page-footer">

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Measurement layout and scoring speed</title>
+<style>
+body{margin:0;font-family:var(--font-sans);color:var(--foreground)}
+#value-layout{margin:0;width:100%}
+#value-layout figcaption{margin-top:8px;color:var(--muted-foreground)}
+</style>
+</head>
+<body>
+<figure id="value-layout" data-viz-composition aria-label="Server scoring time for raster access, quantized cell rows and decoded cell rows, using the same measurements and scoring expression.">
+<div data-viz-container></div>
+<script type="application/json" data-viz-chart>
+{
+  "id": "value-layout",
+  "title": "Per-cell SQL scoring by measurement layout",
+  "showHeader": false,
+  "height": 235,
+  "spec": {
+    "type": "horizontalBar",
+    "y": "Layout",
+    "x": "Milliseconds",
+    "xLabel": "Server milliseconds \u00b7 lower is faster",
+    "showValues": true,
+    "showLegend": false,
+    "startAtZero": true,
+    "sortOrder": "original",
+    "valueFormat": {
+      "style": "decimal",
+      "maximumFractionDigits": 0
+    }
+  },
+  "columns": [
+    "Layout",
+    "Milliseconds"
+  ],
+  "rows": [
+    [
+      "Quantized raster",
+      774.136
+    ],
+    [
+      "Quantized cell rows",
+      570.081
+    ],
+    [
+      "Decoded cell rows",
+      522.591
+    ]
+  ]
+}
+</script>
+<figcaption>270,000 cells · balanced profile · median of 5 warm-cache runs · scoring and evidence bounds, no sorting or window grouping · serialization excluded</figcaption>
+</figure>
+<script type="module">
+import {mountChart} from 'https://persistent.oaistatic.com/plugins/visualize/charts/1.2.3/element.js';
+const root=document.getElementById('value-layout');
+mountChart(root.querySelector('[data-viz-container]'),JSON.parse(root.querySelector('[data-viz-chart]').textContent));
+</script>
+</body>
+</html>

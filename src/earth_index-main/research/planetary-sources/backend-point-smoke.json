@@ -1,0 +1,169 @@
+{
+  "checked_at_utc": "2026-11-15T00:44:26.085730+00:00",
+  "method": "Actual native gRPC SamplePoint calls to the Rust backend using anonymous public upstreams. Point values, not area summaries.",
+  "cases": [
+    {
+      "body": "moon",
+      "longitude": 0.0,
+      "latitude": 0.0,
+      "retrieved_at": "2026-11-15T00:40:35.201625232+00:00",
+      "partial": false,
+      "status_counts": {
+        "AVAILABLE": 29,
+        "OUTSIDE_COVERAGE": 23
+      },
+      "selected_values": [
+        {
+          "variable_id": "moon.elevation",
+          "source_id": "LRO_LOLA_DEM_Global_256ppd_v06",
+          "value": -720.5,
+          "unit": "m",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "moon.surface_noon",
+          "source_id": "diviner_tbol_hour12",
+          "value": 394.4786,
+          "unit": "K",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "moon.surface_temperature_range",
+          "source_id": "derived_temperature_range",
+          "value": 300.18460000000005,
+          "unit": "K_difference",
+          "status": "AVAILABLE"
+        }
+      ],
+      "source_issues": []
+    },
+    {
+      "body": "mars",
+      "longitude": 23.47,
+      "latitude": 0.67,
+      "retrieved_at": "2026-11-15T00:43:49.134967204+00:00",
+      "partial": false,
+      "status_counts": {
+        "AVAILABLE": 23,
+        "NO_DATA": 6
+      },
+      "selected_values": [
+        {
+          "variable_id": "mars.elevation",
+          "source_id": "Mars_MOLA_blend200ppx_HRSC_DEM_clon0dd_200mpp_lzw",
+          "value": 479.0,
+          "unit": "m",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "mars.modeled_surface_temperature_mean",
+          "source_id": "mars_yearly_avg_temperature_celsius",
+          "value": -48.7542724609375,
+          "unit": "degree_C",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "mars.modeled_surface_temperature_min",
+          "source_id": "mars_yearly_minimum_temperature_celsius",
+          "value": -117.27299499511719,
+          "unit": "degree_C",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "mars.modeled_surface_temperature_max",
+          "source_id": "mars_yearly_maximum_temperature_celsius",
+          "value": 25.657012939453125,
+          "unit": "degree_C",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "mars.albedo",
+          "source_id": "TES_Lambert_Albedo_numeric",
+          "value": 0.2680314779281616,
+          "unit": "1",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "mars.surface_temperature_range",
+          "source_id": "derived_temperature_range",
+          "value": 142.9300079345703,
+          "unit": "K_difference",
+          "status": "AVAILABLE"
+        }
+      ],
+      "source_issues": []
+    },
+    {
+      "body": "moon",
+      "longitude": 0.0,
+      "latitude": 85.0,
+      "retrieved_at": "2026-11-15T00:43:48.087819268+00:00",
+      "partial": true,
+      "status_counts": {
+        "AVAILABLE": 26,
+        "OUTSIDE_COVERAGE": 23,
+        "NO_DATA": 2,
+        "SOURCE_ERROR": 1
+      },
+      "selected_values": [
+        {
+          "variable_id": "moon.elevation",
+          "source_id": "LRO_LOLA_DEM_Global_256ppd_v06",
+          "value": -1674.0,
+          "unit": "m",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "moon.surface_noon",
+          "source_id": "diviner_tbol_hour12",
+          "value": 161.6801,
+          "unit": "K",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "moon.solar_illumination",
+          "source_id": "AVGVISIB_65N_240M_201608_NP",
+          "value": 0.0,
+          "unit": "fraction",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "moon.solar_illumination",
+          "source_id": "AVGVISIB_85N_060M_201608_NP",
+          "value": 0.0,
+          "unit": "fraction",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "moon.earth_visibility",
+          "source_id": "AVGVISIB_65N_240M_201608_EARTH_NP",
+          "value": 0.297600001,
+          "unit": "fraction",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "moon.earth_visibility",
+          "source_id": "AVGVISIB_85N_060M_201608_EARTH_NP",
+          "value": 0.162839994,
+          "unit": "fraction",
+          "status": "AVAILABLE"
+        },
+        {
+          "variable_id": "moon.surface_temperature_range",
+          "source_id": "derived_temperature_range",
+          "value": 157.7,
+          "unit": "K_difference",
+          "status": "AVAILABLE"
+        }
+      ],
+      "source_issues": [
+        {
+          "variable_id": "moon.titanium",
+          "source_id": "LP_GRS_TitaniumAbundance_2ppd",
+          "status": "SOURCE_ERROR",
+          "reason": "ArcGIS source error 400"
+        }
+      ]
+    }
+  ]
+}

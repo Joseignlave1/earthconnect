@@ -1,0 +1,29 @@
+{
+  "status": "waiting_for_NASA_no_temperature_values_validated",
+  "sites": [],
+  "pending_sources": [
+    {
+      "site": "atacama",
+      "status": "processing"
+    },
+    {
+      "site": "iceland",
+      "status": "pending"
+    },
+    {
+      "site": "sahara",
+      "status": "pending"
+    }
+  ],
+  "checks": [
+    "processor_and_geometry_hashes",
+    "CSV_content_hashes",
+    "46_unique_2024_windows_per_cell",
+    "finite_values_and_explicit_missingness",
+    "valid_area_fractions",
+    "paired_pixel_support",
+    "source_subset_SHA256_manifests",
+    "no_retained_rasters"
+  ],
+  "separate_scientific_fixture_command": "uv run scripts/test_nasa_temperature.py"
+}
