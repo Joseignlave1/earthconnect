@@ -9,7 +9,6 @@ import './PlanetViewer.css'
 
 type Target = { lat: number; lon: number }
 type Tool = 'filters' | 'console'
-type PlanetViewerProps = { active?: boolean; onHome?: () => void }
 
 const PLANETS: Record<BodyId, { name: string; image: string; tileRoot: string }> = {
   moon: {
@@ -177,13 +176,12 @@ function showMatches(viewer: Cesium.Viewer, matches: EarthMatch[]) {
   })
 }
 
-function EarthGlobe({ active, matches, onOpen }: { active: boolean; matches: EarthMatch[]; onOpen: (match: EarthMatch) => void }) {
+function EarthGlobe({ matches, onOpen }: { matches: EarthMatch[]; onOpen: (match: EarthMatch) => void }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<Cesium.Viewer | null>(null)
   const matchesRef = useRef(matches)
   useEffect(() => { matchesRef.current = matches }, [matches])
   useEffect(() => {
-    if (!active) return
     const container = containerRef.current
     if (!container) return
     let cancelled = false
@@ -210,7 +208,7 @@ function EarthGlobe({ active, matches, onOpen }: { active: boolean; matches: Ear
       viewerRef.current = null
       if (viewer && !viewer.isDestroyed()) viewer.destroy()
     }
-  }, [active, onOpen])
+  }, [onOpen])
   useEffect(() => {
     const viewer = viewerRef.current
     if (!viewer || viewer.isDestroyed()) return
@@ -281,13 +279,13 @@ function ScoreControls({ dataset, threshold, resultLimit, cellCount, areaCount, 
   </div>
 }
 
-function Brand({ onHome }: { onHome?: () => void }) { return <a className="ex-brand" href="/" onClick={(event) => { if (!onHome || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); onHome() }}><span className="ex-brand-orbit"><i /></span><span><b>EARTH</b> CONNECT</span></a> }
+function Brand() { return <a className="ex-brand" href="/"><span className="ex-brand-orbit"><i /></span><span><b>EARTH</b> CONNECT</span></a> }
 
-function MatchDetail({ match, onBack, onHome }: { match: EarthMatch; onBack: () => void; onHome?: () => void }) {
-  return <main className="ex-root ex-detail-root"><div className="ex-stars" aria-hidden="true" /><header className="ex-header"><Brand onHome={onHome} /><button className="ex-back" onClick={onBack} type="button">← Back to matches</button></header><section className="ex-detail-wrap"><article className="ex-detail-card"><div className="ex-detail-score"><strong>{match.score}%</strong><span>similarity</span></div><p className="ex-eyebrow">Earth match · #{match.id.slice(-4).toUpperCase()}</p><h1>{match.title}</h1><p className="ex-detail-location">{match.region} · {Math.abs(match.lat).toFixed(2)}°{match.lat >= 0 ? 'N' : 'S'} / {Math.abs(match.lon).toFixed(2)}°{match.lon >= 0 ? 'E' : 'W'}</p><p className="ex-detail-copy">{match.description}</p><div className="ex-detail-tags">{match.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="ex-metric-grid">{match.metrics.map((metric) => <div key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div><div className="ex-detail-note"><i />Earth Index · 4 km grid</div></article></section></main>
+function MatchDetail({ match, onBack }: { match: EarthMatch; onBack: () => void }) {
+  return <main className="ex-root ex-detail-root"><div className="ex-stars" aria-hidden="true" /><header className="ex-header"><Brand /><button className="ex-back" onClick={onBack} type="button">← Back to matches</button></header><section className="ex-detail-wrap"><article className="ex-detail-card"><div className="ex-detail-score"><strong>{match.score}%</strong><span>similarity</span></div><p className="ex-eyebrow">Earth match · #{match.id.slice(-4).toUpperCase()}</p><h1>{match.title}</h1><p className="ex-detail-location">{match.region} · {Math.abs(match.lat).toFixed(2)}°{match.lat >= 0 ? 'N' : 'S'} / {Math.abs(match.lon).toFixed(2)}°{match.lon >= 0 ? 'E' : 'W'}</p><p className="ex-detail-copy">{match.description}</p><div className="ex-detail-tags">{match.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="ex-metric-grid">{match.metrics.map((metric) => <div key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div><div className="ex-detail-note"><i />Earth Index · 4 km grid</div></article></section></main>
 }
 
-export default function PlanetViewer({ active = true, onHome }: PlanetViewerProps = {}) {
+export default function PlanetViewer() {
   const initialBody = useMemo<BodyId>(() => new URLSearchParams(window.location.search).get('body') === 'mars' ? 'mars' : 'moon', [])
   const initialTarget = useMemo(() => initialBody === 'mars' ? { lat: 18.7, lon: -77.1 } : { lat: -18.4, lon: 33.2 }, [initialBody])
   const [body, setBody] = useState<BodyId>(initialBody)
@@ -320,7 +318,6 @@ export default function PlanetViewer({ active = true, onHome }: PlanetViewerProp
   }, [])
 
   useEffect(() => {
-    if (!active) return
     const controller = new AbortController()
     void loadDatasource(controller.signal).then((loaded) => {
       setDatasource(loaded)
@@ -334,10 +331,9 @@ export default function PlanetViewer({ active = true, onHome }: PlanetViewerProp
       setQueryStatus('Reload to retry')
     })
     return () => controller.abort()
-  }, [active])
+  }, [])
 
   useEffect(() => {
-    if (!active) return
     const controller = new AbortController()
     void samplePoint(body, target.lat, target.lon, controller.signal).then((sample) => {
       setMeasurements(sample.measurements)
@@ -349,10 +345,9 @@ export default function PlanetViewer({ active = true, onHome }: PlanetViewerProp
       setSampleStatus(friendlyApiError(error))
     })
     return () => controller.abort()
-  }, [active, body, target.lat, target.lon])
+  }, [body, target.lat, target.lon])
 
   useEffect(() => () => queryController.current?.abort(), [])
-  useEffect(() => { if (!active) queryController.current?.abort() }, [active])
   const selectTarget = useCallback((next: Target) => {
     if (Math.abs(next.lat - target.lat) < 1e-8 && Math.abs(next.lon - target.lon) < 1e-8) return
     cancelQuery()
@@ -458,17 +453,17 @@ export default function PlanetViewer({ active = true, onHome }: PlanetViewerProp
     }
   }
   const visibleMatches = matches.slice(0, resultLimit)
-  if (detail) return <MatchDetail match={detail} onBack={() => setDetail(null)} onHome={onHome} />
+  if (detail) return <MatchDetail match={detail} onBack={() => setDetail(null)} />
   const activeCount = criteria.filter((item) => item.enabled).length
   const connected = Boolean(datasource && !metadataError)
-  return <main className="ex-root"><div className="ex-stars" aria-hidden="true" /><header className="ex-header"><Brand onHome={onHome} /><div className={`ex-header-meta${connected ? ' is-live' : ''}`} title={API_BASE_URL}><span>{metadataStatus}</span><i />{connected ? 'API online' : 'Connecting'}</div></header>
+  return <main className="ex-root"><div className="ex-stars" aria-hidden="true" /><header className="ex-header"><Brand /><div className={`ex-header-meta${connected ? ' is-live' : ''}`} title={API_BASE_URL}><span>{metadataStatus}</span><i />{connected ? 'API online' : 'Connecting'}</div></header>
     <div className="ex-layout">
       <section className="ex-target-section"><div className="ex-section-label"><span>01</span><p>Select a reference world</p></div><div className="ex-body-tabs" role="tablist" aria-label="Reference planet">{(['moon', 'mars'] as BodyId[]).map((id) => <button aria-selected={body === id} className={body === id ? 'is-active' : ''} key={id} onClick={() => chooseBody(id)} role="tab" type="button">{PLANETS[id].name}</button>)}</div>
         <div className="ex-planet-card"><div className="ex-planet-copy"><p>{PLANETS[body].name}</p><span>Drag · Scroll to zoom · Click to choose</span></div><PlanetGlobe body={body} key={body} onSelect={selectTarget} target={target} /><CoordinatePicker key={`${body}-${target.lat}-${target.lon}`} onSelect={selectTarget} target={target} /><div className="ex-sample-state">{sampleStatus}</div></div>
         <div className="ex-tool-tabs" role="tablist" aria-label="Query tools"><button aria-selected={tool === 'filters'} className={tool === 'filters' ? 'is-active' : ''} onClick={() => setTool('filters')} role="tab" type="button">Filters <span>{activeCount}</span></button><button aria-selected={tool === 'console'} className={tool === 'console' ? 'is-active' : ''} onClick={() => setTool('console')} role="tab" type="button">Console <span>SQL</span></button></div>
         <div className="ex-tool-panel">{tool === 'filters' ? <FilterPanel criteria={criteria} disabled={!datasource} measurements={measurements} onChange={(next) => { cancelQuery(); setCriteria(next); setMatches([]); setScoreDataset(null); setMatchingCellCount(0); setMatchingAreaCount(0); setQueryStatus('Filters changed') }} onRun={() => void runSearch()} running={running} /> : <ConsolePanel disabled={!datasource} onRun={() => void runSearch()} output={consoleOutput} params={params} running={running} setParams={setParams} setSql={setSql} sql={sql} status={queryStatus} />}</div>
       </section>
-      <section className="ex-earth-section"><div className="ex-section-label"><span>02</span><p>Find matches on Earth</p></div><div className="ex-earth-card"><div className="ex-earth-title"><div><p>Earth matches</p><span>{visibleMatches.length ? `Showing ${visibleMatches.length} of ${matchingAreaCount.toLocaleString()} areas` : 'Run Find matches to update the map'}</span></div><div className="ex-legend" aria-label="Map legend"><span><i className="is-best" />Top 5</span><span><i />Other matches</span></div></div><EarthGlobe active={active} matches={visibleMatches} onOpen={openMatch} /><div className="ex-map-note"><span>{matchingCellCount.toLocaleString()} cells above cutoff</span><span>{running ? 'Scoring…' : 'Select a marker for details'}</span></div></div>
+      <section className="ex-earth-section"><div className="ex-section-label"><span>02</span><p>Find matches on Earth</p></div><div className="ex-earth-card"><div className="ex-earth-title"><div><p>Earth matches</p><span>{visibleMatches.length ? `Showing ${visibleMatches.length} of ${matchingAreaCount.toLocaleString()} areas` : 'Run Find matches to update the map'}</span></div><div className="ex-legend" aria-label="Map legend"><span><i className="is-best" />Top 5</span><span><i />Other matches</span></div></div><EarthGlobe matches={visibleMatches} onOpen={openMatch} /><div className="ex-map-note"><span>{matchingCellCount.toLocaleString()} cells above cutoff</span><span>{running ? 'Scoring…' : 'Select a marker for details'}</span></div></div>
         <div className="ex-results-head"><div><p>Ranked locations</p><span>{queryError || queryStatus}</span></div><strong>{matches[0] ? `${matches[0].score.toFixed(1)}% best match` : connected ? 'Ready' : 'Starting'}</strong>{scoreDataset && <ScoreControls areaCount={matchingAreaCount} busy={running} cellCount={matchingCellCount} dataset={scoreDataset} key={`${scoreDataset.distribution.best}-${scoreThreshold}`} onResultLimit={setResultLimit} onThreshold={(value) => void changeThreshold(value)} resultLimit={resultLimit} shownCount={visibleMatches.length} threshold={scoreThreshold} />}</div><div className="ex-results-list">{matches.length === 0 && <div className="ex-results-empty"><span>{running ? '⌁' : '◎'}</span><strong>{running ? 'Scoring Earth' : metadataError ? 'Earth Index offline' : 'No results'}</strong><p>{running ? '35.5 million cells. This can take up to two minutes.' : metadataError || 'Choose a point, check the filters, then run Find matches.'}</p></div>}{visibleMatches.map((match, index) => <button className="ex-result-card" key={match.id} onClick={() => setDetail(match)} type="button"><span className="ex-rank">{String(index + 1).padStart(2, '0')}</span><span className="ex-result-body"><strong>{match.title}</strong><small>{match.region} · {match.country}</small><em>{match.description}</em>{match.reasons && <span className="ex-match-reasons">{match.reasons.map((reason) => <i key={reason.label}><b>{reason.label}</b>{reason.comparison}<strong>{reason.similarity.toFixed(0)}%</strong></i>)}</span>}<span className="ex-tags">{match.tags.map((tag) => <i key={tag}>{tag}</i>)}</span></span><span className="ex-score"><strong>{match.score.toFixed(1)}</strong><small>% match</small><i style={{ '--score': `${match.score}%` } as CSSProperties} /></span></button>)}</div>
       </section>
     </div>
