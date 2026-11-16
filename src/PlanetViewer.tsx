@@ -166,10 +166,10 @@ function showMatches(viewer: Cesium.Viewer, matches: EarthMatch[]) {
       name: match.title,
       position: Cesium.Cartesian3.fromDegrees(match.lon, match.lat, 6500),
       point: {
-        pixelSize: featured ? 8 : 4,
-        color: color.withAlpha(featured ? .78 : .24),
-        outlineColor: featured ? Cesium.Color.WHITE.withAlpha(.62) : color.withAlpha(.38),
-        outlineWidth: featured ? 1.5 : 1,
+        pixelSize: featured ? 10 : 5.5,
+        color: color.withAlpha(featured ? .92 : .5),
+        outlineColor: featured ? Cesium.Color.WHITE.withAlpha(.85) : color.brighten(.25, new Cesium.Color()).withAlpha(.7),
+        outlineWidth: featured ? 2 : 1.25,
         disableDepthTestDistance: 0,
       },
     })
