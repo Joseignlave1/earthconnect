@@ -1,0 +1,279 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
+
+/* Todo está scopeado bajo .eaf: no pisa ni depende de index.css / App.css */
+.eaf {
+  --ink: #f4f6fb;
+  --muted: #9aa4b8;
+  --space: #03070e;
+  --blue-light: #72a7ff;
+  --red: #fc3d21;
+
+  /* ================================
+        GLASS
+     ================================ */
+  --glass-bg-start: rgba(255, 255, 255, 0.17);
+  --glass-bg-end: rgba(255, 255, 255, 0.07);
+  --glass-bg-hover-start: rgba(255, 255, 255, 0.21);
+  --glass-bg-hover-end: rgba(255, 255, 255, 0.09);
+  --glass-border: rgba(255, 255, 255, 0.20);
+  --glass-shadow-inset-light: rgba(255, 255, 255, 0.30);
+  --glass-shadow-inset-dark: rgba(255, 255, 255, 0.05);
+  --glass-shadow-outer: rgba(30, 50, 70, 0.12);
+  --glass-blur: 26px;
+  --glass-saturate: 150%;
+
+  --E: min(78vmin, 760px);
+
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--ink);
+  color-scheme: dark;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background:
+    radial-gradient(circle at 78% 82%, rgba(11, 61, 145, .30), transparent 40%),
+    radial-gradient(circle at 12% 14%, rgba(44, 74, 127, .16), transparent 24%),
+    var(--space);
+}
+.eaf, .eaf * { box-sizing: border-box; }
+.eaf button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+
+/* ---------- Estrellas ---------- */
+.eaf .stars { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.eaf .stars i {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 5px rgba(255,255,255,.7);
+  opacity: .35;
+}
+.eaf .stars i:nth-child(5n) { width: 2px; height: 2px; opacity: .6; }
+.eaf .stars i:nth-child(7n) { opacity: .16; }
+
+/* ---------- Glass ---------- */
+.eaf .glass {
+  background: linear-gradient(135deg, var(--glass-bg-start), var(--glass-bg-end));
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow:
+    inset 0 1px 1px var(--glass-shadow-inset-light),
+    inset 0 -1px 1px var(--glass-shadow-inset-dark),
+    0 16px 40px var(--glass-shadow-outer);
+}
+
+/* ---------- Planetas ---------- */
+.eaf .earth-wrap {
+  position: absolute;
+  z-index: 0;
+  width: var(--E);
+  aspect-ratio: 1;
+  right: calc(var(--E) * -.26);
+  bottom: calc(var(--E) * -.34);
+  mix-blend-mode: screen;
+}
+.eaf .earth {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  clip-path: circle(46%);
+  background-image: url('../../assets/earth-attached.jpg');
+  background-repeat: no-repeat;
+  background-size: 190%;
+  background-position: 50% 52.6%;
+  animation: eaf-spin 260s linear infinite;
+}
+.eaf .moon-orbit {
+  position: absolute;
+  inset: -7% -27%;
+  border-radius: 50%;
+  border: 1px dashed rgba(132,162,209,.28);
+  rotate: -17deg;
+}
+.eaf .moon-path {
+  position: absolute;
+  inset: 0.5px;
+}
+.eaf .moon {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 8%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background-image: url('../../assets/moon-attached.jpg');
+  background-repeat: no-repeat;
+  clip-path: circle(46%);
+  background-size: 150%;
+  background-position: 50% 49%;
+  transform: translate(-50%, -50%);
+  animation: eaf-moon-orbit 110s linear infinite;
+}
+.eaf .mars {
+  --M: min(24vmin, 220px);
+  position: absolute;
+  top: 15%;
+  left: calc(var(--M) * -.3);
+  width: var(--M);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  mix-blend-mode: screen;
+  animation: eaf-float 10s ease-in-out infinite alternate;
+}
+.eaf .mars::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-image: url('../../assets/mars-attached.jpg');
+  background-repeat: no-repeat;
+  clip-path: circle(46%);
+  background-size: 170%;
+  background-position: 46% 50%;
+  animation: eaf-spin 120s linear infinite;
+}
+
+/* ---------- Velo oscuro + viñeta ---------- */
+.eaf .scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow: inset 0 0 22vmax 4vmax #000;
+}
+
+/* ---------- Hero ---------- */
+.eaf .hero {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 0 24px 6vh;
+  text-align: center;
+}
+
+.eaf .hero h1 {
+  margin: 0;
+  color: var(--ink);
+  font: 400 clamp(48px, min(10.5vw, 17vh), 130px)/.84 'Instrument Serif', Georgia, serif;
+  letter-spacing: -.045em;
+}
+.eaf .hero h1 em {
+  color: #9ab9ed;
+  font-weight: 400;
+  text-shadow: 0 0 34px rgba(67,126,222,.2);
+}
+.eaf .hero p {
+  max-width: 470px;
+  margin: clamp(14px, 3.5vh, 32px) auto clamp(16px, 3.5vh, 28px);
+  color: var(--muted);
+  font-size: clamp(12px, 1.8vh, 14px);
+  line-height: 1.75;
+}
+
+.eaf .enter {
+  display: inline-flex;
+  align-items: center;
+  gap: 30px;
+  padding: 14px 16px 14px 24px;
+  border-radius: 999px;
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  font: 600 11px/1 'DM Sans', sans-serif;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  transition: transform .25s, background .25s;
+}
+.eaf .enter:hover {
+  background: linear-gradient(135deg, var(--glass-bg-hover-start), var(--glass-bg-hover-end));
+  transform: translateY(-2px);
+}
+.eaf .enter svg {
+  width: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.eaf .enter:focus-visible {
+  outline: 2px solid var(--blue-light);
+  outline-offset: 4px;
+}
+
+
+/* ---------- Firma NASA ---------- */
+.eaf .nasa-signature {
+  position: absolute;
+  z-index: 3;
+  left: clamp(16px, 3.5vw, 48px);
+  bottom: calc(clamp(16px, 3.5vh, 36px) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.eaf .nasa-signature span {
+  color: #687283;
+  font: 600 8px/1 'DM Sans', sans-serif;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.eaf .nasa-signature img {
+  display: block;
+  width: 74px;
+  height: auto;
+  filter: grayscale(.12) drop-shadow(0 7px 18px rgba(0,0,0,.28));
+}
+
+@keyframes eaf-spin { to { transform: rotate(360deg); } }
+@keyframes eaf-moon-orbit {
+  0%, 100% { top: 0%; left: 50%; }
+  4.167% { top: 1.704%; left: 62.941%; }
+  8.333% { top: 6.699%; left: 75%; }
+  12.5% { top: 14.645%; left: 85.355%; }
+  16.667% { top: 25%; left: 93.301%; }
+  20.833% { top: 37.059%; left: 98.296%; }
+  25% { top: 50%; left: 100%; }
+  29.167% { top: 62.941%; left: 98.296%; }
+  33.333% { top: 75%; left: 93.301%; }
+  37.5% { top: 85.355%; left: 85.355%; }
+  41.667% { top: 93.301%; left: 75%; }
+  45.833% { top: 98.296%; left: 62.941%; }
+  50% { top: 100%; left: 50%; }
+  54.167% { top: 98.296%; left: 37.059%; }
+  58.333% { top: 93.301%; left: 25%; }
+  62.5% { top: 85.355%; left: 14.645%; }
+  66.667% { top: 75%; left: 6.699%; }
+  70.833% { top: 62.941%; left: 1.704%; }
+  75% { top: 50%; left: 0%; }
+  79.167% { top: 37.059%; left: 1.704%; }
+  83.333% { top: 25%; left: 6.699%; }
+  87.5% { top: 14.645%; left: 14.645%; }
+  91.667% { top: 6.699%; left: 25%; }
+  95.833% { top: 1.704%; left: 37.059%; }
+}
+@keyframes eaf-float { to { transform: translate(2vmin, 2vmin); } }
+
+@media (max-width: 560px) {
+  .eaf .nasa-signature span { display: none; }
+  .eaf .nasa-signature img { width: 64px; }
+  .eaf .earth-wrap {
+    --E: min(104vmin, 760px);
+    right: calc(var(--E) * -.3);
+    bottom: calc(var(--E) * -.4);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .eaf .earth, .eaf .moon, .eaf .mars, .eaf .mars::before { animation: none; }
+  .eaf * { transition-duration: .01s !important; }
+}
