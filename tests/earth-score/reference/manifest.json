@@ -1,0 +1,225 @@
+{
+  "changed": {
+    "slope_mean_deg": {
+      "target": 1.1758380861688738
+    }
+  },
+  "chunks": [
+    {
+      "file": "chunk-00.zst",
+      "compressedSha256": "75182fcdbf583480359f23839e39f5121080a0e25fae12732ef561ab1197ff00",
+      "packedSha256": "86abfe3279fabe1eed6961e0c3432a7b53117e39b297c416259daf72d02ad671",
+      "sourceCodesSha256": "63b18f5f1f2d510b3cbd6ae68bb3a240b892680ac32fd1867d459eb9b429aa7d"
+    },
+    {
+      "file": "chunk-01.zst",
+      "compressedSha256": "74a95c16982ffd7e5b5b507d19970e3e388e246d442a1db2e159ccd2cdf1ad01",
+      "packedSha256": "37313baef464c98cdb0e5831ed951e197c4d8c953f36b90dd7cce968f9e6157a",
+      "sourceCodesSha256": "c8a688fdb75f626846c63dedfb372e10283ab4f1d82d66988e6f157ec4065f43"
+    },
+    {
+      "file": "chunk-02.zst",
+      "compressedSha256": "700a883097c1eb26e81e98401bb432c347d4b9b36545135d51c44297bf1f118c",
+      "packedSha256": "642b8112b68008d537e60d14ba05db4e5c23c8e1fb62171433b77ae851c33203",
+      "sourceCodesSha256": "d12543beb24f2975156d3838f84bbd7b5e5a0255780d0b67a2e099574cd45cb8"
+    },
+    {
+      "file": "chunk-03.zst",
+      "compressedSha256": "4091232c3c8cfb555b85340b74f4d8737e0022e4ae4ad327f93dfcf28c6988b4",
+      "packedSha256": "89d0922d9f52fb1410ed517ae451a79ebb0a9cd39006b8a5b336d0924dad6983",
+      "sourceCodesSha256": "c0ec280f613e5c9698644e450aa66256de3718df6ad8d4677019825dac4d3fce"
+    },
+    {
+      "file": "chunk-04.zst",
+      "compressedSha256": "bec52ad03b604055ca308a5af2a0a60dab3e375a4641917dd3bffc6515d1db07",
+      "packedSha256": "b0168de790d04a40aa2b90019620c32e04b8a723bf0ea90e17318bbe2a80c391",
+      "sourceCodesSha256": "a5673dc357ae00e5c6d9e7bbf4025fa111f52fb4df4026c4877779a3b05012a0"
+    },
+    {
+      "file": "chunk-05.zst",
+      "compressedSha256": "53950e05428244fa03ca835426f28e28ab2449d136ea4a9e77696a18e31eda1b",
+      "packedSha256": "ac2f03796d58b5c31158484a1fb962365bdcc2d24a677372d4a427d834df1e0c",
+      "sourceCodesSha256": "411bf839e5f711b2567c068e9ce05060bda05665903707e44cb9312ebebc831f"
+    },
+    {
+      "file": "chunk-06.zst",
+      "compressedSha256": "8a38364fd9b0771309a11021dacdbbc691c6970a302e425a7c44ef7903652306",
+      "packedSha256": "2851eab5818d019b17c0b0a2e48e89215fe2fa3aad3fe63cbbd3ffbb99bf3cd4",
+      "sourceCodesSha256": "df72fd1228906115b56bf86acab3a2ee6753627790f6f55b7de6c152ed04cf12"
+    },
+    {
+      "file": "chunk-07.zst",
+      "compressedSha256": "75043c153be12f1fb0a05cb2ef1579df3d7ced33be5dc1b15764570c74355738",
+      "packedSha256": "6c96ada4a0c09efbb0998017215dff8a76780df5d8a64ad99307ade6eb656630",
+      "sourceCodesSha256": "0a2077f53927294a2801d4759f8648abc08a5ee6ca4b94ea12554f9d731443c6"
+    },
+    {
+      "file": "chunk-08.zst",
+      "compressedSha256": "5e6fe8bbff28dcd68a43252a5a24d04f4c89c09f80cd4ec96b2fc381c0c126a9",
+      "packedSha256": "8b9d481959a8680051c3e37b8b3d624805b65610e0dd886b681def936cfd356b",
+      "sourceCodesSha256": "1f3a7ab83b16c3af29cafbdd01c5d5245ff20771334d25033b340044d766611d"
+    },
+    {
+      "file": "chunk-09.zst",
+      "compressedSha256": "5a6a1093f234b3f22c29bb14a25cf3cccd7cbda6534b219c17bb59898ba51756",
+      "packedSha256": "62d48f1c5b195feea897e3c9c6281800a81c77ea5e0ca1e212a28e68ecef069c",
+      "sourceCodesSha256": "c3dd8ce43b60de5cc4a18904480b81f7c224056134975683eecef37a8eb58932"
+    },
+    {
+      "file": "chunk-10.zst",
+      "compressedSha256": "0bc60e5e24c49d25a4e9b7633b795da54e0b711d0d6608c9dc7a53b7f7ab234c",
+      "packedSha256": "8c3efb69d87c901d6e25556746a8f3a62f082a5d3565cfb68ff9cc7de2c65947",
+      "sourceCodesSha256": "9789c7d0abb6d2f51c93b03a2ce4ecc28fbec0c6ed36351a7efa043581a60036"
+    },
+    {
+      "file": "chunk-11.zst",
+      "compressedSha256": "583c3729a6fa7d2c4a321ebd551b13c2e49e8da3c736683a880a39bfb607646a",
+      "packedSha256": "817df4e7147ee965cd75b69a6395d908ffd77f26cf00c778a239557cf96ffaa0",
+      "sourceCodesSha256": "4de4899cb13e7704f3d4cb63d948b8f88076b47b357dfc26cf37131071dc518e"
+    },
+    {
+      "file": "chunk-12.zst",
+      "compressedSha256": "c9b8e7490452aa71cd9616a9deff0157d252d9ffe58840d1b2896a830bfa7908",
+      "packedSha256": "decd64f3971580ac58dd00b1108b587e5e81ac2bc17305384bf69d881404afcf",
+      "sourceCodesSha256": "937d213cc346e8356b0d4379edb71a7e0032115573333c38fd5574e0be885569"
+    },
+    {
+      "file": "chunk-13.zst",
+      "compressedSha256": "dc32582e1c294cf5e5d0df5f7f3aed75462572dbe2c6a4d868281425c5529a85",
+      "packedSha256": "4e5efaeaec6dcc68a1b97c728cad83bde2b2838e263e3f012890b9f69071adf9",
+      "sourceCodesSha256": "985e688bc75a05214874621a2b390f6a9aed655d0242b2354965c210214a2f13"
+    },
+    {
+      "file": "chunk-14.zst",
+      "compressedSha256": "35fa0e8666c6eef8848531367926fec88b1cb80bc6da6aeb9e0282eb86cbfc4d",
+      "packedSha256": "897a12c803230aea7b1b8b256d81290ac3232939577b81dbefe4dd8a32e7bd8e",
+      "sourceCodesSha256": "e052ff4f5533a67a0d14dda7b386e126475750a6ad99c08652fd585ebb2bb632"
+    },
+    {
+      "file": "chunk-15.zst",
+      "compressedSha256": "87ca9689693d097483b9f64ac72c6c5397448dcabc6a848f693b5e3facd3612a",
+      "packedSha256": "46d7bcc030ff38c68bbd548990b11d0a464255fc1e188d0362f2d67835870c98",
+      "sourceCodesSha256": "885c1d26b150d5f0cb4e5073d60b1cb3948645d7aefa0936b9444efe67349637"
+    },
+    {
+      "file": "chunk-16.zst",
+      "compressedSha256": "70fbecdb0e701df6722f7852cc646d90d2892df52b28f3a372641c1b8445f6fb",
+      "packedSha256": "cda64802a174d5c70c9258dcbad5e512851a9e57d50a27dbd6ee0ea5d67aa5d7",
+      "sourceCodesSha256": "d2541d2eaaaae16e4d3aa0068ba213870ecb3d868459e724a5a349f691010447"
+    },
+    {
+      "file": "chunk-17.zst",
+      "compressedSha256": "10cf7b7e80f9715b776c5d64f0123bfbbd3f9cf6622b263a4681b259115c7873",
+      "packedSha256": "a5a2f5af72d5715fc915cd9ba6bbb89d11b6aef6c2d93d490bc6d91991481d15",
+      "sourceCodesSha256": "a0f11df2186fe09aeab9b5bcbc7134704779e339956055b4ccaae7ea02f9248a"
+    },
+    {
+      "file": "chunk-18.zst",
+      "compressedSha256": "ad18f09ceae8138e58bedc13a71c43724e4b078eb8befc1790782f4b2de867a9",
+      "packedSha256": "b641ea731503dc9882343625163622c426cffd2c39e58615bfa2634d2764a0f8",
+      "sourceCodesSha256": "9eb25cbb1c0589662e5b6bfd7b66b52292f163c4829f584bcad5029df06184e2"
+    },
+    {
+      "file": "chunk-19.zst",
+      "compressedSha256": "9228c5035e66f1d7756336fe3fac224c2f9a229e3945e8dd73cbec2c7ac8a49c",
+      "packedSha256": "6f82c1e6fa5ed264eb872f0ea2a6ae13ccc21d701c38f180d9852e9c98c2f57c",
+      "sourceCodesSha256": "4884fef48979b1b55ec591bdb17820190fcd77b62ca305904929c7bff51bbbac"
+    },
+    {
+      "file": "chunk-20.zst",
+      "compressedSha256": "fbe32f084f25163baee5a5887fff85df6f40572ae6f4f0851f7cef547065f834",
+      "packedSha256": "0928dc2e1cdf8d98590eaf435274cf262e84a0068d219c404cbbfedeca2767da",
+      "sourceCodesSha256": "7c1bcec1441c72df681ff01a9f79663b226dad4a6afc44250b75e3b373ea5f18"
+    },
+    {
+      "file": "chunk-21.zst",
+      "compressedSha256": "ae7cb55fca27efae3c15aa4cfc6cad18be1a4e4b17972118fb8401a0a2ffebff",
+      "packedSha256": "2225cbd2b1d855a879f9fae2b78309ef1313626d06cde80415d174494ad47541",
+      "sourceCodesSha256": "a7a94b6526889992faa640a80120ec08f42d76af3a4b02b6035235f2dccde795"
+    },
+    {
+      "file": "chunk-22.zst",
+      "compressedSha256": "7eff901c7b0ce59e2b22ff735cbe9867e5de1bf4142636b32c1f70264b68efe5",
+      "packedSha256": "8586b2fd25c32416392363d16d123158b0f76da916c7aaf73190252a9508e397",
+      "sourceCodesSha256": "ec3191d1d518c645f3d4cb9c187f912c541ecca133b38abebd7866f649f5ca9c"
+    },
+    {
+      "file": "chunk-23.zst",
+      "compressedSha256": "6c0182f967be79670b26d3f4b6ab6c846271ca1a44f8c2459cd033b334b24c74",
+      "packedSha256": "36f29b429cb5c446f2cf839785257442c6af68ed842c945580bda9e5d6201d85",
+      "sourceCodesSha256": "c056e6d996d38a6aab5c0049d05b51b5126820e7617fdd80d18da2e82c714af4"
+    },
+    {
+      "file": "chunk-24.zst",
+      "compressedSha256": "d83447c106b01ac7bdaf519a79abf09d2a0b98878e7b75c4ed908a1439af6aaa",
+      "packedSha256": "e506d3fa405a572c12a23300f507335b5ca8bb4b37fff069b93c75bc34d28bad",
+      "sourceCodesSha256": "580a0b3d98d5db7e14285d07ce151038e2cae4b23fa0e5d0f8acbb15fadfc46f"
+    },
+    {
+      "file": "chunk-25.zst",
+      "compressedSha256": "9d54797218363abe555ffa320d40669921514eadfe6d3e8b7017e5252986ffa3",
+      "packedSha256": "326300b0e1c49b80a221e3b71b9d4f033dbc22029f3f13c626cf4d8bcab97d3c",
+      "sourceCodesSha256": "c682f2bbf3ef9946b83bf1feef47a7f438c3deec24a1eb350831333a37ead9d2"
+    },
+    {
+      "file": "chunk-26.zst",
+      "compressedSha256": "34176806192a9996e3188ea8f50c213c331e3667b7ad7c667a95550c57a6f2b3",
+      "packedSha256": "29bb506b16e2ca9254d5c8f99b8a430a6eef0a8fa0664fb2e55864c148c7d743",
+      "sourceCodesSha256": "ea97ec1e39fffeaa4d3b49ad758f45f8580b786f670da8b8cd4357a7a52869eb"
+    },
+    {
+      "file": "chunk-27.zst",
+      "compressedSha256": "5b4946d5433719ae630972fb6b586a7430c632ce84e0bbefa4468214af024e01",
+      "packedSha256": "5f129351305c9c0d8b3fd6be2a60523828069d754e65bd20adcdf12be0de94c7",
+      "sourceCodesSha256": "2449ffe1d4c0d9d3b4494daf832b8289314903f7a5a2c7cd120a3a24a67d8f19"
+    },
+    {
+      "file": "chunk-28.zst",
+      "compressedSha256": "832085b6ef9f0a742896e009171b73c9a5185da55a133ca077606f597242a001",
+      "packedSha256": "97b5c7655bbd9336090c4f52240631fd89c3ab67281cd37ad2db5c7aa24bf734",
+      "sourceCodesSha256": "7b1d2689c5d2db1256200bdd4326a62b3fa8f1eb651c6bf758bc6f87d5f73b3b"
+    },
+    {
+      "file": "chunk-29.zst",
+      "compressedSha256": "64240b4fdcad8ffab5e948ca1c18e20a97853ef3bdbec777a6df711557e44ea1",
+      "packedSha256": "e730bc7abbef9d003c8e28318f11b9914b43c2b8b231f8f9601b30f0b0e63763",
+      "sourceCodesSha256": "a887e2bc2fd8ed906344cc2d76b55ae34cc6b79b013095ebe941b7aff407952e"
+    },
+    {
+      "file": "chunk-30.zst",
+      "compressedSha256": "2bc391389f3c95e94eaa27bb97dbb6642a16bb57139aa012a7457192f3bdec23",
+      "packedSha256": "b81b9bb899c56e717e07a651e393b3cc2c82d344b1a02adc8d8ff1c676dc9071",
+      "sourceCodesSha256": "5d44f9cfe5934c0385683e514569cef114ecc3274da72c3351f37180ebeb86d2"
+    },
+    {
+      "file": "chunk-31.zst",
+      "compressedSha256": "6b7051be50224aaec2d4e0b27c360718044e19776a1e439ae837aab41986f13e",
+      "packedSha256": "2c8c19320f1d4dbbb9e5d4affc69000d8dbe686975b395cfc4c6544b3a769554",
+      "sourceCodesSha256": "892d564f560973434fc0d55dc5f3924c4cb8914ed2b78ffeac066dfa6e778845"
+    },
+    {
+      "file": "chunk-32.zst",
+      "compressedSha256": "240b1f8f9ce54c7718b30edffb35d1145f76128a1ca29e7459bb4516e85de6e8",
+      "packedSha256": "4fcf2329efce03950ff44de1e9612e8a95256801d71bf38cef7128f6a490244b",
+      "sourceCodesSha256": "4fd65550482ed5fb80a84371a813f6a19092ff437236e083f23b857e4e571ec2"
+    },
+    {
+      "file": "chunk-33.zst",
+      "compressedSha256": "c9dc0d5b9d50189ab038f12a777815f34e9f3da60498f1bd3bc17de1f9a450ef",
+      "packedSha256": "5c198bdb8574c28597e51d54fc5345c1dfeb0e0a5314713cf6cddea92c3d8839",
+      "sourceCodesSha256": "9379c5ad3006ef258a35b9bfa736fa64d19619d373aec11f37763337f59c106b"
+    },
+    {
+      "file": "chunk-34.zst",
+      "compressedSha256": "ce8e655b97654b665659c85f94a88e1322a7566e4c8835ba1f11eee13b117a3c",
+      "packedSha256": "a90d21e9a19e68f6fe3d683dfa1959aa8ee06d38c2edca37464f1a3b8c82a032",
+      "sourceCodesSha256": "54c47296a4e80f9700407b7e50e21a220d235bef26fa2867e25536493cef7fd2"
+    },
+    {
+      "file": "chunk-35.zst",
+      "compressedSha256": "672848c0b7d5be9f32cc887f06a07267c3df0ad857baad64c225c38daf9e89d8",
+      "packedSha256": "e5ee1cec0611be851fcfe0d8d76139bde782b318eb5ddc50d84516f1c0c22b5a",
+      "sourceCodesSha256": "e834d4265abbb7638e665dfed35c2192f945557fe25d5ce96e0daa6fd8d572dd"
+    }
+  ]
+}

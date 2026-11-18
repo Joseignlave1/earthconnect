@@ -1,0 +1,434 @@
+{
+  "format": "earth-connect-assets-v1",
+  "runtimeFileCount": 43,
+  "runtimeBytes": 223313041,
+  "scoreManifest": {
+    "key": "compute-data/world/manifest-6aa2a505b289ca126ab57af9e33ddfdc205841427f7124dd729b5d3b4dee95e9.json",
+    "bytes": 16947,
+    "sha256": "6aa2a505b289ca126ab57af9e33ddfdc205841427f7124dd729b5d3b4dee95e9",
+    "etag": "49322d62b7995ca97ccad07bf0f82a21",
+    "contentType": "application/json",
+    "cacheControl": "public, max-age=31536000, immutable",
+    "role": "score-manifest"
+  },
+  "assets": {
+    "compute-data/world/chunk-00.zst": {
+      "key": "compute-data/world/chunk-00-75182fcdbf583480359f23839e39f5121080a0e25fae12732ef561ab1197ff00.zst",
+      "bytes": 583074,
+      "sha256": "75182fcdbf583480359f23839e39f5121080a0e25fae12732ef561ab1197ff00",
+      "etag": "b86b4cfd0326e6bafe068076a6b0011e",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-01.zst": {
+      "key": "compute-data/world/chunk-01-74a95c16982ffd7e5b5b507d19970e3e388e246d442a1db2e159ccd2cdf1ad01.zst",
+      "bytes": 582731,
+      "sha256": "74a95c16982ffd7e5b5b507d19970e3e388e246d442a1db2e159ccd2cdf1ad01",
+      "etag": "a0ce4024f3970134f9f1b4fbad580a10",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-02.zst": {
+      "key": "compute-data/world/chunk-02-700a883097c1eb26e81e98401bb432c347d4b9b36545135d51c44297bf1f118c.zst",
+      "bytes": 599237,
+      "sha256": "700a883097c1eb26e81e98401bb432c347d4b9b36545135d51c44297bf1f118c",
+      "etag": "c904157e332e3f83f68ff1afa3b7f195",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-03.zst": {
+      "key": "compute-data/world/chunk-03-4091232c3c8cfb555b85340b74f4d8737e0022e4ae4ad327f93dfcf28c6988b4.zst",
+      "bytes": 602804,
+      "sha256": "4091232c3c8cfb555b85340b74f4d8737e0022e4ae4ad327f93dfcf28c6988b4",
+      "etag": "91e9e5ce4c99355aa4035c01f0930549",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-04.zst": {
+      "key": "compute-data/world/chunk-04-bec52ad03b604055ca308a5af2a0a60dab3e375a4641917dd3bffc6515d1db07.zst",
+      "bytes": 748696,
+      "sha256": "bec52ad03b604055ca308a5af2a0a60dab3e375a4641917dd3bffc6515d1db07",
+      "etag": "790474189cded6b9b38bcebcabbaa666",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-05.zst": {
+      "key": "compute-data/world/chunk-05-53950e05428244fa03ca835426f28e28ab2449d136ea4a9e77696a18e31eda1b.zst",
+      "bytes": 3450729,
+      "sha256": "53950e05428244fa03ca835426f28e28ab2449d136ea4a9e77696a18e31eda1b",
+      "etag": "e9098859efe2e3e7f761e9e24f107708",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-06.zst": {
+      "key": "compute-data/world/chunk-06-8a38364fd9b0771309a11021dacdbbc691c6970a302e425a7c44ef7903652306.zst",
+      "bytes": 4722645,
+      "sha256": "8a38364fd9b0771309a11021dacdbbc691c6970a302e425a7c44ef7903652306",
+      "etag": "00d560cc29152970f8bbf28615239d3f",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-07.zst": {
+      "key": "compute-data/world/chunk-07-75043c153be12f1fb0a05cb2ef1579df3d7ced33be5dc1b15764570c74355738.zst",
+      "bytes": 7571973,
+      "sha256": "75043c153be12f1fb0a05cb2ef1579df3d7ced33be5dc1b15764570c74355738",
+      "etag": "0be97064a90fa1e314f65789883be204",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-08.zst": {
+      "key": "compute-data/world/chunk-08-5e6fe8bbff28dcd68a43252a5a24d04f4c89c09f80cd4ec96b2fc381c0c126a9.zst",
+      "bytes": 6151616,
+      "sha256": "5e6fe8bbff28dcd68a43252a5a24d04f4c89c09f80cd4ec96b2fc381c0c126a9",
+      "etag": "5dfa3fee0e5ca2b3ead3836bcd536407",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-09.zst": {
+      "key": "compute-data/world/chunk-09-5a6a1093f234b3f22c29bb14a25cf3cccd7cbda6534b219c17bb59898ba51756.zst",
+      "bytes": 8559022,
+      "sha256": "5a6a1093f234b3f22c29bb14a25cf3cccd7cbda6534b219c17bb59898ba51756",
+      "etag": "2bf47ad98e9dafe1feab6a7b4c761e54",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-10.zst": {
+      "key": "compute-data/world/chunk-10-0bc60e5e24c49d25a4e9b7633b795da54e0b711d0d6608c9dc7a53b7f7ab234c.zst",
+      "bytes": 6366617,
+      "sha256": "0bc60e5e24c49d25a4e9b7633b795da54e0b711d0d6608c9dc7a53b7f7ab234c",
+      "etag": "f3a0ed2eccbfad23ac6c5fbf324b3153",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-11.zst": {
+      "key": "compute-data/world/chunk-11-583c3729a6fa7d2c4a321ebd551b13c2e49e8da3c736683a880a39bfb607646a.zst",
+      "bytes": 7999447,
+      "sha256": "583c3729a6fa7d2c4a321ebd551b13c2e49e8da3c736683a880a39bfb607646a",
+      "etag": "7e2a64b634a9f8ee269b441eab1bc7da",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-12.zst": {
+      "key": "compute-data/world/chunk-12-c9b8e7490452aa71cd9616a9deff0157d252d9ffe58840d1b2896a830bfa7908.zst",
+      "bytes": 3870783,
+      "sha256": "c9b8e7490452aa71cd9616a9deff0157d252d9ffe58840d1b2896a830bfa7908",
+      "etag": "19fc262a828f4f3b41633f9f627bb9d2",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-13.zst": {
+      "key": "compute-data/world/chunk-13-dc32582e1c294cf5e5d0df5f7f3aed75462572dbe2c6a4d868281425c5529a85.zst",
+      "bytes": 2870026,
+      "sha256": "dc32582e1c294cf5e5d0df5f7f3aed75462572dbe2c6a4d868281425c5529a85",
+      "etag": "eb7f858b60d43a1e1fe092141cdef475",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-14.zst": {
+      "key": "compute-data/world/chunk-14-35fa0e8666c6eef8848531367926fec88b1cb80bc6da6aeb9e0282eb86cbfc4d.zst",
+      "bytes": 1848126,
+      "sha256": "35fa0e8666c6eef8848531367926fec88b1cb80bc6da6aeb9e0282eb86cbfc4d",
+      "etag": "b554544803a9d5d67f7159d0ff294a6d",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-15.zst": {
+      "key": "compute-data/world/chunk-15-87ca9689693d097483b9f64ac72c6c5397448dcabc6a848f693b5e3facd3612a.zst",
+      "bytes": 4066781,
+      "sha256": "87ca9689693d097483b9f64ac72c6c5397448dcabc6a848f693b5e3facd3612a",
+      "etag": "df0bcfee1b6c778a0bc5f4e8c4b92771",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-16.zst": {
+      "key": "compute-data/world/chunk-16-70fbecdb0e701df6722f7852cc646d90d2892df52b28f3a372641c1b8445f6fb.zst",
+      "bytes": 7833276,
+      "sha256": "70fbecdb0e701df6722f7852cc646d90d2892df52b28f3a372641c1b8445f6fb",
+      "etag": "5d0d7f347045866654702e470a2b99f1",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-17.zst": {
+      "key": "compute-data/world/chunk-17-10cf7b7e80f9715b776c5d64f0123bfbbd3f9cf6622b263a4681b259115c7873.zst",
+      "bytes": 4030615,
+      "sha256": "10cf7b7e80f9715b776c5d64f0123bfbbd3f9cf6622b263a4681b259115c7873",
+      "etag": "2da10413438371d8597a4b49f311d4f6",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-18.zst": {
+      "key": "compute-data/world/chunk-18-ad18f09ceae8138e58bedc13a71c43724e4b078eb8befc1790782f4b2de867a9.zst",
+      "bytes": 6612204,
+      "sha256": "ad18f09ceae8138e58bedc13a71c43724e4b078eb8befc1790782f4b2de867a9",
+      "etag": "48830d1ab88d010f94d45a45ada08f32",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-19.zst": {
+      "key": "compute-data/world/chunk-19-9228c5035e66f1d7756336fe3fac224c2f9a229e3945e8dd73cbec2c7ac8a49c.zst",
+      "bytes": 11971446,
+      "sha256": "9228c5035e66f1d7756336fe3fac224c2f9a229e3945e8dd73cbec2c7ac8a49c",
+      "etag": "d2f8b23d7cbb0ab2712891e6a6532b63",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-20.zst": {
+      "key": "compute-data/world/chunk-20-fbe32f084f25163baee5a5887fff85df6f40572ae6f4f0851f7cef547065f834.zst",
+      "bytes": 8576364,
+      "sha256": "fbe32f084f25163baee5a5887fff85df6f40572ae6f4f0851f7cef547065f834",
+      "etag": "c2e81a5a26d07eaf54e402cee490e716",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-21.zst": {
+      "key": "compute-data/world/chunk-21-ae7cb55fca27efae3c15aa4cfc6cad18be1a4e4b17972118fb8401a0a2ffebff.zst",
+      "bytes": 8822424,
+      "sha256": "ae7cb55fca27efae3c15aa4cfc6cad18be1a4e4b17972118fb8401a0a2ffebff",
+      "etag": "e1f66acd24a28d32de5ecd69c88503fe",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-22.zst": {
+      "key": "compute-data/world/chunk-22-7eff901c7b0ce59e2b22ff735cbe9867e5de1bf4142636b32c1f70264b68efe5.zst",
+      "bytes": 12447196,
+      "sha256": "7eff901c7b0ce59e2b22ff735cbe9867e5de1bf4142636b32c1f70264b68efe5",
+      "etag": "dd8c0e6ec2c7c88907b574311d8824f6",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-23.zst": {
+      "key": "compute-data/world/chunk-23-6c0182f967be79670b26d3f4b6ab6c846271ca1a44f8c2459cd033b334b24c74.zst",
+      "bytes": 10510005,
+      "sha256": "6c0182f967be79670b26d3f4b6ab6c846271ca1a44f8c2459cd033b334b24c74",
+      "etag": "dec22a49ab52e2c232e2546956dbd6b3",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-24.zst": {
+      "key": "compute-data/world/chunk-24-d83447c106b01ac7bdaf519a79abf09d2a0b98878e7b75c4ed908a1439af6aaa.zst",
+      "bytes": 8756188,
+      "sha256": "d83447c106b01ac7bdaf519a79abf09d2a0b98878e7b75c4ed908a1439af6aaa",
+      "etag": "fdf311083b52f4e7459c1cd3cf5fcb4e",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-25.zst": {
+      "key": "compute-data/world/chunk-25-9d54797218363abe555ffa320d40669921514eadfe6d3e8b7017e5252986ffa3.zst",
+      "bytes": 4996762,
+      "sha256": "9d54797218363abe555ffa320d40669921514eadfe6d3e8b7017e5252986ffa3",
+      "etag": "a5731c34477b4e6729e39efae7907512",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-26.zst": {
+      "key": "compute-data/world/chunk-26-34176806192a9996e3188ea8f50c213c331e3667b7ad7c667a95550c57a6f2b3.zst",
+      "bytes": 3871954,
+      "sha256": "34176806192a9996e3188ea8f50c213c331e3667b7ad7c667a95550c57a6f2b3",
+      "etag": "e806616fcb1263b334f3fd97add667f6",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-27.zst": {
+      "key": "compute-data/world/chunk-27-5b4946d5433719ae630972fb6b586a7430c632ce84e0bbefa4468214af024e01.zst",
+      "bytes": 7332210,
+      "sha256": "5b4946d5433719ae630972fb6b586a7430c632ce84e0bbefa4468214af024e01",
+      "etag": "3a629e4f83b03d7b5a1155684208741e",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-28.zst": {
+      "key": "compute-data/world/chunk-28-832085b6ef9f0a742896e009171b73c9a5185da55a133ca077606f597242a001.zst",
+      "bytes": 6002719,
+      "sha256": "832085b6ef9f0a742896e009171b73c9a5185da55a133ca077606f597242a001",
+      "etag": "6630bca80a81c54ee44303a4fe9c1187",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-29.zst": {
+      "key": "compute-data/world/chunk-29-64240b4fdcad8ffab5e948ca1c18e20a97853ef3bdbec777a6df711557e44ea1.zst",
+      "bytes": 5685842,
+      "sha256": "64240b4fdcad8ffab5e948ca1c18e20a97853ef3bdbec777a6df711557e44ea1",
+      "etag": "bfc9ec85bd95dcda9dacf2123f944c64",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-30.zst": {
+      "key": "compute-data/world/chunk-30-2bc391389f3c95e94eaa27bb97dbb6642a16bb57139aa012a7457192f3bdec23.zst",
+      "bytes": 4163078,
+      "sha256": "2bc391389f3c95e94eaa27bb97dbb6642a16bb57139aa012a7457192f3bdec23",
+      "etag": "5b4497cb6cc712e02e096ce7cb944b92",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-31.zst": {
+      "key": "compute-data/world/chunk-31-6b7051be50224aaec2d4e0b27c360718044e19776a1e439ae837aab41986f13e.zst",
+      "bytes": 3618035,
+      "sha256": "6b7051be50224aaec2d4e0b27c360718044e19776a1e439ae837aab41986f13e",
+      "etag": "59ff5f7fbc163b863e6d3e4cfb71e5f2",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-32.zst": {
+      "key": "compute-data/world/chunk-32-240b1f8f9ce54c7718b30edffb35d1145f76128a1ca29e7459bb4516e85de6e8.zst",
+      "bytes": 3139032,
+      "sha256": "240b1f8f9ce54c7718b30edffb35d1145f76128a1ca29e7459bb4516e85de6e8",
+      "etag": "3f077df99d75a0fa438384747bde2c29",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-33.zst": {
+      "key": "compute-data/world/chunk-33-c9dc0d5b9d50189ab038f12a777815f34e9f3da60498f1bd3bc17de1f9a450ef.zst",
+      "bytes": 3387627,
+      "sha256": "c9dc0d5b9d50189ab038f12a777815f34e9f3da60498f1bd3bc17de1f9a450ef",
+      "etag": "7787aa962f5d5777521a5ae210843c36",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-34.zst": {
+      "key": "compute-data/world/chunk-34-ce8e655b97654b665659c85f94a88e1322a7566e4c8835ba1f11eee13b117a3c.zst",
+      "bytes": 756941,
+      "sha256": "ce8e655b97654b665659c85f94a88e1322a7566e4c8835ba1f11eee13b117a3c",
+      "etag": "6b8a5ca4ae5261ec4344909f536cd05d",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/chunk-35.zst": {
+      "key": "compute-data/world/chunk-35-672848c0b7d5be9f32cc887f06a07267c3df0ad857baad64c225c38daf9e89d8.zst",
+      "bytes": 287396,
+      "sha256": "672848c0b7d5be9f32cc887f06a07267c3df0ad857baad64c225c38daf9e89d8",
+      "etag": "8b5d26ed09b9b4e928862ce2542b5755",
+      "contentType": "application/zstd",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "data/surface-basins.bin": {
+      "key": "assets/data/surface-basins-b7676da9558e6d3afb8999a00a2214fc46820eeeb3f8bacfece8290eec11ca6c.bin",
+      "bytes": 16617847,
+      "sha256": "b7676da9558e6d3afb8999a00a2214fc46820eeeb3f8bacfece8290eec11ca6c",
+      "etag": "dad3a3c14f139858fe267e654e8a572e",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/earth-blue-marble.jpg": {
+      "key": "assets/textures/earth-blue-marble-b4c4aa7b8ee94975390aa42685c1a0beb942b6b608fe52e2a095bfcd57087f9f.jpg",
+      "bytes": 436887,
+      "sha256": "b4c4aa7b8ee94975390aa42685c1a0beb942b6b608fe52e2a095bfcd57087f9f",
+      "etag": "44bd5f4a39893386555bd7a49578fd76",
+      "contentType": "image/jpeg",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/earth-terrain.bin": {
+      "key": "assets/textures/earth-terrain-6d8e660505be35808e8befaf3e8faa7ad5deba64e68d4627821cacbecd7462a7.bin",
+      "bytes": 17659380,
+      "sha256": "6d8e660505be35808e8befaf3e8faa7ad5deba64e68d4627821cacbecd7462a7",
+      "etag": "ce274d0b2dcf816bca0456c3466d97a5",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/mars-terrain.bin": {
+      "key": "assets/textures/mars-terrain-d96b6a29c4ef8595cab5f53adbc8d4acff976ac41769d8e8c94a1468afeac239.bin",
+      "bytes": 1890506,
+      "sha256": "d96b6a29c4ef8595cab5f53adbc8d4acff976ac41769d8e8c94a1468afeac239",
+      "etag": "c8c0770f0749afbf89f0d5b811a3b781",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/moon-terrain.bin": {
+      "key": "assets/textures/moon-terrain-147d0873a8761291210d999caff4d6feddf92c4f1f5c2554b9c931f5af0aa666.bin",
+      "bytes": 2130165,
+      "sha256": "147d0873a8761291210d999caff4d6feddf92c4f1f5c2554b9c931f5af0aa666",
+      "etag": "ec011dd9b903dc8582d2fbd9182aa62c",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/nasa-deep-star-map.webp": {
+      "key": "assets/textures/nasa-deep-star-map-7bd5cb88a1304c210459b7a7adbcb77abdf5cac06be8b7fc9f273498d83069be.webp",
+      "bytes": 1165688,
+      "sha256": "7bd5cb88a1304c210459b7a7adbcb77abdf5cac06be8b7fc9f273498d83069be",
+      "etag": "290a5d766ef5f8ea7155b1511b5b18b4",
+      "contentType": "image/webp",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "compute-data/world/manifest.json": {
+      "key": "compute-data/world/manifest-6aa2a505b289ca126ab57af9e33ddfdc205841427f7124dd729b5d3b4dee95e9.json",
+      "bytes": 16947,
+      "sha256": "6aa2a505b289ca126ab57af9e33ddfdc205841427f7124dd729b5d3b4dee95e9",
+      "etag": "49322d62b7995ca97ccad07bf0f82a21",
+      "contentType": "application/json",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "score-manifest"
+    }
+  },
+  "metadata": {
+    "data/surface-basins.json": {
+      "key": "assets/data/surface-basins-9e128d6794ba1ebb942457d5efe417915f454fe84015f275e6f096490461a040.json",
+      "bytes": 16985,
+      "sha256": "9e128d6794ba1ebb942457d5efe417915f454fe84015f275e6f096490461a040",
+      "etag": "f7ab9ea13d8e476e5ec5910f40682942",
+      "contentType": "application/json",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "metadata"
+    },
+    "textures/CREDITS.txt": {
+      "key": "assets/textures/CREDITS-52f23e3314168bcb842aaece42c0b4b2c22ce68c25791bed14689986ef4342b2.txt",
+      "bytes": 6095,
+      "sha256": "52f23e3314168bcb842aaece42c0b4b2c22ce68c25791bed14689986ef4342b2",
+      "etag": "4fb9090a01d35cd0692b6c35bf648488",
+      "contentType": "text/plain; charset=utf-8",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "metadata"
+    },
+    "compute-data/world/CREDITS.md": {
+      "key": "compute-data/world/CREDITS-a3394fdfc13df9d378a6dd8ab0056456cd3029eb1ef8b151536696e560a600d0.md",
+      "bytes": 1576,
+      "sha256": "a3394fdfc13df9d378a6dd8ab0056456cd3029eb1ef8b151536696e560a600d0",
+      "etag": "be05033b52a8446ed141478fb4783ce3",
+      "contentType": "text/markdown; charset=utf-8",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "metadata"
+    }
+  },
+  "release": "9b4f36b45e46d8c3b2078e1573b950008c67ef7071fa4df9caaa43287d4c4a0c",
+  "immutableManifestKey": "releases/9b4f36b45e46d8c3b2078e1573b950008c67ef7071fa4df9caaa43287d4c4a0c.json"
+}
