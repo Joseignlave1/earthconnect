@@ -1,13 +1,26 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>earthconnect</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <link rel="preconnect" href="https://earth-connect-assets.pages.dev" crossorigin>
+  <link rel="icon" href="/src/assets/favicon.svg" type="image/svg+xml">
+  <title>Earth Connect</title>
+  <style>
+    html{background:#000;color:#f7f9ff}
+    #initial{position:fixed;inset:0;display:grid;place-items:center;padding:24px;background:#000;font:14px/1.5 system-ui,sans-serif;text-align:center}
+    #root:not(:empty)+#initial{display:none}
+    #initial div{width:min(100%,300px)}
+    #initial b{display:block;text-align:left;letter-spacing:.2em;font-size:13px;height:30px;line-height:30px}
+    #initial b::before{content:"";display:inline-block;vertical-align:middle;width:28px;height:28px;border:1px solid #b8b8b8;border-radius:50%;margin-right:13px;background:radial-gradient(circle,#fc3d21 3px,transparent 4px)}
+    #initial hr{height:2px;margin:30px 0 12px;border:0;background:#292929}
+    #initial p{margin:0;color:#bbb}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <main id="initial"><div><b>EARTH CONNECT</b><hr><p id="initial-status" role="status">Checking Earth data…</p></div></main>
+  <script type="module" src="/src/workspace/pagesBootstrap.ts"></script>
+</body>
 </html>

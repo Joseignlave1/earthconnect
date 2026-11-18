@@ -6,17 +6,37 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:pages": "tsc -b && vite build --mode pages",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "fetch:assets": "node scripts/hydrate-assets.mjs",
+    "test:shader": "npm run fetch:assets -- render && node --test tests/shader-test.test.ts tests/planet-terrain.test.ts tests/solar-camera.test.ts tests/solar-system.test.ts tests/wgsl-project.test.ts tests/planetary-point-cache.test.ts tests/planetary-shader-analysis.test.ts",
+    "export:shader": "node scripts/export-shader.mjs",
+    "export:workspace": "node scripts/export-workspace.mjs",
+    "snapshot:shader": "node scripts/fetch-score-snapshot.mjs",
+    "preview": "vite preview",
+    "build:compute": "node scripts/build-earth-score.mjs && tsc -p tsconfig.compute.json",
+    "test:compute": "npm run fetch:assets -- world && node --test tests/earth-score/compute.test.ts",
+    "test:compute:gpu": "npm run build:compute && node --test tests/earth-score/decoder-worker.test.mjs && node tests/earth-score/run.mjs"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.17.0",
+    "@codingame/monaco-vscode-api": "39.0.4",
+    "@codingame/monaco-vscode-configuration-service-override": "39.0.4",
+    "@codingame/monaco-vscode-files-service-override": "39.0.4",
+    "@codingame/monaco-vscode-languages-service-override": "39.0.4",
+    "@codingame/monaco-vscode-model-service-override": "39.0.4",
+    "@codingame/monaco-vscode-textmate-service-override": "39.0.4",
+    "@codingame/monaco-vscode-theme-service-override": "39.0.4",
+    "@codingame/monaco-vscode-views-service-override": "39.0.4",
     "@connectrpc/connect": "^2.3.0",
     "@connectrpc/connect-web": "^2.3.0",
-    "cesium": "^1.147.0",
-    "proj4": "^2.20.3",
+    "astronomy-engine": "^2.1.19",
+    "monaco-editor": "npm:@codingame/monaco-vscode-editor-api@39.0.4",
+    "monaco-vim": "^0.4.4",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "vscode-languageserver-types": "^3.18.5",
+    "wgsl-analyzer-web": "^0.11.539"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -24,13 +44,14 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "@webgpu/types": "^0.1.74",
     "eslint": "^10.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.13.0",
+    "playwright-core": "1.58.2",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",
-    "vite": "^8.3.6",
-    "vite-plugin-cesium": "^1.2.23"
+    "vite": "^8.3.6"
   }
 }

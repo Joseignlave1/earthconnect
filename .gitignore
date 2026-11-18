@@ -9,7 +9,9 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-pages
 dist-ssr
+exports/
 *.local
 
 # Editor directories and files
@@ -22,3 +24,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local copies of the pinned CDN release and terrain preparation output
+/compute-data/world/chunk-*.zst
+/public/data/surface-basins.bin
+/public/textures/earth-blue-marble.jpg
+/public/textures/earth-elevation.png
+/public/textures/earth-terrain.bin
+/public/textures/mars-terrain.bin
+/public/textures/moon-terrain.bin
+/public/textures/nasa-deep-star-map.webp
