@@ -4,6 +4,12 @@ Earth Connect compares Moon and Mars sites with conditions on Earth. Run
 `npm install` and `npm run dev`, then open the shared sky workspace at
 [localhost:5173](http://localhost:5173/). The same workspace opens at `/find`.
 
+The [hero study](/hero/) looks across the northwestern escarpment of Olympus
+Mons at twilight in WebGPU. The scene combines regional HRSC/MOLA terrain,
+CTX imagery, and local HiRISE stereo data with artistic erosion and lighting.
+A signal arcs from the plain to a small Earth above the horizon.
+[Data credits and baking instructions](src/hero/assets/CREDITS.md)
+
 ## Surface rendering lab
 
 Open the standalone lab at [`/shader-test/`](http://localhost:5173/shader-test/).

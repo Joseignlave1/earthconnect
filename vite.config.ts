@@ -42,11 +42,13 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: { exclude: ['wgsl-analyzer-web'] },
   server: { headers: isolationHeaders },
   preview: { headers: isolationHeaders },
-  build: mode === 'pages' ? { outDir: pagesOutput, emptyOutDir: true } : {
+  build: {
+    ...(mode === 'pages' && { outDir: pagesOutput, emptyOutDir: true }),
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
-        shaderTest: fileURLToPath(new URL('./shader-test/index.html', import.meta.url)),
+        hero: fileURLToPath(new URL('./hero/index.html', import.meta.url)),
+        ...(mode !== 'pages' && { shaderTest: fileURLToPath(new URL('./shader-test/index.html', import.meta.url)) }),
       },
     },
   },
