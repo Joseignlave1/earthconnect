@@ -12,6 +12,7 @@ import type { CompletionItem, Hover, Position, Range } from 'vscode-languageserv
 import { assembleShaderProject, findShaderLocation, selectShaderModule, type ShaderFile, type ShaderFileKind } from './shaderProject'
 import { wgslKeywords as keywords, wgslLanguageId as language, wgslTypes as types } from './wgslTheme'
 import { startWgslLanguageServer } from './wgslLanguageServer'
+import { registerSharedWgslAnalyzer } from './planetaryShaderAnalysis'
 import './WgslEditor.css'
 
 export type WgslDiagnostic = {
@@ -27,7 +28,10 @@ type Props = {
   onPreviewHost: (id: string, host: HTMLElement | undefined) => void
   onPreviewOpenChange: (ids: readonly string[]) => void
   onVisiblePreviews: (ids: readonly string[]) => void
+  takePrewarmedHost?: (id: string) => HTMLElement | undefined
   onLayoutReady: () => void
+  analyzerEnabled?: boolean
+  onAnalyzerReady?: () => void
   onStartError?: () => void
   files: readonly ShaderFile[]
   activeFileId: string
@@ -198,8 +202,8 @@ type FileModel = {
 }
 
 export default function WgslEditor(props: Props) {
-  const { files, activeFileId, diagnostics, insertion, onInserted, prelude = '', label = 'WGSL score function', vim } = props
-  const current = { ...props, prelude, label }
+  const { files, activeFileId, diagnostics, insertion, onInserted, prelude = '', label = 'WGSL score function', vim, analyzerEnabled = true } = props
+  const current = { ...props, prelude, label, analyzerEnabled }
   const panel = useRef<HTMLDivElement>(null)
   const container = useRef<HTMLDivElement>(null)
   const insertedId = useRef<number | undefined>(undefined)
@@ -207,6 +211,7 @@ export default function WgslEditor(props: Props) {
     reconcile: () => void
     updateMarkers: () => void
     updateEditors: () => void
+    maybeStartAnalyzer: () => void
   }>(null)
   const latest = useRef(current)
   useLayoutEffect(() => { latest.current = current })
@@ -238,6 +243,7 @@ export default function WgslEditor(props: Props) {
     let needsReconcile = false
     let syncedProject: { files: readonly ShaderFile[]; activeFileId: string } | undefined
     let server: Awaited<ReturnType<typeof startWgslLanguageServer>> | undefined
+    let unregisterAnalyzer: (() => void) | undefined
     let startupTimer: ReturnType<typeof window.setTimeout> | undefined
     let program = assembleShaderProject([])
     let virtualProgram = ''
@@ -531,6 +537,8 @@ export default function WgslEditor(props: Props) {
 
     const fallback = () => {
       if (analyzerController.signal.aborted) return
+      unregisterAnalyzer?.()
+      unregisterAnalyzer = undefined
       server?.dispose()
       server = undefined
       editorPanel.dataset.languageService = 'local'
@@ -615,31 +623,44 @@ export default function WgslEditor(props: Props) {
         }, fallback, analyzerController.signal).then(ready => {
           if (analyzerController.signal.aborted) return
           server = ready
+          unregisterAnalyzer = registerSharedWgslAnalyzer(ready.syntaxTreeFor)
           editorPanel.dataset.languageService = 'wgsl-analyzer'
           sync()
+          latest.current.onAnalyzerReady?.()
         }).catch(fallback).finally(() => window.clearTimeout(startupTimer))
       } else {
         editorPanel.dataset.languageService = 'local'
       }
     }
 
-    instance.current = { reconcile: () => { void reconcile() }, updateMarkers, updateEditors }
+    let analyzerStarted = false
+    let workbenchReady = false
+    function maybeStartAnalyzer() {
+      if (analyzerStarted || !workbenchReady || !latest.current.analyzerEnabled || controller.signal.aborted) return
+      analyzerStarted = true
+      startAnalyzer(editorPanel!)
+    }
+
+    instance.current = { reconcile: () => { void reconcile() }, updateMarkers, updateEditors, maybeStartAnalyzer }
     void mountShaderWorkbench(host, {
-      onSelect: id => latest.current.onActiveFileChange(id),
-      onClose: id => latest.current.onCloseFile(id),
-      onReopen: id => latest.current.onReopenFile(id),
+      onSelect: id => { if (!controller.signal.aborted) latest.current.onActiveFileChange(id) },
+      onClose: id => !controller.signal.aborted && latest.current.onCloseFile(id),
+      onReopen: id => { if (!controller.signal.aborted) latest.current.onReopenFile(id) },
       onEditor: editor => {
+        if (controller.signal.aborted) return
         activeEditor = editor
         if (workbench) updateEditors()
       },
       onPreviewHost: (id, preview) => {
+        if (controller.signal.aborted) return
         if (preview) previewHosts.set(id, preview)
         else previewHosts.delete(id)
         latest.current.onPreviewHost(id, preview)
       },
-      onPreviewOpenChange: ids => latest.current.onPreviewOpenChange(ids),
-      onVisiblePreviews: ids => latest.current.onVisiblePreviews(ids),
-    }).then(async bench => {
+      onPreviewOpenChange: ids => { if (!controller.signal.aborted) latest.current.onPreviewOpenChange(ids) },
+      onVisiblePreviews: ids => { if (!controller.signal.aborted) latest.current.onVisiblePreviews(ids) },
+      takePrewarmedHost: id => controller.signal.aborted ? undefined : latest.current.takePrewarmedHost?.(id),
+    }, controller.signal).then(async bench => {
       if (controller.signal.aborted) {
         bench.dispose()
         return
@@ -670,8 +691,9 @@ export default function WgslEditor(props: Props) {
       await reconcile(true)
       if (!controller.signal.aborted) {
         bench.renderVisibleEditors()
+        workbenchReady = true
         latest.current.onLayoutReady()
-        startAnalyzer(editorPanel)
+        maybeStartAnalyzer()
       }
     }).catch(error => {
       if (controller.signal.aborted) return
@@ -683,6 +705,8 @@ export default function WgslEditor(props: Props) {
 
     return () => {
       controller.abort()
+      unregisterAnalyzer?.()
+      unregisterAnalyzer = undefined
       analyzerController.abort()
       host.removeEventListener('keydown', runFromPreview)
       window.clearTimeout(startupTimer)
@@ -702,6 +726,7 @@ export default function WgslEditor(props: Props) {
   useLayoutEffect(() => { instance.current?.reconcile() }, [files, activeFileId, prelude])
   useEffect(() => { instance.current?.updateMarkers() }, [diagnostics])
   useEffect(() => { instance.current?.updateEditors() }, [vim, label, insertion, onInserted])
+  useEffect(() => { if (analyzerEnabled) instance.current?.maybeStartAnalyzer() }, [analyzerEnabled])
 
   return <div ref={panel} className="wgsl-editor">
     <div ref={container} className="wgsl-monaco" />

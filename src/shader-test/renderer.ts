@@ -5,7 +5,7 @@ import { GpuTimer, GPU_STAGES, type GpuTimings, type TimingResult } from './gpu-
 import { resolveScoreStyle, ScoreDistribution, type ColorMode } from './score-style.ts'
 import { PostProcess } from './postprocess.ts'
 import { motionBlurUniforms } from './motion-blur.ts'
-import { shaderModule, uploadBuffer, fullscreenVertex } from './gpu.ts'
+import { shaderModule, uploadBuffer, writeTextureChunked, fullscreenVertex } from './gpu.ts'
 import { surfaceShader } from './surface-shader.ts'
 import { cameraBasis, cameraMatrix, createMesh, EARTH_AXIS, ease, FOV, grabCenter, grabRotation, orbitRotation, surfacePoint, SurfacePicker, type Camera, type Rotation, type Selection, type Vec3 } from './geometry.ts'
 import { contourDetail } from './contours.ts'
@@ -13,20 +13,22 @@ import { cellAddress, MISSING, RADIUS, SIZE, tileRow, tileX, worldTiles } from '
 import type { WorldNoise } from './world-noise.ts'
 import DatasetWorker from './noise-worker.ts?worker&inline'
 import { prepareDataset, type DataRequest, type DatasetMessage } from './prepare-dataset.ts'
-import { elevationAt, elevationPyramid, loadTerrain, poleElevations, type Terrain } from './terrain.ts'
+import { elevationAt, elevationPyramid, packRg32FloatLevels, type Terrain } from './terrain.ts'
+import { loadPreparedTerrain, type PreparedTerrain } from './terrain-loader.ts'
 import type { EarthScore, ScoreLayout } from '../earth-score/index.ts'
-import { createScoreTextures, destroyScoreTextures, prepareComputedScores, readComputedScore, scoreMipCount, writeScoreLookup, type ScoreTextures } from './computed-scores.ts'
+import { createScoreTextures, destroyScoreTextures, prepareComputedScores, readComputedScore, scoreMipCount, scoreTexturesMatch, writeScoreLookup, type ScoreTextures } from './computed-scores.ts'
 import type { SolarCamera, SolarFocus, SolarFrame, SourceBody } from '../workspace/solarCamera.ts'
 import type { SolarScene, SourcePoint } from '../workspace/solarScene.ts'
 import { createSurfaceDevicePool } from './surface-device.ts'
+import type { TerrainLoader } from '../workspace/earthWorkspaceResources.ts'
 
 export type Options = { dataBoundary: boolean; contextFloor: number; contextOpacity: number; minimumScore: number; colorMode: ColorMode; focus: number; morph: number; base: number; emphasis: number; topRange: number; emission: number; opacity: number; exposure: number; bloom: number; hdr: boolean; relief: number; contourInterval: number; depthInterval: number; contourOpacity: number; grid: boolean; peaks: boolean; imagery: boolean }
 type ScoreDescription = { name: string; description: string }
-type SolarSettings = { createScene: typeof SolarScene.create; assetUrl: WorkspaceAssets['url']; onSourcePick: (body: SourceBody, point: SourcePoint) => void }
+type SolarSettings = { createScene: typeof SolarScene.create; assetUrl: WorkspaceAssets['url']; loadTerrain?: TerrainLoader; onSourcePick: (body: SourceBody, point: SourcePoint) => void }
 type SurfaceAssets = WorkspaceAssets['url']
 type RendererSettings = {
   assets?: SurfaceAssets
-  snapshot?: (signal: AbortSignal) => Promise<Blob>
+  loadTerrain?: TerrainLoader
   onDevice?: (device: GPUDevice) => void
   acquireDevice?: ReturnType<typeof createSurfaceDevicePool>
   transparent?: boolean
@@ -37,7 +39,113 @@ type RendererSettings = {
 type ComputedSource = { layout: ScoreLayout; bestAddress: number | null }
 type DatasetJob = { controller: AbortController; worker?: Worker }
 type OrbitView = { rotation: Rotation; zoom: number; center: Vec3 }
+type SurfacePipelines = {
+  layout: GPUBindGroupLayout
+  surface: GPURenderPipeline
+  annotation: GPURenderPipeline
+  coverage: GPURenderPipeline | null
+  coverageDescriptor: GPURenderPipelineDescriptor
+}
+type SharedMeshGpu = {
+  vertexBuffer: GPUBuffer
+  indexBuffer: GPUBuffer
+  geographicSampler: GPUSampler
+}
+type DeviceSurfaceCache = {
+  pipelines: Map<string, Promise<SurfacePipelines>>
+  mesh?: SharedMeshGpu
+  earthMip?: { pipeline: GPURenderPipeline; sampler: GPUSampler }
+  terrains: WeakMap<object, GPUTexture>
+  earthTextures: Map<string, GPUTexture>
+  createdTextures: GPUTexture[]
+}
+
 const tileCount = worldTiles().length
+const sharedMesh = createMesh()
+const decodedImages = new Map<string, Promise<HTMLImageElement>>()
+const surfaceCache = new WeakMap<GPUDevice, DeviceSurfaceCache>()
+
+function loadDecodedImage(url: string, crossOrigin: boolean): Promise<HTMLImageElement> {
+  let pending = decodedImages.get(url)
+  if (!pending) {
+    pending = new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image()
+      if (crossOrigin) image.crossOrigin = 'anonymous'
+      image.onload = () => resolve(image)
+      image.onerror = () => reject(new Error('Could not load the Earth background. Reload to retry.'))
+      image.src = url
+    })
+    decodedImages.set(url, pending)
+    void pending.catch(() => { if (decodedImages.get(url) === pending) decodedImages.delete(url) })
+  }
+  return pending
+}
+
+function getSurfaceCache(device: GPUDevice): DeviceSurfaceCache {
+  let entry = surfaceCache.get(device)
+  if (!entry) {
+    const createdTextures: GPUTexture[] = []
+    entry = { pipelines: new Map(), terrains: new WeakMap(), earthTextures: new Map(), createdTextures }
+    surfaceCache.set(device, entry)
+    void device.lost.then(() => {
+      entry!.mesh?.vertexBuffer.destroy()
+      entry!.mesh?.indexBuffer.destroy()
+      for (const texture of createdTextures) texture.destroy()
+      createdTextures.length = 0
+      surfaceCache.delete(device)
+    })
+  }
+  return entry
+}
+
+function getSurfacePipelines(device: GPUDevice, banks: number, bankSize: number, filterable: boolean, reverseDepth: boolean): Promise<SurfacePipelines> {
+  const cache = getSurfaceCache(device)
+  const key = `${banks}:${bankSize}:${filterable}:${reverseDepth}`
+  let pending = cache.pipelines.get(key)
+  if (!pending) {
+    pending = (async () => {
+      const vf = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT
+      const bindLayout = device.createBindGroupLayout({ label: 'Surface resources',entries: [
+        { binding: 0,visibility: vf,buffer: { type: 'uniform' } },
+        { binding: 1,visibility: GPUShaderStage.FRAGMENT,texture: { sampleType: 'uint' } },
+        { binding: 2,visibility: GPUShaderStage.FRAGMENT,texture: { sampleType: 'float' } },
+        { binding: 3,visibility: vf,texture: { sampleType: filterable ? 'float' : 'unfilterable-float' } },
+        { binding: 4,visibility: vf,sampler: { type: 'filtering' } },
+        { binding: 5,visibility: GPUShaderStage.FRAGMENT,texture: { sampleType: 'float' } },
+        ...Array.from({ length: banks },(_,i) => ({ binding: 6 + i,visibility: GPUShaderStage.FRAGMENT,texture: { sampleType: 'uint' as const,viewDimension: '2d-array' as const } })),
+      ] })
+      const module = await shaderModule(device,'Earth surface WGSL',surfaceShader(banks,bankSize,filterable))
+      const layout = device.createPipelineLayout({ bindGroupLayouts: [bindLayout] })
+      const pipeline = (label: string,entryPoint: string,targets: GPUColorTargetState[],count = 1): GPURenderPipelineDescriptor => ({
+        label,layout,
+        vertex: { module,entryPoint: 'surfaceVertex',buffers: [{ arrayStride: 8,attributes: [{ shaderLocation: 0,offset: 0,format: 'float32x2' }] }] },
+        fragment: { module,entryPoint,targets },
+        primitive: { topology: 'triangle-list',cullMode: 'none' },
+        depthStencil: { format: reverseDepth ? 'depth32float' : 'depth24plus',depthWriteEnabled: true,depthCompare: reverseDepth ? 'greater' : 'less' },multisample: { count },
+      })
+      const [surface,annotation] = await Promise.all([
+        device.createRenderPipelineAsync(pipeline('4x MSAA Earth surface','surfaceFragment',[{ format: 'rgba16float' }],4)),
+        device.createRenderPipelineAsync(pipeline('Geographic annotations','annotationFragment',[{ format: 'rg32float' }])),
+      ])
+      return { layout: bindLayout,surface,annotation,coverage: null,coverageDescriptor: pipeline('Geographic annotations with coverage','coverageAnnotationFragment',[{ format: 'rg32float' },{ format: 'r8unorm' }]) }
+    })()
+    cache.pipelines.set(key, pending)
+    void pending.catch(() => { if (cache.pipelines.get(key) === pending) cache.pipelines.delete(key) })
+  }
+  return pending
+}
+
+function getSharedMeshGpu(device: GPUDevice): SharedMeshGpu {
+  const cache = getSurfaceCache(device)
+  if (!cache.mesh) {
+    cache.mesh = {
+      vertexBuffer: uploadBuffer(device,'Surface UV vertices',sharedMesh.uv,GPUBufferUsage.VERTEX),
+      indexBuffer: uploadBuffer(device,'Surface indices',sharedMesh.indices,GPUBufferUsage.INDEX),
+      geographicSampler: device.createSampler({ addressModeU: 'repeat',addressModeV: 'clamp-to-edge',magFilter: 'linear',minFilter: 'linear',mipmapFilter: 'linear',maxAnisotropy: 16 }),
+    }
+  }
+  return cache.mesh
+}
 
 export class SurfaceRenderer {
   private device!: GPUDevice
@@ -45,7 +153,7 @@ export class SurfaceRenderer {
   private deviceErrors?: AbortController
   private context!: GPUCanvasContext
   private format: GPUTextureFormat = 'bgra8unorm'
-  private pipelines: { surface: GPURenderPipeline; annotation: GPURenderPipeline; coverage: GPURenderPipeline | null; coverageDescriptor: GPURenderPipelineDescriptor } | null = null
+  private pipelines: SurfacePipelines | null = null
   private layout!: GPUBindGroupLayout
   private bindings!: GPUBindGroup
   private annotationUniform!: GPUBuffer
@@ -57,18 +165,24 @@ export class SurfaceRenderer {
   private post!: PostProcess
   private cursor: { x: number; y: number } | null = null
   private scoreMap: ScoreTextures | null = null
+  private spareScoreMap: ScoreTextures | null = null
   private bankSize = 256
   private earthTexture!: GPUTexture
+  private earthOwned = true
+  private earthReady = false
   private earthImage: HTMLImageElement | null = null
+  private earthImageUrl: string | null = null
+  private earthCrossOrigin = false
   private terrainTexture!: GPUTexture
+  private terrainOwned = true
   private terrainRequest = new AbortController()
   private terrain: Terrain | null = null
   private poleHeights: [number,number] = [0,0]
-  private terrainLevels: ReturnType<typeof elevationPyramid> = []
+  private preparedTerrain: PreparedTerrain<'rg32float'> | null = null
   private vertexBuffer!: GPUBuffer
   private indexBuffer!: GPUBuffer
   private geographicSampler!: GPUSampler
-  private mesh = createMesh()
+  private mesh = sharedMesh
   private picker = new SurfacePicker(this.mesh)
   private terrainHeight = (longitude: number, latitude: number) => Math.abs(latitude) === Math.PI / 2 ? this.poleHeights[latitude > 0 ? 1 : 0] : elevationAt(this.terrain!,longitude,latitude)
   private dataset: WorldNoise | null = null
@@ -115,41 +229,42 @@ export class SurfaceRenderer {
   /** Load and dispatch Earth Score on this exact device. Device recovery replaces it. */
   get computeDevice(): GPUDevice | null { return this.lost || this.destroyed ? null : this.device }
 
-  private constructor(private canvas: HTMLCanvasElement, private onPick: (selection: Selection | null, score: number | null) => void, private onError: (error: Error) => void, private onStatus: (status: string) => void, private transparent: boolean, private solarSettings?: SolarSettings, private acquireDevice = createSurfaceDevicePool(), assets?: SurfaceAssets, private onDevice?: RendererSettings['onDevice']) {
+  private constructor(private canvas: HTMLCanvasElement, private onPick: (selection: Selection | null, score: number | null) => void, private onError: (error: Error) => void, private onStatus: (status: string) => void, private transparent: boolean, private solarSettings?: SolarSettings, private acquireDevice = createSurfaceDevicePool(), assets?: SurfaceAssets, private onDevice?: RendererSettings['onDevice'], loadTerrain?: TerrainLoader) {
     const context = canvas.getContext('webgpu')
     if (!context) throw new Error('Could not create the WebGPU surface.')
     this.context = context
-    const earthImage = new Image()
-    earthImage.onload = () => {
-      if (this.destroyed) return
-      this.earthImage = earthImage
-      if (!this.lost) this.uploadEarth()
-      this.invalidate(false)
-    }
-    earthImage.onerror = () => {
-      if (!this.destroyed) this.onError(new Error('Could not load the Earth background. Reload to retry.'))
-    }
     const { signal } = this.terrainRequest
     const assetError = (error: unknown) => {
       if (!signal.aborted) this.onError(error instanceof Error ? error : new Error(String(error)))
     }
     const terrain = assets
-      ? assets('textures/earth-terrain.bin', signal).then(url => loadTerrain(url, signal))
-      : loadTerrain(`${import.meta.env.BASE_URL}textures/earth-terrain.bin?v=f370977a579e35f0-bytes1`, signal)
-    if (assets) {
-      void assets('textures/earth-blue-marble.jpg', signal).then(url => {
-        if (signal.aborted) return
-        earthImage.crossOrigin = 'anonymous'
-        earthImage.src = url
-      }).catch(assetError)
-    } else {
-      earthImage.src = `${import.meta.env.BASE_URL}textures/earth-blue-marble.jpg`
-    }
-    void terrain.then(terrain => {
+      ? (loadTerrain
+        ? loadTerrain('textures/earth-terrain.bin', 'rg32float', s => assets('textures/earth-terrain.bin', s), signal)
+        : assets('textures/earth-terrain.bin', signal).then(url => loadPreparedTerrain(url, 'rg32float', signal)))
+      : loadPreparedTerrain(`${import.meta.env.BASE_URL}textures/earth-terrain.bin?v=f370977a579e35f0-bytes1`, 'rg32float', signal)
+    this.earthCrossOrigin = Boolean(assets)
+    const imageUrlPromise = assets
+      ? assets('textures/earth-blue-marble.jpg', signal)
+      : Promise.resolve(`${import.meta.env.BASE_URL}textures/earth-blue-marble.jpg`)
+    void imageUrlPromise.then(async url => {
+      if (this.destroyed || signal.aborted) return
+      this.earthImageUrl = url
+      if (!this.lost && getSurfaceCache(this.device).earthTextures.has(url)) {
+        this.uploadEarth()
+        this.invalidate(false)
+        return
+      }
+      const image = await loadDecodedImage(url, this.earthCrossOrigin)
+      if (this.destroyed || signal.aborted) return
+      this.earthImage = image
+      if (!this.lost) this.uploadEarth()
+      this.invalidate(false)
+    }).catch(assetError)
+    void terrain.then(prepared => {
       if (this.destroyed) return
-      this.terrain = terrain
-      this.poleHeights = poleElevations(this.terrain)
-      this.terrainLevels = elevationPyramid(this.terrain)
+      this.terrain = prepared.terrain
+      this.poleHeights = prepared.poles
+      this.preparedTerrain = prepared
       this.preparePicker()
       if (!this.lost) this.uploadTerrain()
       this.invalidate()
@@ -176,20 +291,12 @@ export class SurfaceRenderer {
     this.invalidate()
   }
 
-  static async create(canvas: HTMLCanvasElement,onPick: (selection: Selection | null,score: number | null) => void,onError: (error: Error) => void,onStatus: (status: string) => void,{ transparent = false,signal,initialView,solar,acquireDevice,assets,snapshot,onDevice }: RendererSettings = {}) {
+  static async create(canvas: HTMLCanvasElement,onPick: (selection: Selection | null,score: number | null) => void,onError: (error: Error) => void,onStatus: (status: string) => void,{ transparent = false,signal,initialView,solar,acquireDevice,assets,loadTerrain,onDevice }: RendererSettings = {}) {
     signal?.throwIfAborted()
-    const renderer = new SurfaceRenderer(canvas,onPick,onError,onStatus,transparent,solar,acquireDevice,assets,onDevice)
+    const renderer = new SurfaceRenderer(canvas,onPick,onError,onStatus,transparent,solar,acquireDevice,assets,onDevice,loadTerrain)
     if (initialView) renderer.rotation = viewRotation(initialView.longitude * Math.PI / 180,initialView.latitude * Math.PI / 180)
     const cancel = () => renderer.destroy()
     signal?.addEventListener('abort',cancel,{ once: true })
-    if (snapshot) {
-      const { signal } = renderer.terrainRequest
-      void snapshot(signal).then(blob => {
-        if (!signal.aborted && !renderer.computed && !renderer.pendingComputed) renderer.loadSnapshot(blob)
-      }).catch(error => {
-        if (!signal.aborted) onError(error instanceof Error ? error : new Error(String(error)))
-      })
-    }
     try { await renderer.initialize(); signal?.throwIfAborted(); return renderer }
     catch (error) { renderer.destroy(); throw error }
     finally { signal?.removeEventListener('abort',cancel) }
@@ -228,35 +335,14 @@ export class SurfaceRenderer {
     this.onDevice?.(device)
     this.bankSize = Math.min(256,device.limits.maxTextureArrayLayers)
     const banks = Math.ceil(tileCount / this.bankSize)
-    const vf = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT
-    this.layout = device.createBindGroupLayout({ label: 'Surface resources',entries: [
-      { binding: 0,visibility: vf,buffer: { type: 'uniform' } },
-      { binding: 1,visibility: GPUShaderStage.FRAGMENT,texture: { sampleType: 'uint' } },
-      { binding: 2,visibility: GPUShaderStage.FRAGMENT,texture: { sampleType: 'float' } },
-      { binding: 3,visibility: vf,texture: { sampleType: filterable ? 'float' : 'unfilterable-float' } },
-      { binding: 4,visibility: vf,sampler: { type: 'filtering' } },
-      { binding: 5,visibility: GPUShaderStage.FRAGMENT,texture: { sampleType: 'float' } },
-      ...Array.from({ length: banks },(_,i) => ({ binding: 6 + i,visibility: GPUShaderStage.FRAGMENT,texture: { sampleType: 'uint' as const,viewDimension: '2d-array' as const } })),
-    ] })
-    const module = await shaderModule(device,'Earth surface WGSL',surfaceShader(banks,this.bankSize,filterable))
-    const layout = device.createPipelineLayout({ bindGroupLayouts: [this.layout] })
     const reverseDepth = Boolean(this.solarSettings)
-    const pipeline = (label: string,entryPoint: string,targets: GPUColorTargetState[],count = 1): GPURenderPipelineDescriptor => ({
-      label,layout,
-      vertex: { module,entryPoint: 'surfaceVertex',buffers: [{ arrayStride: 8,attributes: [{ shaderLocation: 0,offset: 0,format: 'float32x2' }] }] },
-      fragment: { module,entryPoint,targets },
-      primitive: { topology: 'triangle-list',cullMode: 'none' },
-      depthStencil: { format: reverseDepth ? 'depth32float' : 'depth24plus',depthWriteEnabled: true,depthCompare: reverseDepth ? 'greater' : 'less' },multisample: { count },
-    })
-    const [surface,annotation] = await Promise.all([
-      device.createRenderPipelineAsync(pipeline('4x MSAA Earth surface','surfaceFragment',[{ format: 'rgba16float' }],4)),
-      device.createRenderPipelineAsync(pipeline('Geographic annotations','annotationFragment',[{ format: 'rg32float' }])),
-    ])
+    const pipelines = await getSurfacePipelines(device,banks,this.bankSize,filterable,reverseDepth)
     if (this.destroyed || this.device !== device) return
-    this.pipelines = { surface,annotation,coverage: null,coverageDescriptor: pipeline('Geographic annotations with coverage','coverageAnnotationFragment',[{ format: 'rg32float' },{ format: 'r8unorm' }]) }
+    this.layout = pipelines.layout
+    this.pipelines = pipelines
     this.post = new PostProcess(device,this.format,this.transparent,reverseDepth)
     if (this.solarSettings) {
-      const solar = await this.solarSettings.createScene(device,new Date(this.sun.timestamp),() => this.invalidate(),this.onError,this.solarCamera,this.solarSettings.assetUrl)
+      const solar = await this.solarSettings.createScene(device,new Date(this.sun.timestamp),() => this.invalidate(),this.onError,this.solarCamera,this.solarSettings.assetUrl,this.solarSettings.loadTerrain)
       if (this.destroyed || this.device !== device) { solar.destroy(); return }
       this.solar = solar
       this.solarCamera = solar.camera
@@ -267,14 +353,17 @@ export class SurfaceRenderer {
     if (this.destroyed || this.device !== device) return
     this.uniformBuffer = device.createBuffer({ label: 'Surface parameters',size: this.uniformValues.byteLength,usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
     this.annotationUniform = device.createBuffer({ label: 'Annotation parameters',size: this.uniformValues.byteLength,usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
-    this.vertexBuffer = uploadBuffer(device,'Surface UV vertices',this.mesh.uv,GPUBufferUsage.VERTEX)
-    this.indexBuffer = uploadBuffer(device,'Surface indices',this.mesh.indices,GPUBufferUsage.INDEX)
-    this.geographicSampler = device.createSampler({ addressModeU: 'repeat',addressModeV: 'clamp-to-edge',magFilter: 'linear',minFilter: 'linear',mipmapFilter: 'linear',maxAnisotropy: 16 })
+    const sharedGpu = getSharedMeshGpu(device)
+    this.vertexBuffer = sharedGpu.vertexBuffer
+    this.indexBuffer = sharedGpu.indexBuffer
+    this.geographicSampler = sharedGpu.geographicSampler
     this.scoreMap = createScoreTextures(device,this.bankSize,banks,this.dataset?.tiles.length ?? 0)
     writeScoreLookup(device,this.scoreMap,new Uint16Array(36 * 18).fill(MISSING))
     this.earthTexture = device.createTexture({ label: 'Earth imagery placeholder',size: [1,1],format: 'rgba8unorm',usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST })
+    this.earthOwned = true
     device.queue.writeTexture({ texture: this.earthTexture },new Uint8Array([18,30,42,255]),{},[1,1])
     this.terrainTexture = device.createTexture({ label: 'Terrain placeholder',size: [1,1],format: 'rg32float',usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST })
+    this.terrainOwned = true
     device.queue.writeTexture({ texture: this.terrainTexture },new Float32Array([0,32]),{},[1,1])
     this.canvas.dataset.sunTime = this.sun.timestamp
     this.canvas.dataset.sunLatitude = (sunlight ? Math.asin(sunlight[1]) * 180 / Math.PI : this.sun.latitude).toFixed(6)
@@ -285,7 +374,23 @@ export class SurfaceRenderer {
     this.canvas.dataset.terrainFiltering = filterable ? 'hardware' : 'shader'
     if (this.dataset) this.upload()
     if (this.terrain) this.uploadTerrain()
-    if (this.earthImage) this.uploadEarth()
+    if (this.earthImageUrl) {
+      if (getSurfaceCache(device).earthTextures.has(this.earthImageUrl) || this.earthImage) {
+        this.uploadEarth()
+      } else {
+        const url = this.earthImageUrl
+        void loadDecodedImage(url, this.earthCrossOrigin).then(image => {
+          if (this.destroyed || this.lost || this.device !== device || this.earthImageUrl !== url) return
+          this.earthImage = image
+          this.uploadEarth()
+          this.invalidate(false)
+        }).catch(error => {
+          if (!this.destroyed && !this.terrainRequest.signal.aborted) {
+            this.onError(error instanceof Error ? error : new Error(String(error)))
+          }
+        })
+      }
+    }
     this.bindResources()
     this.lost = false
     this.canvas.dispatchEvent(new Event('computedevicechange'))
@@ -310,50 +415,74 @@ export class SurfaceRenderer {
   }
 
   private uploadTerrain() {
-    const first = this.terrainLevels[0]
-    this.terrainTexture.destroy()
-    this.terrainTexture = this.device.createTexture({ label: 'Numeric elevation and coast distance',size: [first.width,first.height],mipLevelCount: this.terrainLevels.length,format: 'rg32float',usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST })
-    this.terrainLevels.forEach((level,index) => {
-      const data = new Float32Array(level.values.length * 2)
-      for (let i = 0; i < level.values.length; i++) { data[i * 2] = level.values[i]; data[i * 2 + 1] = level.coast[i] }
-      this.device.queue.writeTexture({ texture: this.terrainTexture,mipLevel: index },data,{ bytesPerRow: level.width * 8 },[level.width,level.height])
-    })
+    const terrain = this.terrain!
+    const cache = getSurfaceCache(this.device)
+    let texture = cache.terrains.get(terrain)
+    if (!texture) {
+      const levels = this.preparedTerrain?.levels ?? packRg32FloatLevels(elevationPyramid(terrain))
+      const first = levels[0]
+      texture = this.device.createTexture({ label: 'Numeric elevation and coast distance',size: [first.width,first.height],mipLevelCount: levels.length,format: 'rg32float',usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST })
+      levels.forEach((level,index) => {
+        writeTextureChunked(this.device.queue,texture!,index,level.data,level.width,level.height,8)
+      })
+      cache.terrains.set(terrain,texture)
+      cache.createdTextures.push(texture)
+    }
+    // Drop the ~85 MiB float32 mip pyramid from CPU RAM once uploaded to the GPU.
+    if (this.preparedTerrain) this.preparedTerrain.levels = null
+    if (this.terrainOwned) this.terrainTexture.destroy()
+    this.terrainTexture = texture
+    this.terrainOwned = false
     this.lighting.setTerrain(this.terrainTexture)
     this.bindResources()
     this.canvas.dataset.terrainReady = 'true'
   }
 
   private uploadEarth() {
-    const image = this.earthImage!,device = this.device
-    this.earthTexture.destroy()
-    this.earthTexture = device.createTexture({ label: 'NASA Earth imagery',size: [image.naturalWidth,image.naturalHeight],mipLevelCount: Math.floor(Math.log2(Math.max(image.naturalWidth,image.naturalHeight))) + 1,format: 'rgba8unorm',usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT })
-    device.queue.copyExternalImageToTexture({ source: image },{ texture: this.earthTexture },[image.naturalWidth,image.naturalHeight])
-    // Generate image mips directly on the GPU. Elevation/score mips retain their
-    // own numeric averaging/max rules and never go through this image filter.
-    const module = device.createShaderModule({ code: `${fullscreenVertex}
-      @group(0) @binding(0) var source: texture_2d<f32>;
-      @group(0) @binding(1) var s: sampler;
-      @fragment fn mip(input: ScreenVertex) -> @location(0) vec4f { return textureSampleLevel(source,s,input.uv,0.); }
-    ` })
-    const pipeline = device.createRenderPipeline({ layout: 'auto',vertex: { module,entryPoint: 'screenVertex' },fragment: { module,entryPoint: 'mip',targets: [{ format: 'rgba8unorm' }] } })
-    const sampler = device.createSampler({ minFilter: 'linear',magFilter: 'linear' })
-    const encoder = device.createCommandEncoder({ label: 'Earth imagery mipmaps' })
-    for (let level = 1; level < this.earthTexture.mipLevelCount; level++) {
-      const group = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0),entries: [{ binding: 0,resource: this.earthTexture.createView({ baseMipLevel: level - 1,mipLevelCount: 1 }) },{ binding: 1,resource: sampler }] })
-      const pass = encoder.beginRenderPass({ colorAttachments: [{ view: this.earthTexture.createView({ baseMipLevel: level,mipLevelCount: 1 }),loadOp: 'clear',storeOp: 'store' }] })
-      pass.setPipeline(pipeline); pass.setBindGroup(0,group); pass.draw(3); pass.end()
+    const device = this.device,url = this.earthImageUrl!
+    const cache = getSurfaceCache(device)
+    let texture = cache.earthTextures.get(url)
+    if (!texture) {
+      const image = this.earthImage
+      if (!image) return
+      texture = device.createTexture({ label: 'NASA Earth imagery',size: [image.naturalWidth,image.naturalHeight],mipLevelCount: Math.floor(Math.log2(Math.max(image.naturalWidth,image.naturalHeight))) + 1,format: 'rgba8unorm',usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT })
+      device.queue.copyExternalImageToTexture({ source: image },{ texture },[image.naturalWidth,image.naturalHeight])
+      // Generate image mips directly on the GPU. Elevation/score mips retain their
+      // own numeric averaging/max rules and never go through this image filter.
+      if (!cache.earthMip) {
+        const module = device.createShaderModule({ code: `${fullscreenVertex}
+          @group(0) @binding(0) var source: texture_2d<f32>;
+          @group(0) @binding(1) var s: sampler;
+          @fragment fn mip(input: ScreenVertex) -> @location(0) vec4f { return textureSampleLevel(source,s,input.uv,0.); }
+        ` })
+        cache.earthMip = {
+          pipeline: device.createRenderPipeline({ layout: 'auto',vertex: { module,entryPoint: 'screenVertex' },fragment: { module,entryPoint: 'mip',targets: [{ format: 'rgba8unorm' }] } }),
+          sampler: device.createSampler({ minFilter: 'linear',magFilter: 'linear' }),
+        }
+      }
+      const { pipeline,sampler } = cache.earthMip
+      const encoder = device.createCommandEncoder({ label: 'Earth imagery mipmaps' })
+      for (let level = 1; level < texture.mipLevelCount; level++) {
+        const group = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0),entries: [{ binding: 0,resource: texture.createView({ baseMipLevel: level - 1,mipLevelCount: 1 }) },{ binding: 1,resource: sampler }] })
+        const pass = encoder.beginRenderPass({ colorAttachments: [{ view: texture.createView({ baseMipLevel: level,mipLevelCount: 1 }),loadOp: 'clear',storeOp: 'store' }] })
+        pass.setPipeline(pipeline); pass.setBindGroup(0,group); pass.draw(3); pass.end()
+      }
+      device.queue.submit([encoder.finish()])
+      cache.earthTextures.set(url,texture)
+      cache.createdTextures.push(texture)
     }
-    device.queue.submit([encoder.finish()])
+    this.earthImage = null
+    decodedImages.delete(url)
+    if (this.earthOwned) this.earthTexture.destroy()
+    this.earthTexture = texture
+    this.earthOwned = false
+    this.earthReady = true
     this.bindResources()
     this.canvas.dataset.earthReady = 'true'
   }
 
   regenerate(frequency: number, seed: number) {
     this.startDataset({ kind: 'noise',frequency,seed })
-  }
-
-  loadSnapshot(source: string | Blob) {
-    this.startDataset({ kind: 'snapshot',source: typeof source === 'string' ? new URL(source,window.location.href).href : source })
   }
 
   /**
@@ -369,10 +498,25 @@ export class SurfaceRenderer {
     this.pendingComputed = request
     const active = signal ? AbortSignal.any([signal,request.signal]) : request.signal
     const started = performance.now()
+    const bankCount = this.scoreMap!.banks.length
+    const sites = earth.layout.sites.length
+    let target = this.spareScoreMap
+    if (target) {
+      this.spareScoreMap = null
+      if (!scoreTexturesMatch(target,this.bankSize,bankCount,sites)) {
+        destroyScoreTextures(target)
+        target = null
+      }
+    }
     try {
-      const { textures,histogram,bestAddress,bytes } = await prepareComputedScores(device,earth,this.bankSize,this.scoreMap!.banks.length,active)
+      const { textures,histogram,bestAddress,bytes } = await prepareComputedScores(device,earth,this.bankSize,bankCount,active,target ?? undefined)
+      target = null
       if (active.aborted || this.computeDevice !== device) {
-        destroyScoreTextures(textures)
+        if (this.computeDevice === device && !this.spareScoreMap && scoreTexturesMatch(textures,this.bankSize,bankCount,sites)) {
+          this.spareScoreMap = textures
+        } else {
+          destroyScoreTextures(textures)
+        }
         active.throwIfAborted()
         throw new Error('The WebGPU device changed while preparing scores.')
       }
@@ -381,12 +525,22 @@ export class SurfaceRenderer {
       this.scoreMap = textures
       this.computed = { layout: earth.layout,bestAddress }
       this.bindResources()
-      destroyScoreTextures(previous)
+      if (!this.spareScoreMap && scoreTexturesMatch(previous,this.bankSize,bankCount,sites)) {
+        this.spareScoreMap = previous
+      } else {
+        destroyScoreTextures(previous)
+      }
       const entries = earth.layout.rows
       const distribution = new ScoreDistribution(histogram)
       this.publishScoreInfo('computed',{ name,description },distribution,entries,bytes)
       this.invalidate()
       this.onStatus(`Live query · ${name}\n${description}\n4 × 4 km · ${distribution.valid.toLocaleString()} valid cells\n${earth.layout.sites.length} × ${SIZE}² tiles · ${(bytes / 2 ** 20).toFixed(1)} MiB GPU incl. LODs\nPrepared in ${((performance.now() - started) / 1000).toFixed(1)} s (WebGPU)`)
+    } catch (error) {
+      if (target) {
+        if (this.computeDevice === device && !this.spareScoreMap) this.spareScoreMap = target
+        else destroyScoreTextures(target)
+      }
+      throw error
     } finally {
       if (this.pendingComputed === request) this.pendingComputed = null
     }
@@ -404,7 +558,7 @@ export class SurfaceRenderer {
     this.stopDataset()
     const job: DatasetJob = { controller: new AbortController() }
     this.pendingDataset = job
-    const action = request.kind === 'snapshot' ? 'Loading real 4 km scores' : 'Generating 4 km noise'
+    const action = 'Generating 4 km noise'
     this.onStatus(`${action}…`)
     const active = () => this.pendingDataset === job && !this.destroyed
     const progress = (done: number,total: number) => {
@@ -466,7 +620,7 @@ export class SurfaceRenderer {
     try { worker.postMessage(request) } catch { fallback() }
   }
 
-  private publishScoreInfo(source: 'snapshot' | 'noise' | 'computed', score: ScoreDescription, distribution: ScoreDistribution, entries: number, bytes: number) {
+  private publishScoreInfo(source: 'noise' | 'computed', score: ScoreDescription, distribution: ScoreDistribution, entries: number, bytes: number) {
     this.distribution = distribution
     this.style = resolveScoreStyle(distribution,this.options,this.style)
     this.selected = null
@@ -479,10 +633,9 @@ export class SurfaceRenderer {
 
   private publishCpuScoreInfo(dataset: WorldNoise) {
     const entries = dataset.tiles.length * SIZE * SIZE
-    const { snapshot } = dataset
-    const score = snapshot ?? { name: 'Synthetic Perlin noise',description: 'Synthetic noise on the same native 4 km score grid.' }
-    this.publishScoreInfo(snapshot ? 'snapshot' : 'noise',score,new ScoreDistribution(dataset.histogram),entries,dataset.bytes)
-    this.onStatus(`${snapshot ? `Real data · ${snapshot.name}\n${snapshot.description}\nCaptured ${snapshot.fetchedAt.slice(0,10)}\n` : 'Synthetic Perlin noise\n'}4 × 4 km · ${dataset.valid.toLocaleString()} valid cells\n${dataset.tiles.length} × ${SIZE}² tiles · ${(entries * 2 / 1e6).toFixed(1)} MB uint16\n${(dataset.bytes / 2 ** 20).toFixed(1)} MiB incl. LODs per CPU / GPU copy\n${snapshot ? 'Prepared' : 'Generated'} in ${(dataset.milliseconds / 1000).toFixed(1)} s`)
+    const score = { name: 'Synthetic Perlin noise',description: 'Synthetic noise on the same native 4 km score grid.' }
+    this.publishScoreInfo('noise',score,new ScoreDistribution(dataset.histogram),entries,dataset.bytes)
+    this.onStatus(`Synthetic Perlin noise\n4 × 4 km · ${dataset.valid.toLocaleString()} valid cells\n${dataset.tiles.length} × ${SIZE}² tiles · ${(entries * 2 / 1e6).toFixed(1)} MB uint16\n${(dataset.bytes / 2 ** 20).toFixed(1)} MiB incl. LODs per CPU / GPU copy\nGenerated in ${(dataset.milliseconds / 1000).toFixed(1)} s`)
   }
 
   private clearComputedScores() {
@@ -780,8 +933,8 @@ export class SurfaceRenderer {
     if (redraw) {
       canvas.dataset.sceneDraws = String(Number(canvas.dataset.sceneDraws || 0) + 1)
       if (solar) {
-        canvas.dataset.frameSource = renderEarth && this.earthImage && this.terrain &&
-          solar.skySettled && solar.terrainReady ? canvas.dataset.source ?? '' : ''
+        canvas.dataset.frameSource = renderEarth && this.earthReady && this.terrain &&
+          solar.skySettled && solar.terrainReady ? (canvas.dataset.source || 'surface') : ''
       }
     }
     if (built.bloom) canvas.dataset.bloomBuilds = String(Number(canvas.dataset.bloomBuilds || 0) + 1)
@@ -1057,10 +1210,15 @@ export class SurfaceRenderer {
     this.hasSolarLabels = false
     this.solar?.destroy()
     this.solar = undefined
-    this.earthTexture?.destroy(); this.terrainTexture?.destroy()
+    if (this.earthOwned) this.earthTexture?.destroy()
+    if (this.terrainOwned) this.terrainTexture?.destroy()
+    this.earthOwned = this.terrainOwned = false
+    this.earthReady = false
     if (this.scoreMap) destroyScoreTextures(this.scoreMap)
     this.scoreMap = null
-    this.vertexBuffer?.destroy(); this.indexBuffer?.destroy(); this.uniformBuffer?.destroy(); this.annotationUniform?.destroy()
+    if (this.spareScoreMap) destroyScoreTextures(this.spareScoreMap)
+    this.spareScoreMap = null
+    this.uniformBuffer?.destroy(); this.annotationUniform?.destroy()
     this.timer?.destroy(); this.timer = null
     this.lighting?.destroy(); this.post?.destroy()
     this.pipelines = null
@@ -1075,6 +1233,8 @@ export class SurfaceRenderer {
     this.stopDataset()
     this.dataset = null
     this.computed = null
+    this.earthImage = null
+    this.preparedTerrain = null
     cancelAnimationFrame(this.projectionFrame)
     cancelAnimationFrame(this.frame); this.observer.disconnect()
     this.canvas.removeEventListener('pointerdown',this.pointerDown)

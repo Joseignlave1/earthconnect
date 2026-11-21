@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { gzipSync } from 'node:zlib'
 import { chromium } from 'playwright-core'
 import { createServer } from 'vite'
 import { hydrateAssets } from '../scripts/hydrate-assets.mjs'
@@ -165,11 +164,11 @@ test('compute score textures, distribution, peak, selection, cancellation and re
       const { renderer,device,canvas } = window.gpuTest
       return renderer.computeDevice && renderer.computeDevice !== device && !canvas.dataset.scoreName
     })
-    await page.evaluate(() => window.gpuTest.renderer.loadSnapshot('/data/surface-basins.bin'))
-    await page.waitForFunction(() => window.gpuTest.canvas.dataset.source === 'snapshot')
+    await page.evaluate(() => window.gpuTest.renderer.regenerate(6,42))
+    await page.waitForFunction(() => window.gpuTest.canvas.dataset.source === 'noise')
     await page.evaluate(async () => {
       const { renderer,makeFixture,canvas,description } = window.gpuTest
-      const snapshotName = canvas.dataset.scoreName
+      const noiseName = canvas.dataset.scoreName
       const fixture = makeFixture(renderer.computeDevice)
       const device = renderer.computeDevice
       try {
@@ -178,14 +177,14 @@ test('compute score textures, distribution, peak, selection, cancellation and re
         const interrupted = renderer.setComputedScores(fixture,description('interrupted')).then(() => false,() => true)
         device.destroy()
         if (!await interrupted) throw new Error('A query published after its device was lost')
-        Object.assign(window.gpuTest,{ snapshotName,device })
+        Object.assign(window.gpuTest,{ noiseName,device })
       } finally {
         fixture.destroy()
       }
     })
     await page.waitForFunction(() => {
-      const { renderer,device,canvas,snapshotName } = window.gpuTest
-      return renderer.computeDevice && renderer.computeDevice !== device && canvas.dataset.scoreName === snapshotName &&
+      const { renderer,device,canvas,noiseName } = window.gpuTest
+      return renderer.computeDevice && renderer.computeDevice !== device && canvas.dataset.scoreName === noiseName &&
         canvas.dataset.ready === 'true' && canvas.dataset.idle === 'true'
     })
     let blockedWorkers = 0
@@ -193,27 +192,24 @@ test('compute score textures, distribution, peak, selection, cancellation and re
       blockedWorkers++
       return route.fulfill({ contentType: 'text/html',body: '<!doctype html><title>Unexpected HTML</title>' })
     })
-    await page.evaluate(bytes => {
+    await page.evaluate(() => {
       const { renderer,canvas } = window.gpuTest
-      window.gpuTest.snapshot = { cells: canvas.dataset.cells,bestScore: canvas.dataset.bestScore }
-      renderer.loadSnapshot(new Blob([new Uint8Array(bytes)]))
-    }, Array.from(gzipSync(Buffer.alloc(8))))
-    await page.waitForFunction(() => window.gpuTest.renderErrors.length > 0)
-    await page.evaluate(() => window.gpuTest.renderer.regenerate(6,42))
-    await page.waitForFunction(() => /Generating 4 km noise · \d+ \/ \d+ tiles/.test(window.gpuTest.getStatus()))
-    await page.evaluate(() => window.gpuTest.renderer.loadSnapshot('/data/surface-basins.bin'))
-    await page.waitForFunction(() => window.gpuTest.getStatus().startsWith('Real data'))
-    const restored = await page.evaluate(() => {
-      const { canvas,snapshot } = window.gpuTest
-      return { expected: snapshot,actual: { cells: canvas.dataset.cells,bestScore: canvas.dataset.bestScore } }
+      window.gpuTest.noise = { cells: canvas.dataset.cells,bestScore: canvas.dataset.bestScore }
+      renderer.regenerate(6,42)
     })
-    assert.equal(blockedWorkers,3)
+    await page.waitForFunction(() => /Generating 4 km noise · \d+ \/ \d+ tiles/.test(window.gpuTest.getStatus()))
+    await page.waitForFunction(() => window.gpuTest.getStatus().startsWith('Synthetic Perlin noise'))
+    const restored = await page.evaluate(() => {
+      const { canvas,noise } = window.gpuTest
+      return { expected: noise,actual: { cells: canvas.dataset.cells,bestScore: canvas.dataset.bestScore } }
+    })
+    assert.equal(blockedWorkers,1)
     assert.deepEqual(restored.actual,restored.expected)
     const renderErrors = await page.evaluate(() => {
       window.gpuTest.renderer.destroy()
       return window.gpuTest.renderErrors
     })
-    assert.deepEqual(renderErrors,['Invalid score snapshot header.'])
+    assert.deepEqual(renderErrors,[])
     const canvases = await page.evaluate(async () => {
       const [{ SurfaceRenderer }, { createEarthWorkspaceResources }] = await Promise.all([
         import('/src/shader-test/renderer.ts'), import('/src/workspace/earthWorkspaceResources.ts'),

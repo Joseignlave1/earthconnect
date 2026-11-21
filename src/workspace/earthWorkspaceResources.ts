@@ -1,17 +1,80 @@
 import { loadEarthScore, type EarthScore, type EarthScoreOptions } from '../earth-score/index.ts'
+import { samplePoint } from '../earthIndexApi.ts'
 import { createSurfaceDevicePool } from '../shader-test/surface-device.ts'
+import type { TerrainPackFormat } from '../shader-test/terrain.ts'
+import { loadPreparedTerrain, type PreparedTerrain } from '../shader-test/terrain-loader.ts'
+import { canonicalPoint, coordinatesValid, createPlanetaryPointCache, pointKey, type PlanetaryCoordinates } from './planetaryPointCache.ts'
 
 type World = {
   loading: Promise<EarthScore>
   publish: (task: () => Promise<void>) => Promise<void>
 }
 
-export function createEarthWorkspaceResources() {
+export type TerrainLoader = <F extends TerrainPackFormat>(
+  path: string,
+  format: F,
+  getUrl: (signal: AbortSignal) => Promise<string>,
+  signal: AbortSignal,
+) => Promise<PreparedTerrain<F>>
+
+export function createEarthWorkspaceResources(acquireDevice = createSurfaceDevicePool(), lifetime?: AbortSignal) {
   const worlds = new WeakMap<GPUDevice, { world: World; users: number; release: () => void }>()
-  const acquireDevice = createSurfaceDevicePool()
+  const terrains = new Map<string, Promise<PreparedTerrain<TerrainPackFormat>>>()
+  const pointLifetime = lifetime ?? new AbortController().signal
+  const readPoint = createPlanetaryPointCache(samplePoint, pointLifetime)
+
+  function prefetchPoints(points: readonly PlanetaryCoordinates[]) {
+    const unique = new Map<string, PlanetaryCoordinates>()
+    for (const raw of points) {
+      if (!coordinatesValid(raw.latitude, raw.longitude)) continue
+      const point = canonicalPoint(raw)
+      const key = pointKey(point)
+      if (!unique.has(key)) unique.set(key, point)
+    }
+    if (!unique.size) return
+    const items = [...unique.values()]
+    let next = 0
+    for (let worker = 0; worker < Math.min(4, items.length); worker++) {
+      void (async () => {
+        while (next < items.length && !pointLifetime.aborted) {
+          const point = items[next++]
+          await readPoint(point, pointLifetime).catch(() => {})
+        }
+      })()
+    }
+  }
+
+  const acquireTerrain: TerrainLoader = <F extends TerrainPackFormat>(
+    path: string,
+    format: F,
+    getUrl: (signal: AbortSignal) => Promise<string>,
+    signal: AbortSignal,
+  ): Promise<PreparedTerrain<F>> => {
+    signal.throwIfAborted()
+    const key = `${format}:${path}`
+    let pending = terrains.get(key) as Promise<PreparedTerrain<F>> | undefined
+    if (!pending) {
+      const controller = new AbortController()
+      pending = getUrl(controller.signal)
+        .then(url => loadPreparedTerrain(url, format, controller.signal))
+      terrains.set(key, pending)
+      void pending.catch(() => {
+        if (terrains.get(key) === pending) terrains.delete(key)
+      })
+    }
+    return new Promise<PreparedTerrain<F>>((resolve, reject) => {
+      const abort = () => reject(signal.reason)
+      signal.addEventListener('abort', abort, { once: true })
+      if (signal.aborted) return abort()
+      void pending.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort))
+    })
+  }
 
   return {
     acquireDevice,
+    acquireTerrain,
+    readPoint,
+    prefetchPoints,
     acquireWorld(device: GPUDevice, options: Omit<EarthScoreOptions, 'signal'>) {
       let entry = worlds.get(device)
       if (!entry) {

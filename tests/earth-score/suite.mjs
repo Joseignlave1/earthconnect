@@ -161,6 +161,17 @@ function verifyQueryScores(earth, criteria, codes, actual) {
   return stats
 }
 
+function baselineQuerySource(earth, overrides = {}) {
+  const query = buildEarthQuery(earth.baseline.map((feature, index) => ({
+    key: feature.field, label: feature.field, group: String(feature.group), unit: '',
+    enabled: true, target: feature.target, tolerance: feature.tolerance, weight: feature.weight,
+    min: null, max: null,
+    qualityKey: index === 0 ? 'terrain_valid_fraction' : index === 1 ? 'landcover_valid_fraction' : undefined,
+    ...overrides[feature.field],
+  })))
+  return earth.queryShaderSource(query)
+}
+
 async function verifyFullWorld(device, earth, ref) {
   const makeStats = () => ({ exact: 0, withinOne: 0, missing: 0 })
   const baseline = makeStats()
@@ -231,22 +242,14 @@ async function verifyFullWorld(device, earth, ref) {
     ]
     const noCandidates = [criterion('slope_mean_deg', { ...terrain, target: 4, min: 1e10 })]
     const plan = buildEarthQuery(criteria)
-    const query = earth.dispatchQuery(plan)
-    let criteriaReference
-    const readQuery = read(scores, rows * 4, data => {
-      criteriaReference = new Uint32Array(data.slice(0))
-      return verifyQueryScores(earth, criteria, storedCodes, criteriaReference)
-    })
-    const empty = earth.dispatchQuery(buildEarthQuery(noCandidates))
-    const [criteriaScores] = await Promise.all([readQuery, query, empty])
+    await earth.dispatchShader(earth.queryShaderSource(plan))
+    const criteriaScores = await read(scores, rows * 4, data => verifyQueryScores(earth, criteria, storedCodes, new Uint32Array(data)))
+    await earth.dispatchShader(earth.queryShaderSource(buildEarthQuery(noCandidates)))
     const emptyScores = await read(scores, rows * 4, data => verifyQueryScores(earth, noCandidates, storedCodes, new Uint32Array(data)))
     assert(criteriaScores.missing > 0 && criteriaScores.missingAndRejected > 0 && criteriaScores.rejected > 0 &&
       criteriaScores.positive > 0 && criteriaScores.best > SCORE_MAX / 2, 'Expected missing, rejected, and strong criteria matches')
     assert(emptyScores.missing > 0 && emptyScores.rejected > 0 && emptyScores.positive === 0, 'Impossible filter should yield no candidates')
     assert(emptyScores.missing < criteriaScores.missing, 'A sampled subset should require fewer values')
-    await earth.dispatchShader(earth.queryShaderSource(plan))
-    const generatedScores = { exact: 0, withinOne: 0, missing: 0 }
-    await read(scores, rows * 4, data => compareScores(new Uint32Array(data), criteriaReference, generatedScores, index))
 
     const elevation = earth.fields.findIndex(({ name }) => name === 'elevation_median_m')
     const { origin, denominator } = earth.fields[elevation].encoding
@@ -256,20 +259,15 @@ async function verifyFullWorld(device, earth, ref) {
     const tolerance = 1e-6
     const narrow = [criterion('elevation_median_m', { target: exactElevation + tolerance, tolerance })]
     const narrowPlan = buildEarthQuery(narrow)
-    await earth.dispatchQuery(narrowPlan)
+    await earth.dispatchShader(earth.queryShaderSource(narrowPlan))
     const narrowScore = await read(scores, rows * 4, data => new Uint32Array(data)[address.row])
     assert(narrowScore === Math.round(SCORE_MAX * Math.exp(-.5)), `Unexpected narrow-tolerance score: ${narrowScore}`)
-    await earth.dispatchShader(earth.queryShaderSource(narrowPlan))
-    await read(scores, rows * 4, data => {
-      const generatedNarrow = new Uint32Array(data)[address.row]
-      assert(generatedNarrow === narrowScore, `Generated WGSL lost the narrow target offset: ${generatedNarrow} against ${narrowScore}.${earth.queryShaderSource(narrowPlan)}`)
-    })
 
-    await earth.dispatch()
+    await earth.dispatchShader(baselineQuerySource(earth))
     await read(scores, rows * 4, async data => {
       assert(await sha256(data) === hashes[index], 'Criteria query changed the baseline')
     })
-    return { criteriaScores, emptyScores, generatedScores, narrowScore }
+    return { criteriaScores, emptyScores, narrowScore }
   }
 
   async function checkShaderCoordinates() {
@@ -446,10 +444,10 @@ async function verifyFullWorld(device, earth, ref) {
   try {
     await checkScores(baseline, false)
     const warmStart = performance.now()
-    await earth.dispatch(ref.changed)
+    await earth.dispatchShader(baselineQuerySource(earth, ref.changed))
     const changedQueryMs = Math.round(performance.now() - warmStart)
     await checkScores(moved, true)
-    await earth.dispatch()
+    await earth.dispatchShader(baselineQuerySource(earth))
     for (const { index, rows, scores, packedInput } of earth.chunks) {
       await read(scores, rows * 4, async data => {
         assert(await sha256(data) === hashes[index], `Restored baseline differs at chunk ${index}`)
@@ -462,7 +460,7 @@ async function verifyFullWorld(device, earth, ref) {
     const criteriaQueries = await checkCriteriaQueries()
     await checkShaderCoordinates()
     const shaderScores = await checkShaderScores()
-    await earth.dispatch()
+    await earth.dispatchShader(baselineQuerySource(earth))
     return { baseline, moved, reconstructedBytes, changedQueryMs, hashes, shaderScores, ...criteriaQueries }
   } finally {
     staging.destroy()
@@ -543,21 +541,19 @@ export async function verify() {
     const start = performance.now()
     earth = await loadEarthScore(device, { manifestUrl: '/world/manifest.json' })
     const loadedMs = Math.round(performance.now() - start)
-    await earth.dispatch()
+    await earth.dispatchShader(baselineQuerySource(earth))
     const firstQueryMs = Math.round(performance.now() - start)
     console.log(`Uploaded ${earth.chunks.length} chunks and scored ${earth.layout.rows} addresses in ${firstQueryMs} ms`)
     assert(earth.layout.rows === 35550640 && earth.layout.sites.length === 460 && earth.fields.length === 25,
       'Unexpected world layout')
-    assert(tracker.workers.length === 4 && tracker.workers.every(w => w.terminated), 'Decode worker pool leaked')
+    assert(tracker.workers.length >= 4 && tracker.workers.length <= 8 && tracker.workers.every(w => w.terminated), 'Decode worker pool leaked')
     const { hashes, ...report } = await verifyFullWorld(device, earth, reference)
     const baselineHash = await sha256(new TextEncoder().encode(hashes.join('')))
-    await rejects(earth.dispatch({ slope_mean_deg: { tolerance: 0 } }), /Invalid score parameters/)
-    await rejects(earth.dispatchQuery({}), /buildEarthQuery/)
+    await rejects(Promise.resolve().then(() => earth.queryShaderSource({})), /buildEarthQuery/)
     earth.destroy()
     earth.destroy()
     assert(tracker.buffers.every(b => b.destroyed), 'Successful load or validation leaked GPU buffers')
-    await rejects(earth.dispatch(), /destroyed/)
-    await rejects(earth.dispatchQuery({}), /destroyed/)
+    await rejects(earth.dispatchShader('fn score(cell: EarthCell) -> f32 { return 0.; }'), /destroyed/)
     device.pushErrorScope('validation')
     await verifyFailurePaths(device, tracker)
     assert(await device.popErrorScope() === null && uncaptured.length === 0, `Unexpected WebGPU errors: ${uncaptured}`)

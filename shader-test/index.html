@@ -15,7 +15,7 @@
       <p id="benchmark-info" class="control-note" role="status">Profile orbit, hover and display adjustments</p>
       <details class="query-info"><summary>Orbit pass timings</summary><p id="benchmark-stages">Run GPU profiling to measure each pass.</p></details>
       <label for="data-source">Score data</label>
-      <select id="data-source"><option value="snapshot">High, dry mountain basins</option><option value="flat">Flat, bare terrain (original)</option><option value="live" id="live-source">Live planetary analogues</option><option value="noise">Synthetic Perlin noise</option></select>
+      <select id="data-source"><option value="live" id="live-source">Live planetary analogues</option><option value="noise">Synthetic Perlin noise</option></select>
       <p id="live-unavailable" class="control-note" hidden>For live planetary analogues, start <code>npm run dev</code> and open the <a href="http://localhost:5173/shader-test/">served lab</a>.</p>
       <p id="earth-data-status" class="live-status" role="status" aria-atomic="true" hidden></p>
       <button id="retry-earth-data" type="button" hidden>Retry Earth data</button>
@@ -37,8 +37,6 @@
           <p id="live-criteria-coverage"></p>
         </details>
       </section>
-      <a id="download-snapshot" class="credit" download="surface-scores.bin">Download compressed snapshot</a>
-      <details id="fixed-query" class="query-info"><summary>Query details</summary><p id="query-description">Loading query details…</p></details>
       <button id="best-match" class="best-match" type="button" disabled>Go to best score</button>
       <div class="views"><button id="plane" type="button">Plane</button><button id="globe" type="button">Globe</button></div>
       <label for="morph">Plane → globe <output id="morph-value">100%</output></label>
@@ -82,7 +80,7 @@
       <div class="checks"><label><input id="dataBoundary" type="checkbox" /> No-data limits</label><label><input id="hdr" type="checkbox" checked /> HDR lighting</label><label><input id="grid" type="checkbox" /> Graticule</label><label><input id="peaks" type="checkbox" checked /> Preserve peaks</label><label><input id="imagery" type="checkbox" /> Satellite imagery</label></div>
       <div class="height-legend"><span><i class="sea"></i>Coastline · sea level</span><span><i class="depth"></i>Ocean depth contours</span><span title="Faint solid red outlines separate missing query scores from available scores, including valid zero values. Display filters do not change these boundaries."><i class="missing"></i>No data · coverage limit</span><span><i></i>Minor contours appear as you zoom</span></div>
       <div class="actions"><button id="regenerate" type="button">New noise</button><button id="reset" type="button">Reset camera</button></div>
-      <p id="texture-info" class="technical" role="status">Loading real scores…</p>
+      <p id="texture-info" class="technical" role="status">Run an analogue query or switch to synthetic noise.</p>
       <a class="credit" href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography/" target="_blank" rel="noreferrer">Earth imagery: NASA Blue Marble</a>
       <a class="credit" href="https://www.gebco.net/data-products-gridded-bathymetry-data/gebco2026-grid" target="_blank" rel="noreferrer">Elevation: GEBCO 2026 · ~10 km overview</a>
     </aside>

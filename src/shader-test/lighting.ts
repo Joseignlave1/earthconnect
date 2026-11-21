@@ -96,9 +96,68 @@ const mipShader = `${fullscreenVertex}${lightBindings}
   return sum / count;
 }`
 
+type LightingPipelines = {
+  gradientPipeline: GPUComputePipeline
+  bakePipeline: GPURenderPipeline
+  mipPipeline: GPURenderPipeline
+}
+
+type SharedSlopes = { texture: GPUTexture; built: boolean }
+
+type DeviceLightingCache = {
+  pipelines?: Promise<LightingPipelines>
+  slopes: WeakMap<GPUTexture, SharedSlopes>
+  created: GPUTexture[]
+}
+
+const lightingCache = new WeakMap<GPUDevice, DeviceLightingCache>()
+
+function getLightingCache(device: GPUDevice): DeviceLightingCache {
+  let entry = lightingCache.get(device)
+  if (!entry) {
+    const created: GPUTexture[] = []
+    entry = { slopes: new WeakMap(), created }
+    lightingCache.set(device, entry)
+    void device.lost.then(() => {
+      for (const texture of created) texture.destroy()
+      created.length = 0
+      lightingCache.delete(device)
+    })
+  }
+  return entry
+}
+
+function getLightingPipelines(device: GPUDevice): Promise<LightingPipelines> {
+  const cache = getLightingCache(device)
+  if (!cache.pipelines) {
+    const pending = (async () => {
+      const [gradient,bake,mip] = await Promise.all([
+        shaderModule(device,'Terrain gradients WGSL',gradientShader),shaderModule(device,'Solar lighting WGSL',bakeShader),shaderModule(device,'Lighting mipmaps WGSL',mipShader),
+      ])
+      const gradientLayout = device.createBindGroupLayout({ entries: [
+        { binding: 0,visibility: GPUShaderStage.COMPUTE,texture: { sampleType: 'unfilterable-float' } },
+        { binding: 1,visibility: GPUShaderStage.COMPUTE,storageTexture: { access: 'write-only',format: 'rg32float' } },
+      ] })
+      const bakeLayout = device.createBindGroupLayout({ entries: [
+        { binding: 0,visibility: GPUShaderStage.FRAGMENT,buffer: { type: 'uniform' } },
+        { binding: 1,visibility: GPUShaderStage.FRAGMENT,texture: { sampleType: 'unfilterable-float' } },
+      ] })
+      const [gradientPipeline,bakePipeline,mipPipeline] = await Promise.all([
+        device.createComputePipelineAsync({ label: 'Precompute terrain gradients',layout: device.createPipelineLayout({ bindGroupLayouts: [gradientLayout] }),compute: { module: gradient,entryPoint: 'gradients' } }),
+        device.createRenderPipelineAsync({ label: 'Bake frozen solar lighting',layout: device.createPipelineLayout({ bindGroupLayouts: [bakeLayout] }),vertex: { module: bake,entryPoint: 'screenVertex' },fragment: { module: bake,entryPoint: 'bake',targets: [{ format: 'r8unorm' }] } }),
+        device.createRenderPipelineAsync({ label: 'Filter lighting mipmaps',layout: 'auto',vertex: { module: mip,entryPoint: 'screenVertex' },fragment: { module: mip,entryPoint: 'mip',targets: [{ format: 'r8unorm' }] } }),
+      ])
+      return { gradientPipeline,bakePipeline,mipPipeline }
+    })()
+    cache.pipelines = pending
+    void pending.catch(() => { if (cache.pipelines === pending) cache.pipelines = undefined })
+  }
+  return cache.pipelines
+}
+
 export class TerrainLighting {
   texture: GPUTexture
-  private slopes: GPUTexture | null = null
+  private slopes: SharedSlopes | null = null
   private uniforms: GPUBuffer
   private gradientPipeline!: GPUComputePipeline
   private bakePipeline!: GPURenderPipeline
@@ -106,7 +165,6 @@ export class TerrainLighting {
   private gradientGroup!: GPUBindGroup
   private bakeGroup!: GPUBindGroup
   private mipGroups: GPUBindGroup[] = []
-  private gradientPending = false
   private exaggeration: number | null = null
 
   constructor(private device: GPUDevice,private sun: readonly number[]) {
@@ -116,24 +174,8 @@ export class TerrainLighting {
   }
 
   async initialize() {
-    const d = this.device
-    const [gradient,bake,mip] = await Promise.all([
-      shaderModule(d,'Terrain gradients WGSL',gradientShader),shaderModule(d,'Solar lighting WGSL',bakeShader),shaderModule(d,'Lighting mipmaps WGSL',mipShader),
-    ])
-    const gradientLayout = d.createBindGroupLayout({ entries: [
-      { binding: 0,visibility: GPUShaderStage.COMPUTE,texture: { sampleType: 'unfilterable-float' } },
-      { binding: 1,visibility: GPUShaderStage.COMPUTE,storageTexture: { access: 'write-only',format: 'rg32float' } },
-    ] })
-    const bakeLayout = d.createBindGroupLayout({ entries: [
-      { binding: 0,visibility: GPUShaderStage.FRAGMENT,buffer: { type: 'uniform' } },
-      { binding: 1,visibility: GPUShaderStage.FRAGMENT,texture: { sampleType: 'unfilterable-float' } },
-    ] })
-    const [gp,bp,mp] = await Promise.all([
-      d.createComputePipelineAsync({ label: 'Precompute terrain gradients',layout: d.createPipelineLayout({ bindGroupLayouts: [gradientLayout] }),compute: { module: gradient,entryPoint: 'gradients' } }),
-      d.createRenderPipelineAsync({ label: 'Bake frozen solar lighting',layout: d.createPipelineLayout({ bindGroupLayouts: [bakeLayout] }),vertex: { module: bake,entryPoint: 'screenVertex' },fragment: { module: bake,entryPoint: 'bake',targets: [{ format: 'r8unorm' }] } }),
-      d.createRenderPipelineAsync({ label: 'Filter lighting mipmaps',layout: 'auto',vertex: { module: mip,entryPoint: 'screenVertex' },fragment: { module: mip,entryPoint: 'mip',targets: [{ format: 'r8unorm' }] } }),
-    ])
-    this.gradientPipeline = gp; this.bakePipeline = bp; this.mipPipeline = mp
+    const { gradientPipeline,bakePipeline,mipPipeline } = await getLightingPipelines(this.device)
+    this.gradientPipeline = gradientPipeline; this.bakePipeline = bakePipeline; this.mipPipeline = mipPipeline
   }
 
   setTerrain(terrain: GPUTexture) {
@@ -141,28 +183,36 @@ export class TerrainLighting {
     // native height-grid noise into lighting. Contours use full-precision data.
     const level = Math.min(1,terrain.mipLevelCount - 1)
     const width = Math.max(1,terrain.width >> level),height = Math.max(1,terrain.height >> level)
-    this.slopes?.destroy(); this.texture.destroy()
-    this.slopes = this.device.createTexture({ label: 'Cached east/north terrain gradients',size: [width,height],format: 'rg32float',usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC })
+    this.texture.destroy()
+    const cache = getLightingCache(this.device)
+    let shared = cache.slopes.get(terrain)
+    if (!shared) {
+      const texture = this.device.createTexture({ label: 'Cached east/north terrain gradients',size: [width,height],format: 'rg32float',usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC })
+      shared = { texture,built: false }
+      cache.slopes.set(terrain,shared)
+      cache.created.push(texture)
+    }
+    this.slopes = shared
     this.texture = this.device.createTexture({ label: 'Baked solar illumination',size: [width,height],format: 'r8unorm',mipLevelCount: Math.floor(Math.log2(Math.max(width,height))) + 1,usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC })
     this.gradientGroup = this.device.createBindGroup({ layout: this.gradientPipeline.getBindGroupLayout(0),entries: [
-      { binding: 0,resource: terrain.createView({ baseMipLevel: level,mipLevelCount: 1 }) },{ binding: 1,resource: this.slopes.createView() },
+      { binding: 0,resource: terrain.createView({ baseMipLevel: level,mipLevelCount: 1 }) },{ binding: 1,resource: shared.texture.createView() },
     ] })
     const group = (pipeline: GPURenderPipeline,view: GPUTextureView) => this.device.createBindGroup({ layout: pipeline.getBindGroupLayout(0),entries: [
       { binding: 0,resource: { buffer: this.uniforms } },{ binding: 1,resource: view },
     ] })
-    this.bakeGroup = group(this.bakePipeline,this.slopes.createView())
+    this.bakeGroup = group(this.bakePipeline,shared.texture.createView())
     this.mipGroups = Array.from({ length: this.texture.mipLevelCount - 1 },(_,i) => group(this.mipPipeline,this.texture.createView({ baseMipLevel: i,mipLevelCount: 1 })))
-    this.gradientPending = true; this.exaggeration = null
+    this.exaggeration = null
   }
 
   encode(encoder: GPUCommandEncoder,exaggeration: number) {
     if (!this.slopes || this.exaggeration === exaggeration) return { gradients: false,lighting: false }
-    const gradients = this.gradientPending
+    const gradients = !this.slopes.built
     if (gradients) {
       const pass = encoder.beginComputePass({ label: 'Cache terrain gradients' })
       pass.setPipeline(this.gradientPipeline); pass.setBindGroup(0,this.gradientGroup)
-      pass.dispatchWorkgroups(Math.ceil(this.slopes.width / 8),Math.ceil(this.slopes.height / 8)); pass.end()
-      this.gradientPending = false
+      pass.dispatchWorkgroups(Math.ceil(this.slopes.texture.width / 8),Math.ceil(this.slopes.texture.height / 8)); pass.end()
+      this.slopes.built = true
     }
     this.device.queue.writeBuffer(this.uniforms,0,new Float32Array([...this.sun,exaggeration]))
     for (let level = 0; level < this.texture.mipLevelCount; level++) {
@@ -176,5 +226,5 @@ export class TerrainLighting {
     return { gradients,lighting: true }
   }
 
-  destroy() { this.texture.destroy(); this.slopes?.destroy(); this.uniforms.destroy() }
+  destroy() { this.texture.destroy(); this.uniforms.destroy() }
 }

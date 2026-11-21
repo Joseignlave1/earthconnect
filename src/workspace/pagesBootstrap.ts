@@ -1,5 +1,21 @@
 import type { WorkspaceAssets } from './workspaceAssets.ts'
 import { loadWorkspaceRelease, type DownloadProgress } from './workspaceRelease.ts'
+import { createSurfaceDevicePool } from '../shader-test/surface-device.ts'
+import { endStartupSpan, markStartup, startStartupSpan } from './startupTiming.ts'
+
+markStartup('bootstrap')
+
+// Start WebGPU adapter/device acquisition immediately in parallel with IDB and JS loading.
+const devicePool = createSurfaceDevicePool()
+startStartupSpan('gpu-device')
+const initialDeviceLease = devicePool()
+void initialDeviceLease.ready.then(() => endStartupSpan('gpu-device'), () => undefined)
+let releasedInitialDevice = false
+function releaseInitialDevice() {
+  if (releasedInitialDevice) return
+  releasedInitialDevice = true
+  initialDeviceLease.release()
+}
 
 // Start the release check while the UI bundle loads. Keep the latest events
 // for React's first render and let retries use the ordinary release loader.
@@ -41,6 +57,14 @@ const loadInitialRelease: typeof loadWorkspaceRelease = async (signal, onProgres
   }
 }
 
-void import('./pagesApp.tsx').then(({ mount }) => mount(loadInitialRelease)).catch(() => {
+// Start fetching the workspace & Monaco bundles in parallel with pagesApp.
+startStartupSpan('workspace-js')
+void import('./SharedSkyWorkspace.tsx').then(() => endStartupSpan('workspace-js'), () => undefined)
+startStartupSpan('app-bundle')
+void import('./pagesApp.tsx').then(({ mount }) => {
+  endStartupSpan('app-bundle')
+  mount(loadInitialRelease, devicePool, releaseInitialDevice)
+}).catch(() => {
+  releaseInitialDevice()
   document.querySelector('#initial-status')!.textContent = 'Could not open Earth Connect. Reload to retry.'
 })

@@ -42,6 +42,11 @@ export async function startWgslLanguageServer(
   }
 
   const uri = server.uriOf(file)
+  const analysisUri = server.uriOf('shaders/analyze.wgsl')
+  let analysisOpened = false
+  let analysisVersion = 0
+  let analysisText: string | undefined
+  let analysisQueue = Promise.resolve()
   let id = 0
   let version = 1
   let disposed = false
@@ -164,6 +169,39 @@ export async function startWgslLanguageServer(
         await new Promise(resolve => setTimeout(resolve, 25 * (attempt + 1)))
       }
       throw new Error('The WGSL analyzer could not produce a syntax tree.')
+    },
+    syntaxTreeFor(text: string, signal?: AbortSignal) {
+      const task = analysisQueue.then(async () => {
+        signal?.throwIfAborted()
+        if (disposed) throw new Error('WGSL analysis has stopped.')
+        if (!analysisOpened) {
+          analysisOpened = true
+          analysisVersion = 1
+          analysisText = text
+          notify('textDocument/didOpen', {
+            textDocument: { uri: analysisUri, languageId: 'wesl', version: analysisVersion, text },
+          })
+        } else if (analysisText !== text) {
+          analysisText = text
+          notify('textDocument/didChange', {
+            textDocument: { uri: analysisUri, version: ++analysisVersion },
+            contentChanges: [{ text }],
+          })
+        }
+        for (let attempt = 0; attempt < 8; attempt++) {
+          signal?.throwIfAborted()
+          try {
+            const tree = await request<string>('wgsl-analyzer/viewSyntaxTree', { textDocument: { uri: analysisUri } })
+            if (tree) return tree
+          } catch (error) {
+            if (!(error instanceof WgslRequestError) || error.code !== -32801) throw error
+          }
+          await new Promise(resolve => setTimeout(resolve, 25 * (attempt + 1)))
+        }
+        throw new Error('The WGSL analyzer could not produce a syntax tree.')
+      })
+      analysisQueue = task.then(() => undefined, () => undefined)
+      return task
     },
     dispose,
   }

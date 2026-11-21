@@ -95,32 +95,9 @@ max overviews. Numeric terrain stays `rg32float`; hardware anisotropic filtering
 is used with `float32-filterable`, otherwise equivalent directional filtering
 runs in the terrain shader without reducing height precision.
 
-The default snapshot searches for **high, dry mountain basins** with soft
-preferences: elevation 3000 ± 1200 m, mean slope ≤4° (3° excess tolerance),
-21 km relief 1500 ± 700 m, terrain position −200 ± 300 m, rainfall ≤250 mm/year
-(250 mm excess tolerance), coldest-month temperature −10 ± 12°C and warmest
-15 ± 10°C. The score is `exp(-0.5 * mean(normalized squared losses))` over six
-families; the two temperatures share one family. Missing fields or terrain
-coverage below 90% remain missing. These are illustrative matching preferences.
-
-Each snapshot came from one global Earth Index request against
-`earth-ed5bc9904a5f`. `public/data/surface-basins.json` records the complete SQL,
-parameters, capture time, grid, counts and SHA-256. The original flat/bare-terrain
-query and its `surface-scores.bin/json` files remain available in the selector.
-Snapshot mode loads local assets without backend requests and exposes a download
-link for the active file.
-Synthetic noise remains available in the selector.
-
-Both snapshots preserve all **71,101,280 native uint16 bytes**. The basin file
-is **16,617,847 bytes**, using row-delta prediction (modulo 65536, reset each row)
-and per-tile low/high byte planes before gzip. The original file is 2,787,704
-bytes using direct gzip. The ECS1 header embeds JSON provenance and encoding;
-zero and missing code 65535 are preserved exactly. A worker decompresses the
-snapshot and builds maximum overviews before transfer to the GPU. All decoded
-native scores are checked against the captured API SHA-256 in regression tests.
-`npm run snapshot:shader -- basins` (or `-- flat`) is the explicit one-shot
-capture utility; it refuses to query when that snapshot already exists. It is
-not part of startup or builds. Query definitions live in `scripts/score-queries.ts`.
+The surface lab defaults to **Live planetary analogues** (running Earth Score on
+WebGPU from a Mars or Moon query) and also offers **Synthetic Perlin noise** in
+the selector.
 
 Score rendering separates dim context, bright matches, and filtering:
 
@@ -177,8 +154,8 @@ blends the noise over it. Source and credit information is in
 [the texture credits](public/textures/CREDITS.txt).
 
 `npm run export:shader` creates `exports/earth-connect-surface-lab.html`, with
-the image, both real score snapshots, styles, scripts and score worker embedded.
-The file opens from disk and supports both snapshots and synthetic noise offline.
+the image, terrain, styles, scripts and noise worker embedded.
+The file opens from disk and supports synthetic noise offline.
 Use the served `/shader-test/` page for live planetary queries and their Earth
 dataset.
 
@@ -259,10 +236,9 @@ reports a local integrity error, move the named file aside and rerun it.
 Once the local files are verified, these builds and tests can reuse them
 without downloading them again.
 
-On first launch, the globe opens with a live WebGPU score map from the same
-Hello, World! shader used in the editable workspace. On subsequent launches,
-it opens the original basins snapshot. The scene, score maps, and planetary
-coordinate picker use the local data.
+The globe opens with a live WebGPU score map from the same Hello, World! shader
+used in the editable workspace. The scene, score maps, and planetary coordinate
+picker use the local data.
 **Copy sampled WGSL values** contacts the Earth Index API when requested.
 To use another compatible sampling server, set `VITE_EARTH_INDEX_API_URL`
 when running either export command.

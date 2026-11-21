@@ -1,4 +1,39 @@
 export type Terrain = { pixels: Uint8ClampedArray; width: number; height: number }
+export type TerrainPackFormat = 'rg32float' | 'rgba8unorm'
+export type PackedTerrainLevel<T extends Float32Array<ArrayBuffer> | Uint8Array<ArrayBuffer> = Float32Array<ArrayBuffer> | Uint8Array<ArrayBuffer>> = {
+  data: T
+  width: number
+  height: number
+}
+export type TerrainWorkerRequest = { url: string; format: TerrainPackFormat }
+export type TerrainWorkerResponse =
+  | { kind: 'ok'; terrain: Terrain; poles: [number, number]; levels: PackedTerrainLevel[] }
+  | { kind: 'error'; message: string }
+
+export function packRg32FloatLevels(levels: ReturnType<typeof elevationPyramid>): PackedTerrainLevel<Float32Array<ArrayBuffer>>[] {
+  return levels.map(({ values, coast, width, height }) => {
+    const data = new Float32Array(values.length * 2)
+    for (let i = 0; i < values.length; i++) {
+      data[i * 2] = values[i]
+      data[i * 2 + 1] = coast[i]
+    }
+    return { data, width, height }
+  })
+}
+
+export function packRgba8Levels(levels: ReturnType<typeof elevationPyramid>): PackedTerrainLevel<Uint8Array<ArrayBuffer>>[] {
+  return levels.map(({ values, width, height }) => {
+    // Normalized linear filtering commutes with the affine two-channel decode.
+    // Generate each mip from real metres before packing.
+    const data = new Uint8Array(width * height * 4)
+    for (let i = 0; i < values.length; i++) {
+      const code = Math.round(values[i] + 32768)
+      data[i * 4] = code >> 8
+      data[i * 4 + 1] = code & 255
+    }
+    return { data, width, height }
+  })
+}
 
 // ECT1: magic, uint32 little-endian width/height, then packed RGBA data bytes.
 // Decode numeric data without canvas readback, color conversion or privacy noise.

@@ -9,7 +9,7 @@ import { prepareScoreShader, SCORE_SHADER_EXAMPLES, SCORE_SHADER_FIELDS, SCORE_S
 import { createLayout, createScoreGeometry, GRID_WIDTH } from '../../src/earth-score/layout.ts'
 import { parseManifest } from '../../src/earth-score/manifest.ts'
 import { createQueryParameters, type EarthQueryCriterion } from '../../src/earth-score/query.ts'
-import { createLookup, createParameters } from '../../src/earth-score/scoring.ts'
+import { createLookup } from '../../src/earth-score/scoring.ts'
 import type { Criterion } from '../../src/explorerData.ts'
 
 const world = new URL('../../compute-data/world/', import.meta.url)
@@ -89,21 +89,6 @@ test('exact float lookup preserves valid physical zero and encodes missing separ
   assert.equal(floats[temperature + 1], -150)
   assert.equal(floats[temperature + 7501], 0)
   assert.equal(floats[temperature + 65535], Math.fround((65535 - 7501) / 50))
-})
-
-test('target, tolerance and weight overrides keep the baseline reusable', () => {
-  const floats = (overrides?: Parameters<typeof createParameters>[1]) =>
-    new Float32Array(createParameters(manifest, overrides).buffer)
-  const initial = floats()
-  const moved = floats({ slope_mean_deg: { target: 1.25, tolerance: 4, weight: 2 } })
-  assert.equal(moved[16], 1.25)
-  assert.equal(moved[17], 0.25)
-  assert.equal(moved[18], Math.fround(2 / 5.5))
-  assert.equal(initial[18], Math.fround(1 / 4.5))
-  assert.deepEqual(floats(), initial)
-  assert.throws(() => floats({ no_field: { target: 0 } }), /Unknown score feature/)
-  assert.throws(() => floats({ slope_mean_deg: { tolerance: 0 } }), /Invalid score parameters/)
-  assert.throws(() => floats({ slope_mean_deg: { weight: 1e39 } }), /Invalid score parameters/)
 })
 
 function criterion(key: string, settings: Partial<EarthQueryCriterion> = {}): Criterion {
@@ -203,8 +188,14 @@ fn score(pixel: EarthCell) -> f32 {
   const compiled = prepareScoreShader(program, manifest)
   assert.match(compiled.entryPoint, /earth_score_internal_1_/)
   assert.equal(compiled.sourceLines, 7)
+  const bareIndex = manifest.columns.indexOf('bare_fraction')
+  const slopeIndex = manifest.columns.indexOf('slope_mean_deg')
+  assert.match(compiled.code, new RegExp(`_value\\(rows, ${bareIndex}u, row,`))
+  assert.doesNotMatch(compiled.code, new RegExp(`_value\\(rows, ${slopeIndex}u, row,`))
+  const allFieldsProgram = `fn score(pixel: EarthCell) -> f32 {\n  return ${SCORE_SHADER_FIELDS.map(f => `pixel.${f.name}`).join(' + ')};\n}`
+  const compiledAll = prepareScoreShader(allFieldsProgram, manifest)
   for (const field of SCORE_SHADER_FIELDS) {
-    assert.match(compiled.code, new RegExp(`_value\\(rows, ${manifest.columns.indexOf(field.name)}u, row\\)`))
+    assert.match(compiledAll.code, new RegExp(`_value\\(rows, ${manifest.columns.indexOf(field.name)}u, row,`))
   }
 })
 

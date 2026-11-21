@@ -10,8 +10,6 @@ await hydrateAssets('render')
 const assets = [
   ['earthImageUrl', 'textures/earth-blue-marble.jpg', 'image/jpeg'],
   ['terrainDataUrl', 'textures/earth-terrain.bin', 'application/octet-stream'],
-  ['flatSnapshotUrl', 'data/surface-scores.bin', 'application/octet-stream'],
-  ['scoreSnapshotUrl', 'data/surface-basins.bin', 'application/octet-stream'],
 ]
 const embedded = await Promise.all(assets.map(async ([name, path, contentType]) => {
   const bytes = await readFile(resolve(root, 'public', path))
@@ -27,8 +25,11 @@ const result = await build({
   plugins: [{
     name: 'embed-surface-lab-assets',
     enforce: 'pre',
-    resolveId(id) {
+    resolveId(id, importer) {
       if (id === './labAssets.ts') return assetModule
+      if (id === './terrain-worker-factory.ts' && importer === resolve(root, 'src/shader-test/terrain-loader.ts')) {
+        return resolve(root, 'src/shader-test/embedded-terrain-worker.ts')
+      }
     },
     load(id) {
       if (id === assetModule) return [...embedded, 'export const scoreManifestUrl = ""'].join('\n')

@@ -15,7 +15,8 @@ const worldPaths = world.chunks.map(chunk => {
   }
   return path
 })
-const renderPaths = Object.keys(release.assets).filter(path => !path.startsWith(worldDirectory))
+const ignoredPaths = new Set(['data/surface-basins.bin'])
+const renderPaths = Object.keys(release.assets).filter(path => !path.startsWith(worldDirectory) && !ignoredPaths.has(path))
 const groups = {
   all: [...renderPaths, ...worldPaths],
   render: renderPaths,

@@ -20,9 +20,8 @@ const terrain = 'textures/'
 const image = `${terrain}earth-blue-marble.jpg`
 const earth = `${terrain}earth-terrain.bin`
 const sky = `${terrain}nasa-deep-star-map.webp`
-const basins = 'data/surface-basins.bin'
 const textures = [image, earth, sky]
-const assets = [basins, ...textures, `${terrain}moon-terrain.bin`, `${terrain}mars-terrain.bin`]
+const assets = [...textures, `${terrain}moon-terrain.bin`, `${terrain}mars-terrain.bin`]
 const virtualAsset = '\0workspace-asset:'
 
 const wasm = await readFile(resolve(root, 'src/earth-score/zstd.wasm'))
@@ -77,11 +76,14 @@ const result = await build({
       },
     },
     {
-      name: 'use-embedded-decoder-worker',
+      name: 'use-embedded-workers',
       enforce: 'pre',
       resolveId(source, importer) {
         if (source === './decoder-worker.ts' && importer === resolve(root, 'src/earth-score/decoder-pool.ts')) {
           return resolve(root, 'src/workspace/embeddedDecoder.ts')
+        }
+        if (source === './terrain-worker-factory.ts' && importer === resolve(root, 'src/shader-test/terrain-loader.ts')) {
+          return resolve(root, 'src/shader-test/embedded-terrain-worker.ts')
         }
       },
     },

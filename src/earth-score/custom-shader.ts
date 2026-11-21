@@ -128,6 +128,7 @@ function inspectSource(source: string) {
   const lex = /\s+|\/\/[^\n]*|\/\*|[\p{ID_Start}_][\p{ID_Continue}_]*|[^]/gu
   let previous = ''
   let scoreLocation: ReturnType<typeof sourceLocation> | undefined
+  const identifiers = new Set<string>()
   for (let match = lex.exec(source); match; match = lex.exec(source)) {
     const text = match[0]
     if (text.startsWith('//') || /^\s/u.test(text)) continue
@@ -151,9 +152,10 @@ function inspectSource(source: string) {
       }])
     }
     if (previous === 'fn' && text === 'score') scoreLocation = sourceLocation(source, match.index, text.length)
+    if (text.length > 1 || /[\p{ID_Start}_]/u.test(text)) identifiers.add(text)
     previous = text
   }
-  return scoreLocation
+  return { scoreLocation, identifiers }
 }
 
 // Let the WGSL compiler validate the editable module. The engine adds the
@@ -162,47 +164,60 @@ function inspectSource(source: string) {
 export function prepareScoreShader(source: string, manifest: ScoreManifest, planetary?: PlanetaryShaderData) {
   const lowered = lowerPlanetaryCalls(source, planetary)
   source = lowered.source.replace(/\r\n?/g, '\n')
-  const scoreLocation = inspectSource(source)
+  const { scoreLocation, identifiers } = inspectSource(source)
   const taken = new Set(Array.from(source.matchAll(/earth_score_internal_\d+_/g), ([match]) => match))
   let index = 0
   while (taken.has(`earth_score_internal_${index}_`)) index++
   const internal = `earth_score_internal_${index}_`
+  let readsColumns = false
   const fields = SCORE_SHADER_FIELDS.map(({ name }) => {
-    const index = manifest.columns.indexOf(name)
-    return index >= 0 ? `${internal}value(rows, ${index}u, row)` : 'NO_DATA'
+    const column = manifest.columns.indexOf(name)
+    if (column < 0 || !identifiers.has(name)) return 'NO_DATA'
+    readsColumns = true
+    const { origin, denominator } = manifest.encodings[column]
+    return `${internal}value(rows, ${column}u, row, ${origin}i, ${denominator}.0)`
   })
-  const engineCode = sourceCodeWGSL.replaceAll('sourceCode', `${internal}source_code`).replaceAll('packedInput', `${internal}packed_input`)
-  const geometry = manifest.columns.length * 65536
-  const suffix = /* wgsl */ `
-@group(0) @binding(0) var<storage, read> ${internal}packed_input: array<u32>;
-@group(0) @binding(1) var<storage, read_write> ${internal}scores: array<u32>;
-@group(0) @binding(2) var<storage, read> ${internal}lookup: array<u32>;
-@group(0) @binding(4) var<uniform> ${internal}first_site: u32;
-${engineCode}
-${planetShaderFunctions(internal, lowered.slots)}
-fn ${internal}value(rows: u32, field: u32, row: u32) -> f32 {
+  const needsGeo = identifiers.has('latitude_deg') || identifiers.has('longitude_deg')
+  const needsGrid = needsGeo || identifiers.has('grid_x') || identifiers.has('grid_y')
+  const engineCode = readsColumns
+    ? sourceCodeWGSL.replaceAll('sourceCode', `${internal}source_code`).replaceAll('packedInput', `${internal}packed_input`) + `
+fn ${internal}value(rows: u32, field: u32, row: u32, origin: i32, denominator: f32) -> f32 {
   let code = ${internal}source_code(rows, field, row);
   if (code == 0u) { return NO_DATA; }
-  return bitcast<f32>(${internal}lookup[field * 65536u + code]);
-}
-@compute @workgroup_size(${WORKGROUP_SIZE})
-fn ${internal}dispatch(@builtin(global_invocation_id) id: vec3u) {
-  let rows = arrayLength(&${internal}scores);
-  let row = id.x;
-  if (row >= rows) { return; }
+  return f32(i32(code) - origin) / denominator;
+}`
+    : ''
+  const geometry = manifest.columns.length * 65536
+  const gridCode = needsGrid ? `
   let site = ${internal}first_site + row / ${PIXELS_PER_SITE}u;
   let pixel = row % ${PIXELS_PER_SITE}u;
   let origin = ${internal}lookup[${geometry}u + site];
   let grid_x = origin % ${GRID_WIDTH}u + pixel % ${TILE_SIZE}u;
-  let grid_y = origin / ${GRID_WIDTH}u + pixel / ${TILE_SIZE}u;
+  let grid_y = origin / ${GRID_WIDTH}u + pixel / ${TILE_SIZE}u;` : ''
+  const geoCode = needsGeo ? `
   let location = ${geometry + manifest.sites.length}u + grid_y * 3u;
   let x_offset = f32(grid_x) + 0.5 - ${GRID_WIDTH / 2}.0;
   let inside = abs(x_offset) < f32(${internal}lookup[location + 2u]);
   let latitude = select(NO_DATA, bitcast<f32>(${internal}lookup[location]), inside);
-  let longitude = select(NO_DATA, x_offset * bitcast<f32>(${internal}lookup[location + 1u]), inside);
+  let longitude = select(NO_DATA, x_offset * bitcast<f32>(${internal}lookup[location + 1u]), inside);` : ''
+  const bindings = [
+    readsColumns && `@group(0) @binding(0) var<storage, read> ${internal}packed_input: array<u32>;`,
+    `@group(0) @binding(1) var<storage, read_write> ${internal}scores: array<u32>;`,
+    needsGrid && `@group(0) @binding(2) var<storage, read> ${internal}lookup: array<u32>;`,
+    needsGrid && `@group(0) @binding(4) var<uniform> ${internal}first_site: u32;`,
+  ].filter(Boolean).join('\n')
+  const suffix = /* wgsl */ `
+${bindings}
+${engineCode}
+${planetShaderFunctions(internal, lowered.slots)}
+@compute @workgroup_size(${WORKGROUP_SIZE})
+fn ${internal}dispatch(@builtin(global_invocation_id) id: vec3u) {
+  let rows = arrayLength(&${internal}scores);
+  let row = id.x;
+  if (row >= rows) { return; }${gridCode}${geoCode}
   let result: f32 = score(EarthCell(
     ${fields.join(',\n    ')},
-    latitude, longitude, grid_x, grid_y
+    ${needsGeo ? 'latitude, longitude' : 'NO_DATA, NO_DATA'}, ${needsGrid ? 'grid_x, grid_y' : '0u, 0u'}
   ));
   let exponent = bitcast<u32>(result) & 0x7f800000u;
   if (exponent == 0x7f800000u || result < 0.0) {
@@ -236,7 +251,14 @@ export async function makeScorePipeline(device: GPUDevice, layout: GPUPipelineLa
     validation = device.popErrorScope()
     void validation.catch(() => {})
   }
-  const [compilation, fault] = await Promise.all([module.getCompilationInfo(), validation])
+  const info = module.getCompilationInfo()
+  const pipeline = device.createComputePipelineAsync({
+    label: 'Custom Earth score function', layout, compute: { module, entryPoint: shader.entryPoint },
+  }).then(
+    value => ({ ok: true as const, value }),
+    error => ({ ok: false as const, error }),
+  )
+  const [compilation, fault, built] = await Promise.all([info, validation, pipeline])
   const diagnostics = compilation.messages.map((value): ScoreShaderDiagnostic => {
     const line = value.lineNum
     const signature = line === shader.callLine ? shader.scoreLocation : undefined
@@ -248,12 +270,9 @@ export async function makeScorePipeline(device: GPUDevice, layout: GPUPipelineLa
   })
   if (diagnostics.some(diagnostic => diagnostic.severity === 'error')) throw new ScoreShaderError(diagnostics)
   if (fault) throw new ScoreShaderError([{ line: 0, column: 0, length: 0, message: fault.message, severity: 'error' }])
-  try {
-    return await device.createComputePipelineAsync({
-      label: 'Custom Earth score function', layout, compute: { module, entryPoint: shader.entryPoint },
-    })
-  } catch (error) {
+  if (!built.ok) {
     throw new ScoreShaderError([{ line: 0, column: 0, length: 0,
-      message: error instanceof Error ? error.message : String(error), severity: 'error' }])
+      message: built.error instanceof Error ? built.error.message : String(built.error), severity: 'error' }])
   }
+  return built.value
 }

@@ -4,7 +4,7 @@ import { cellAddress } from './world-grid.ts'
 import { magmaColor } from './color.ts'
 import { HIGHLIGHT_START, scoreAtPalette, type ColorMode } from './score-style.ts'
 import { createLiveQueryControls } from './live-query.ts'
-import { earthImageUrl, flatSnapshotUrl, scoreSnapshotUrl, terrainDataUrl } from './labAssets.ts'
+import { earthImageUrl, terrainDataUrl } from './labAssets.ts'
 
 const surfaceAssets: Readonly<Record<string, string>> = {
   'textures/earth-blue-marble.jpg': earthImageUrl,
@@ -75,7 +75,6 @@ async function start() {
         element(`${name}-label`).hidden = input.hidden
         input.disabled = locked
       }
-      if (canvas.dataset.scoreDescription) output('query-description',canvas.dataset.scoreDescription)
       const key = JSON.stringify([style,options.colorMode,options.emission,options.hdr,options.minimumScore,renderer!.matchingScoreCount,ready])
       if (key === legendKey) return
       legendKey = key
@@ -89,7 +88,7 @@ async function start() {
         output(id,score.toFixed(3)); element(id).title = `Score ${score.toFixed(6)}`
       }
       const empty = style.best <= style.cutoff || (auto && !style.eligible)
-      output('score-focus',!ready ? 'Calibrating colors…' : empty ? 'No bright matches above baseline · context still available' : auto
+      output('score-focus',!ready ? 'Run a query to calibrate colors.' : empty ? 'No bright matches above baseline · context still available' : auto
         ? `Most colors: ${style.anchors[0].toFixed(4)}–${style.best.toFixed(4)} · top ${Math.round(style.focus * 100)}% focus`
         : `Most colors: ${(style.best - (style.best - style.cutoff) * style.topRange).toFixed(4)}–${style.best.toFixed(4)}`)
       output('score-policy',locked ? 'Highlight scale and baseline locked across queries. Context and filter remain adjustable.' : auto
@@ -135,23 +134,8 @@ async function start() {
     }
     const frequency = element<HTMLInputElement>('frequency')
     const source = element<HTMLSelectElement>('data-source')
-    const snapshotLink = element<HTMLAnchorElement>('download-snapshot')
-    snapshotLink.addEventListener('click', event => {
-      if (snapshotLink.origin === location.origin || !/^https?:$/.test(snapshotLink.protocol)) return
-      event.preventDefault()
-      const filename = snapshotLink.download
-      void fetch(snapshotLink.href).then(async response => {
-        if (!response.ok) throw new Error(`Could not download the score snapshot (HTTP ${response.status}).`)
-        const url = URL.createObjectURL(await response.blob())
-        const link = document.createElement('a')
-        link.href = url
-        link.download = filename
-        link.click()
-        setTimeout(() => URL.revokeObjectURL(url), 1000)
-      }).catch(error)
-    })
     liveQuery = createLiveQueryControls(canvas, renderer)
-    if (source.value === 'live' && element<HTMLOptionElement>('live-source').disabled) source.value = 'snapshot'
+    if (source.value === 'live' && element<HTMLOptionElement>('live-source').disabled) source.value = 'noise'
     const regenerate = () => {
       if (source.value !== 'noise') return
       try { renderer!.regenerate(frequency.valueAsNumber, seed) }
@@ -164,15 +148,8 @@ async function start() {
       frequency.disabled = !noise
       element<HTMLButtonElement>('regenerate').disabled = !noise
       element('error').hidden = true
-      snapshotLink.hidden = noise || live
-      element('fixed-query').hidden = live
       liveQuery!.setActive(live)
-      if (live) return
-      const flat = source.value === 'flat'
-      snapshotLink.href = flat ? flatSnapshotUrl : scoreSnapshotUrl
-      snapshotLink.download = flat ? 'surface-scores.bin' : 'surface-basins.bin'
       if (noise) regenerate()
-      else renderer!.loadSnapshot(flat ? flatSnapshotUrl : scoreSnapshotUrl)
     }
     source.addEventListener('change',loadData)
     frequency.addEventListener('input', () => {

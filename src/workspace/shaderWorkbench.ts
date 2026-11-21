@@ -35,6 +35,7 @@ type WorkbenchCallbacks = {
   onPreviewHost: (fileId: string, host: HTMLElement | undefined) => void
   onPreviewOpenChange: (fileIds: readonly string[]) => void
   onVisiblePreviews: (fileIds: readonly string[]) => void
+  takePrewarmedHost?: (fileId: string) => HTMLElement | undefined
 }
 
 type FileEntry = {
@@ -187,12 +188,14 @@ async function addFile(file: ShaderFile) {
   }
 }
 
-export async function mountShaderWorkbench(host: HTMLElement, callbacks: WorkbenchCallbacks) {
+export async function mountShaderWorkbench(host: HTMLElement, callbacks: WorkbenchCallbacks, signal?: AbortSignal) {
   await initializeWorkbench()
+  signal?.throwIfAborted()
   const [groups, editorService, codeEditorService] = await Promise.all([
     getService(IEditorGroupsService), getService(IEditorService), getService(ICodeEditorService),
   ])
   await groups.whenRestored
+  signal?.throwIfAborted()
   currentMount?.()
   host.classList.add('shader-workbench')
   const attachment = renderEditorPart(host)
@@ -247,9 +250,9 @@ export async function mountShaderWorkbench(host: HTMLElement, callbacks: Workben
       previewGroupIds.set(fileId, group.id)
       let previewHost = previewHosts.get(fileId)
       if (!previewHost) {
-        previewHost = host.ownerDocument.createElement('div')
+        previewHost = callbacks.takePrewarmedHost?.(fileId) ?? host.ownerDocument.createElement('div')
         previewHost.className = 'sky-preview-host'
-        parking.append(previewHost)
+        movePreviewHost(previewHost, parking)
         previewHosts.set(fileId, previewHost)
         callbacks.onPreviewHost(fileId, previewHost)
         changed = true

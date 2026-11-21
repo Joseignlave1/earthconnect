@@ -1,7 +1,9 @@
 import { createMesh, type Vec3 } from '../shader-test/geometry.ts'
-import { shaderModule, uploadBuffer } from '../shader-test/gpu.ts'
+import { shaderModule, uploadBuffer, writeTextureChunked } from '../shader-test/gpu.ts'
 import { bodyRadius } from './solarSystem.ts'
-import { elevationAt, elevationPyramid, loadTerrain, poleElevations, type Terrain } from '../shader-test/terrain.ts'
+import { elevationAt, elevationPyramid, packRgba8Levels, poleElevations, type Terrain } from '../shader-test/terrain.ts'
+import { loadPreparedTerrain, type PreparedTerrain } from '../shader-test/terrain-loader.ts'
+import type { TerrainLoader } from './earthWorkspaceResources.ts'
 import type { WorkspaceAssets } from './workspaceAssets.ts'
 
 export type TerrainBody = 'moon' | 'mars'
@@ -21,13 +23,20 @@ function normalAt(longitude: number, latitude: number): Vec3 {
   return [c * Math.sin(longitude), Math.sin(latitude), c * Math.cos(longitude)]
 }
 
+const planetColumns = 512, planetRows = 256
+let sharedPlanetGrid: ReturnType<typeof createMesh> | undefined
+
+function getPlanetGrid() {
+  return (sharedPlanetGrid ??= createMesh(planetColumns, planetRows))
+}
+
 export type PlanetTerrain = ReturnType<typeof buildPlanetTerrain>
 
 export function buildPlanetTerrain(body: TerrainBody, terrain: Terrain) {
   const { relief } = settings[body]
   const radius = bodyRadius(body)
-  const columns = 512, rows = 256
-  const { uv, indices } = createMesh(columns, rows)
+  const columns = planetColumns, rows = planetRows
+  const { uv, indices } = getPlanetGrid()
   const [south, north] = poleElevations(terrain)
   const readElevation = (longitude: number, latitude: number) => {
     if (latitude <= -Math.PI / 2) return south
@@ -61,7 +70,7 @@ export function buildPlanetTerrain(body: TerrainBody, terrain: Terrain) {
     }
     return [interpolate(0), interpolate(1), interpolate(2)]
   }
-  return { radius, columns, rows, positions, uv, indices, elevationAt: readElevation, positionAt }
+  return { radius, columns, rows, positions, indices, elevationAt: readElevation, positionAt }
 }
 
 const surfaceShader = /* wgsl */ `
@@ -155,14 +164,98 @@ fn contourLine(height: f32, gradient: f32, interval: f32, width: f32) -> f32 {
   return vec4f(color, 1.);
 }`
 
-type GpuTerrain = {
+type SharedBodyTerrain = {
   mesh: PlanetTerrain
-  parameters: Float32Array<ArrayBuffer>
   vertices: GPUBuffer
   indices: GPUBuffer
-  uniform: GPUBuffer
   heights: GPUTexture
+  sampler: GPUSampler
+}
+
+type GpuTerrain = {
+  shared: SharedBodyTerrain
+  parameters: Float32Array<ArrayBuffer>
+  uniform: GPUBuffer
   bindGroup: GPUBindGroup
+}
+
+type DevicePlanetCache = {
+  pipeline?: Promise<GPURenderPipeline>
+  indices?: GPUBuffer
+  bodies: WeakMap<Terrain, SharedBodyTerrain>
+  created: SharedBodyTerrain[]
+}
+
+const planetCache = new WeakMap<GPUDevice, DevicePlanetCache>()
+
+function getPlanetCache(device: GPUDevice): DevicePlanetCache {
+  let entry = planetCache.get(device)
+  if (!entry) {
+    const created: SharedBodyTerrain[] = []
+    entry = { bodies: new WeakMap(), created }
+    planetCache.set(device, entry)
+    void device.lost.then(() => {
+      entry!.indices?.destroy()
+      for (const item of created) {
+        item.vertices.destroy()
+        item.heights.destroy()
+      }
+      created.length = 0
+      planetCache.delete(device)
+    })
+  }
+  return entry
+}
+
+function getPlanetPipeline(device: GPUDevice): Promise<GPURenderPipeline> {
+  const cache = getPlanetCache(device)
+  if (!cache.pipeline) {
+    const pending = shaderModule(device, 'Planetary DEM terrain shader', surfaceShader).then(module =>
+      device.createRenderPipelineAsync({
+        label: 'Planetary DEM terrain',
+        layout: 'auto',
+        vertex: {
+          module, entryPoint: 'vertexMain',
+          buffers: [{ arrayStride: 12, attributes: [{ shaderLocation: 0, format: 'float32x3', offset: 0 }] }],
+        },
+        fragment: { module, entryPoint: 'fragmentMain', targets: [{ format: 'rgba16float' }] },
+        primitive: { topology: 'triangle-list', cullMode: 'back' },
+        multisample: { count: 4 },
+        depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
+      }))
+    cache.pipeline = pending
+    void pending.catch(() => { if (cache.pipeline === pending) cache.pipeline = undefined })
+  }
+  return cache.pipeline
+}
+
+function getSharedBodyTerrain(device: GPUDevice, body: TerrainBody, prepared: PreparedTerrain<'rgba8unorm'>): SharedBodyTerrain {
+  const cache = getPlanetCache(device)
+  let shared = cache.bodies.get(prepared.terrain)
+  if (!shared) {
+    const { terrain } = prepared
+    const levels = prepared.levels ?? packRgba8Levels(elevationPyramid(terrain))
+    const mesh = buildPlanetTerrain(body, terrain)
+    const heights = device.createTexture({
+      label: `${body} numeric terrain grid`,
+      size: [terrain.width, terrain.height], mipLevelCount: levels.length,
+      format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    })
+    for (const [mipLevel, { data, width, height }] of levels.entries()) {
+      writeTextureChunked(device.queue, heights, mipLevel, data, width, height, 4)
+    }
+    const vertices = uploadBuffer(device, `${body} displaced terrain vertices`, mesh.positions, GPUBufferUsage.VERTEX)
+    const indices = (cache.indices ??= uploadBuffer(device, 'Planetary displaced terrain indices', mesh.indices, GPUBufferUsage.INDEX))
+    const sampler = device.createSampler({
+      addressModeU: 'repeat', magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', maxAnisotropy: 8,
+    })
+    shared = { mesh, heights, vertices, indices, sampler }
+    cache.bodies.set(terrain, shared)
+    cache.created.push(shared)
+  }
+  // Mip levels are only needed for GPU upload; drop CPU copy once resident on GPU.
+  prepared.levels = null
+  return shared
 }
 
 export class PlanetTerrainRenderer {
@@ -175,30 +268,22 @@ export class PlanetTerrainRenderer {
     this.pipeline = pipeline
   }
 
-  static async create(device: GPUDevice, signal: AbortSignal, assetUrl: WorkspaceAssets['url']) {
+  static async create(device: GPUDevice, signal: AbortSignal, assetUrl: WorkspaceAssets['url'], loadTerrain?: TerrainLoader) {
     const bodies: TerrainBody[] = ['moon', 'mars']
-    const [module, ...terrain] = await Promise.all([
-      shaderModule(device, 'Planetary DEM terrain shader', surfaceShader),
-      ...bodies.map(async body => loadTerrain(await assetUrl(`textures/${body}-terrain.bin`, signal), signal)),
+    const [pipeline, ...terrain] = await Promise.all([
+      getPlanetPipeline(device),
+      ...bodies.map(async body => {
+        const path = `textures/${body}-terrain.bin`
+        return loadTerrain
+          ? loadTerrain(path, 'rgba8unorm', s => assetUrl(path, s), signal)
+          : loadPreparedTerrain(await assetUrl(path, signal), 'rgba8unorm', signal)
+      }),
     ])
-    signal.throwIfAborted()
-    const pipeline = await device.createRenderPipelineAsync({
-      label: 'Planetary DEM terrain',
-      layout: 'auto',
-      vertex: {
-        module, entryPoint: 'vertexMain',
-        buffers: [{ arrayStride: 12, attributes: [{ shaderLocation: 0, format: 'float32x3', offset: 0 }] }],
-      },
-      fragment: { module, entryPoint: 'fragmentMain', targets: [{ format: 'rgba16float' }] },
-      primitive: { topology: 'triangle-list', cullMode: 'back' },
-      multisample: { count: 4 },
-      depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
-    })
     signal.throwIfAborted()
     const renderer = new PlanetTerrainRenderer(device, pipeline)
     try {
       for (const [index, body] of bodies.entries()) {
-        renderer.upload(body, terrain[index])
+        renderer.attach(body, terrain[index])
       }
       return renderer
     } catch (error) {
@@ -207,53 +292,31 @@ export class PlanetTerrainRenderer {
     }
   }
 
-  private upload(body: TerrainBody, terrain: Terrain) {
+  private attach(body: TerrainBody, prepared: PreparedTerrain<'rgba8unorm'>) {
     const device = this.device
-    const mesh = buildPlanetTerrain(body, terrain)
-    const levels = elevationPyramid(terrain)
-    const heights = device.createTexture({
-      label: `${body} numeric terrain grid`,
-      size: [terrain.width, terrain.height], mipLevelCount: levels.length,
-      format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-    })
-    for (const [mipLevel, { values, width, height }] of levels.entries()) {
-      // Normalized linear filtering commutes with the affine two-channel
-      // decode. Generate each mip from real metres before packing.
-      const pixels = new Uint8Array(width * height * 4)
-      for (let i = 0; i < values.length; i++) {
-        const code = Math.round(values[i] + 32768)
-        pixels[i * 4] = code >> 8
-        pixels[i * 4 + 1] = code & 255
-      }
-      device.queue.writeTexture({ texture: heights, mipLevel }, pixels, { bytesPerRow: width * 4 }, [width, height])
-    }
+    const shared = getSharedBodyTerrain(device, body, prepared)
     const parameters = new Float32Array(40)
     const { relief, interval, low, high } = settings[body]
-    parameters.set([mesh.radius * 1000, relief, interval, 1], 20)
+    parameters.set([shared.mesh.radius * 1000, relief, interval, 1], 20)
     parameters.set(low, 24)
     parameters.set(high, 28)
     const uniform = device.createBuffer({
       label: `${body} terrain parameters`,
       size: parameters.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     })
-    const vertices = uploadBuffer(device, `${body} displaced terrain vertices`, mesh.positions, GPUBufferUsage.VERTEX)
-    const indices = uploadBuffer(device, `${body} displaced terrain indices`, mesh.indices, GPUBufferUsage.INDEX)
-    const sampler = device.createSampler({
-      addressModeU: 'repeat', magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', maxAnisotropy: 8,
-    })
     const bindGroup = device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: uniform } },
-        { binding: 1, resource: heights.createView() },
-        { binding: 2, resource: sampler },
+        { binding: 1, resource: shared.heights.createView() },
+        { binding: 2, resource: shared.sampler },
       ],
     })
-    this.bodies.set(body, { mesh, parameters, vertices, indices, uniform, heights, bindGroup })
+    this.bodies.set(body, { shared, parameters, uniform, bindGroup })
   }
 
   getTerrain(body: TerrainBody) {
-    return this.bodies.get(body)?.mesh
+    return this.bodies.get(body)?.shared.mesh
   }
 
   draw(
@@ -262,7 +325,7 @@ export class PlanetTerrainRenderer {
   ) {
     const data = this.bodies.get(body)
     if (!data) return
-    const { mesh, parameters, vertices, indices, uniform, bindGroup } = data
+    const { shared: { mesh, vertices, indices }, parameters, uniform, bindGroup } = data
     const pixelRatio = Math.min(window.devicePixelRatio || 1, 2)
     parameters.set(matrix, 0)
     parameters.set(sunlight, 16)
@@ -283,11 +346,8 @@ export class PlanetTerrainRenderer {
   }
 
   destroy() {
-    for (const { vertices, indices, uniform, heights } of this.bodies.values()) {
-      vertices.destroy()
-      indices.destroy()
+    for (const { uniform } of this.bodies.values()) {
       uniform.destroy()
-      heights.destroy()
     }
     this.bodies.clear()
   }

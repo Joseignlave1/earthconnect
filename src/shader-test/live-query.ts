@@ -205,7 +205,7 @@ export function createLiveQueryControls(canvas: HTMLCanvasElement, renderer: Sur
       const publish = publication.then(async () => {
         signal.throwIfAborted()
         report('Scoring the 4 km Earth grid on WebGPU…')
-        await earth.dispatchQuery(query)
+        await earth.dispatchShader(earth.queryShaderSource(query), signal)
         signal.throwIfAborted()
         report('Preparing the Earth score map…')
         const description = `Live Earth analogue for ${name} · ${effective.length} effective criteria${sample.partial ? ' · partial sample' : ''}`

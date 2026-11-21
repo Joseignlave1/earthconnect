@@ -92,6 +92,47 @@ struct CursorVertex { @builtin(position) position: vec4f, @location(0) local: ve
   return vec4f(mix(vec3f(.025,.03,.04),vec3f(.96,.94,1.),mark / max(.0001,alpha)),alpha);
 }`
 
+type PostPipelines = {
+  bloom: GPURenderPipeline
+  composition: GPURenderPipeline
+  presentation: GPURenderPipeline
+  cursor: GPURenderPipeline
+  motion?: GPURenderPipeline
+}
+
+const postPipelines = new WeakMap<GPUDevice, Map<string, Promise<PostPipelines>>>()
+
+function getPostPipelines(device: GPUDevice, format: GPUTextureFormat, reverseDepth: boolean): Promise<PostPipelines> {
+  let byKey = postPipelines.get(device)
+  if (!byKey) {
+    byKey = new Map()
+    postPipelines.set(device, byKey)
+  }
+  const key = `${format}:${reverseDepth}`
+  let pending = byKey.get(key)
+  if (!pending) {
+    pending = (async () => {
+      const [bloom,composition,presentation,cursor,motion] = await Promise.all([
+        shaderModule(device,'Bloom WGSL',bloomShader),shaderModule(device,'Composition WGSL',compositionShader),
+        shaderModule(device,'Presentation WGSL',presentationShader),shaderModule(device,'Cursor WGSL',cursorShader),
+        reverseDepth ? shaderModule(device,'Camera motion blur WGSL',motionBlurShader) : undefined,
+      ])
+      const vertex = (module: GPUShaderModule,entryPoint = 'screenVertex') => ({ module,entryPoint })
+      const [bp,cp,pp,sp,mp] = await Promise.all([
+        device.createRenderPipelineAsync({ label: 'HDR bloom',layout: 'auto',vertex: vertex(bloom),fragment: { module: bloom,entryPoint: 'bloomFragment',targets: [{ format: 'rgba16float' }] } }),
+        device.createRenderPipelineAsync({ label: 'Cached tone map and coverage',layout: 'auto',vertex: vertex(composition),fragment: { module: composition,entryPoint: 'compositeFragment',targets: [{ format }] } }),
+        device.createRenderPipelineAsync({ label: 'Cached image and surface markers',layout: 'auto',vertex: vertex(presentation),fragment: { module: presentation,entryPoint: 'presentFragment',targets: [{ format }] } }),
+        device.createRenderPipelineAsync({ label: 'Space cursor',layout: 'auto',vertex: vertex(cursor,'cursorVertex'),fragment: { module: cursor,entryPoint: 'cursorFragment',targets: [{ format,blend: { color: { srcFactor: 'src-alpha',dstFactor: 'one-minus-src-alpha' },alpha: { srcFactor: 'one',dstFactor: 'one-minus-src-alpha' } } }] } }),
+        motion ? device.createRenderPipelineAsync({ label: 'Depth-aware camera motion blur',layout: 'auto',vertex: vertex(motion),fragment: { module: motion,entryPoint: 'blurFragment',targets: [{ format: 'rgba16float' }] } }) : undefined,
+      ])
+      return { bloom: bp,composition: cp,presentation: pp,cursor: sp,motion: mp }
+    })()
+    byKey.set(key, pending)
+    void pending.catch(() => { if (byKey!.get(key) === pending) byKey!.delete(key) })
+  }
+  return pending
+}
+
 export type Presentation = { hdr: boolean; exposure: number; glow: number; ratio: number; dataBoundary: boolean; cursor: [number,number] | null; markers: number[]; motion?: MotionBlurUniforms }
 
 export class PostProcess {
@@ -140,23 +181,11 @@ export class PostProcess {
 
   async initialize() {
     const device = this.device
-    const [bloom,composition,presentation,cursor,motion] = await Promise.all([
-      shaderModule(device,'Bloom WGSL',bloomShader),shaderModule(device,'Composition WGSL',compositionShader),
-      shaderModule(device,'Presentation WGSL',presentationShader),shaderModule(device,'Cursor WGSL',cursorShader),
-      this.reverseDepth ? shaderModule(device,'Camera motion blur WGSL',motionBlurShader) : undefined,
-    ])
-    const vertex = (module: GPUShaderModule,entryPoint = 'screenVertex') => ({ module,entryPoint })
-    const [bp,cp,pp,sp,mp] = await Promise.all([
-      device.createRenderPipelineAsync({ label: 'HDR bloom',layout: 'auto',vertex: vertex(bloom),fragment: { module: bloom,entryPoint: 'bloomFragment',targets: [{ format: 'rgba16float' }] } }),
-      device.createRenderPipelineAsync({ label: 'Cached tone map and coverage',layout: 'auto',vertex: vertex(composition),fragment: { module: composition,entryPoint: 'compositeFragment',targets: [{ format: this.format }] } }),
-      device.createRenderPipelineAsync({ label: 'Cached image and surface markers',layout: 'auto',vertex: vertex(presentation),fragment: { module: presentation,entryPoint: 'presentFragment',targets: [{ format: this.format }] } }),
-      device.createRenderPipelineAsync({ label: 'Space cursor',layout: 'auto',vertex: vertex(cursor,'cursorVertex'),fragment: { module: cursor,entryPoint: 'cursorFragment',targets: [{ format: this.format,blend: { color: { srcFactor: 'src-alpha',dstFactor: 'one-minus-src-alpha' },alpha: { srcFactor: 'one',dstFactor: 'one-minus-src-alpha' } } }] } }),
-      motion ? device.createRenderPipelineAsync({ label: 'Depth-aware camera motion blur',layout: 'auto',vertex: vertex(motion),fragment: { module: motion,entryPoint: 'blurFragment',targets: [{ format: 'rgba16float' }] } }) : undefined,
-    ])
-    this.motionPipeline = mp
-    if (mp) this.motionUniform = device.createBuffer({ label: 'Camera motion parameters',size: 96,usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
-    this.bloomPipeline = bp; this.compositionPipeline = cp; this.presentationPipeline = pp; this.cursorPipeline = sp
-    this.cursorGroup = device.createBindGroup({ layout: sp.getBindGroupLayout(0),entries: [{ binding: 0,resource: { buffer: this.cursorUniform } }] })
+    const { bloom,composition,presentation,cursor,motion } = await getPostPipelines(device,this.format,this.reverseDepth)
+    this.motionPipeline = motion
+    if (motion) this.motionUniform = device.createBuffer({ label: 'Camera motion parameters',size: 96,usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
+    this.bloomPipeline = bloom; this.compositionPipeline = composition; this.presentationPipeline = presentation; this.cursorPipeline = cursor
+    this.cursorGroup = device.createBindGroup({ layout: cursor.getBindGroupLayout(0),entries: [{ binding: 0,resource: { buffer: this.cursorUniform } }] })
   }
 
   private target(label: string,width: number,height: number,format: GPUTextureFormat = 'rgba16float',sampleCount = 1,sampled = sampleCount === 1) {

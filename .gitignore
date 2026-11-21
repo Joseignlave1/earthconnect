@@ -27,7 +27,6 @@ exports/
 
 # Local copies of the pinned CDN release and terrain preparation output
 /compute-data/world/chunk-*.zst
-/public/data/surface-basins.bin
 /public/textures/earth-blue-marble.jpg
 /public/textures/earth-elevation.png
 /public/textures/earth-terrain.bin

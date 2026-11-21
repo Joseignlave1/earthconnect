@@ -1,5 +1,4 @@
-import { WORKGROUP_SIZE, type FieldEncoding, type ScoreManifest } from './manifest.ts'
-import { SCORE_MAX, SCORE_MISSING, sourceCodeWGSL } from './scoring.ts'
+import type { FieldEncoding, ScoreManifest } from './manifest.ts'
 
 const scoreFields = new Set([
   'annual_precip_mm', 'bare_fraction', 'coldest_month_air_c', 'dominant_lithology_code',
@@ -221,62 +220,3 @@ ${termsCode.join('\n')}
   return exp(-0.5 * min(1000.0, loss));
 }`
 }
-
-export const queryShader = /* wgsl */ `
-struct Term {
-  limits: vec4u, // field index, inclusive code bounds, categorical match code
-  scoring: vec4f, // pivot code, offset from target, distance multiplier
-}
-struct Query {
-  termCount: u32,
-  coverageCount: u32,
-  coverage: array<vec4u, ${coverageFields.size}>,
-  terms: array<Term>,
-}
-@group(0) @binding(0) var<storage, read> packedInput: array<u32>;
-@group(0) @binding(1) var<storage, read_write> scores: array<u32>;
-@group(0) @binding(2) var<storage, read> p: Query;
-${sourceCodeWGSL}
-@compute @workgroup_size(${WORKGROUP_SIZE})
-fn score(@builtin(global_invocation_id) id: vec3u) {
-  let row = id.x;
-  let rows = packedInput[2];
-  if (row >= rows) { return; }
-  for (var i = 0u; i < p.coverageCount; i++) {
-    let rule = p.coverage[i];
-    if (sourceCode(rows, rule.x, row) < rule.y) {
-      scores[row] = ${SCORE_MISSING}u;
-      return;
-    }
-  }
-
-  var rejected = false;
-  var loss = 0.0;
-  for (var i = 0u; i < p.termCount; i++) {
-    let term = p.terms[i];
-    let code = sourceCode(rows, term.limits.x, row);
-    if (code == 0u) {
-      scores[row] = ${SCORE_MISSING}u;
-      return;
-    }
-    rejected = rejected || code < term.limits.y || code > term.limits.z;
-    if (rejected || term.scoring.z == 0.0) { continue; }
-    var distance = 0.0;
-    if (term.limits.w == ${numericTerm}u) {
-      distance = ((f32(code) - term.scoring.x) + term.scoring.y) * term.scoring.z;
-    } else if (code != term.limits.w) {
-      distance = term.scoring.z;
-    }
-    loss += distance * distance;
-  }
-  if (rejected) {
-    scores[row] = 0u;
-    return;
-  }
-  let scaled = ${SCORE_MAX}.0 * clamp(exp(-0.5 * min(1000.0, loss)), 0.0, 1.0);
-  let whole = u32(floor(scaled));
-  let fraction = scaled - f32(whole);
-  let up = fraction > 0.5 || (fraction == 0.5 && (whole & 1u) != 0u);
-  scores[row] = whole + select(0u, 1u, up);
-}
-`

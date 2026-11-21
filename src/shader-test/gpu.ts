@@ -15,6 +15,32 @@ export function uploadBuffer(device: GPUDevice, label: string, data: Float32Arra
   return buffer
 }
 
+// Upload large texture mip levels in bounded row strips so Dawn does not retain
+// a single multi-tens-of-MiB IPC transfer buffer in the renderer process.
+export function writeTextureChunked(
+  queue: GPUQueue,
+  texture: GPUTexture,
+  mipLevel: number,
+  data: ArrayBufferView<ArrayBuffer>,
+  width: number,
+  height: number,
+  bytesPerPixel: number,
+  maxChunkBytes = 8 * 1024 * 1024,
+) {
+  const bytesPerRow = width * bytesPerPixel
+  const rowsPerChunk = Math.max(1, Math.floor(maxChunkBytes / bytesPerRow))
+  if (height <= rowsPerChunk) {
+    queue.writeTexture({ texture, mipLevel }, data, { bytesPerRow }, [width, height])
+    return
+  }
+  const bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+  for (let y = 0; y < height; y += rowsPerChunk) {
+    const rows = Math.min(rowsPerChunk, height - y)
+    const slice = bytes.subarray(y * bytesPerRow, (y + rows) * bytesPerRow)
+    queue.writeTexture({ texture, mipLevel, origin: [0, y, 0] }, slice, { bytesPerRow }, [width, rows])
+  }
+}
+
 export const fullscreenVertex = `
 struct ScreenVertex {
   @builtin(position) position: vec4f,

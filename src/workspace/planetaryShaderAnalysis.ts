@@ -265,11 +265,21 @@ export function readPlanetaryCalls(source: string, syntaxTree: string): readonly
 }
 
 type Server = Awaited<ReturnType<typeof startWgslLanguageServer>>
+type SharedSyntaxTreeProvider = (source: string, signal?: AbortSignal) => Promise<string>
+let sharedProvider: SharedSyntaxTreeProvider | undefined
 let session: Promise<Server> | undefined
 let openedSource: string | undefined
 let shutdown: AbortController | undefined
 let idle: ReturnType<typeof setTimeout> | undefined
 let queue = Promise.resolve()
+
+/** Reuse an already-running editor wgsl-analyzer instance for planetary AST inspection. */
+export function registerSharedWgslAnalyzer(provider: SharedSyntaxTreeProvider) {
+  sharedProvider = provider
+  return () => {
+    if (sharedProvider === provider) sharedProvider = undefined
+  }
+}
 
 function stopSession() {
   shutdown?.abort()
@@ -280,6 +290,17 @@ function stopSession() {
 
 async function inspect(source: string, signal: AbortSignal) {
   signal.throwIfAborted()
+  const shared = sharedProvider
+  if (shared) {
+    try {
+      const tree = await shared(source, signal)
+      signal.throwIfAborted()
+      return readPlanetaryCalls(source, tree)
+    } catch (error) {
+      if (signal.aborted || error instanceof PlanetaryAnalysisError) throw error
+      // Fall back to a dedicated analyzer session if the editor's session stopped.
+    }
+  }
   clearTimeout(idle)
   let timeout: ReturnType<typeof setTimeout> | undefined
   const deadline = new Promise<never>((_, reject) => {

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { loadWorkspaceRelease, type DownloadProgress } from './workspaceRelease.ts'
 import type { WorkspaceAssets } from './workspaceAssets.ts'
+import { markStartup, reportStartupTiming } from './startupTiming.ts'
 import './WorkspaceStartup.css'
 
 const decimal = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const mb = (bytes: number) => decimal.format(bytes / 1_000_000)
 
 export function WorkspaceStartup({ open, embedded, loadInitialRelease }: {
-  open(assets: WorkspaceAssets, onReady: () => void): Promise<ReactNode>
+  open(assets: WorkspaceAssets, onReady: () => void, signal: AbortSignal): Promise<ReactNode>
   embedded?: () => WorkspaceAssets
   loadInitialRelease?: typeof loadWorkspaceRelease
 }) {
@@ -34,11 +35,15 @@ export function WorkspaceStartup({ open, embedded, loadInitialRelease }: {
       // Leave a full paint opportunity for Monaco, the preview controls and
       // the already completed WebGPU canvas before removing the overlay.
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        if (isCurrent()) setReady(true)
+        if (isCurrent()) {
+          markStartup('revealed')
+          reportStartupTiming()
+          setReady(true)
+        }
       }))
     }
     try {
-      const view = await open(assets, onReady)
+      const view = await open(assets, onReady, signal)
       if (isCurrent()) setWorkspace({ id, view })
     } catch (cause) {
       if (isCurrent()) setError(cause instanceof Error ? cause.message : String(cause))

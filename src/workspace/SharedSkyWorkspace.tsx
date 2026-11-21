@@ -1,5 +1,5 @@
 import type { WorkspaceAssets } from './workspaceAssets.ts'
-import { Component, lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { Component, lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { BodyId } from '../explorerData'
 import { DEFAULT_SCORE_SHADER, SCORE_SHADER_PRELUDE } from '../earth-score/custom-shader.ts'
@@ -12,9 +12,11 @@ import { createEarthWorkspaceResources, type EarthWorkspaceResources } from './e
 import { useEarthWorkspace } from './useEarthWorkspace'
 import { assembleShaderProject, defaultShaderSource, findShaderLocation, readShaderProject, resolveShaderFiles, saveShaderProject, selectShaderModule, shaderModuleId, type ShaderProject } from './shaderProject'
 import { formatPointCall, type PlanetaryCoordinates } from './planetaryPointCache.ts'
+import { endStartupSpan, startStartupSpan } from './startupTiming.ts'
 import './SharedSkyWorkspace.css'
 
-const WgslEditor = import.meta.env.VITE_WORKSPACE_STANDALONE ? null : lazy(() => import('./WgslEditor'))
+const wgslEditorImport = import.meta.env.VITE_WORKSPACE_STANDALONE ? null : import('./WgslEditor')
+const WgslEditor = wgslEditorImport ? lazy(() => wgslEditorImport) : null
 
 class ShaderEditorBoundary extends Component<{ children: ReactNode; onError: () => void }> {
   state = { failed: false }
@@ -172,7 +174,7 @@ type SceneRun = { id: number; source: string }
 type SceneShader = ReturnType<typeof assembleShaderProject>
 const introShader = assembleShaderProject([helloWorldExample])
 
-function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onDiagnostics, onInsert, footer, onReady, preloadWorld = true, initialView }: {
+function SkyScene({ assets, resources, fileId, assembled, run, onDiagnostics, onInsert, footer, onReady, preloadWorld = true, initialView }: {
   onReady: (computed: boolean) => void
   preloadWorld?: boolean
   initialView?: { latitude: number; longitude: number }
@@ -181,7 +183,6 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
   resources?: EarthWorkspaceResources
   fileId?: string
   assembled?: SceneShader
-  snapshotOnly?: boolean
   run?: SceneRun
   onDiagnostics?: (diagnostics: WgslDiagnostic[] | undefined) => void
   onInsert?: (text: string) => void
@@ -193,17 +194,16 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
   const [points, setPoints] = useState<Partial<Record<BodyId, Point>>>({})
   const engine = useEarthWorkspace(canvas, assets, pickPoint, resources, preloadWorld, initialView)
   const pendingPreview = useRef<number>(undefined)
-  const previousProgram = useRef<{ source?: string; snapshotOnly?: boolean }>(undefined)
+  const previousProgram = useRef<{ source?: string }>(undefined)
   const previousRun = useRef<number | undefined>(undefined)
   const queuedProgram = useRef<{ source: string; delay: number }>(undefined)
   const diagnostics = engine.shaderDiagnostics
   const failed = engine.shaderSource === assembled?.source && diagnostics.find(item => item.severity === 'error')
   const { runShader, cancelShader } = engine
-  const needsComputedScore = assembled !== undefined && (!snapshotOnly || run !== undefined)
   const computed = engine.frameSource === 'computed' && engine.shaderActive
-  const populated = needsComputedScore
-    ? computed || (engine.frameSource === 'snapshot' && failed)
-    : engine.frameSource === 'snapshot'
+  const populated = assembled !== undefined
+    ? computed || (Boolean(engine.frameSource) && Boolean(failed))
+    : Boolean(engine.frameSource)
   const dataSettled = !preloadWorld || engine.worldSettled
   useEffect(() => {
     if ((populated && dataSettled) || engine.surfaceFailed) onReady(computed)
@@ -226,11 +226,11 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
     const previous = previousProgram.current
     if (forced || previous?.source !== sourceCode) {
       cancelShader()
-      previousProgram.current = { source: sourceCode, snapshotOnly }
+      previousProgram.current = { source: sourceCode }
       previousRun.current = run?.id
       queuedProgram.current = forced ? { source: run.source, delay: 0 } :
-        sourceCode !== undefined && !(snapshotOnly && (!previous || previous.snapshotOnly))
-          ? { source: sourceCode, delay: previous ? 550 : 0 }
+        sourceCode !== undefined
+          ? { source: sourceCode, delay: previous ? 75 : 0 }
           : undefined
     }
     const pending = queuedProgram.current
@@ -240,7 +240,7 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
       runShader(pending.source)
     }, pending.delay)
     return () => window.clearTimeout(pendingPreview.current)
-  }, [sourceCode, snapshotOnly, run, runShader, cancelShader])
+  }, [sourceCode, run, runShader, cancelShader])
 
   function project(next: Projection) {
     setProjection(next)
@@ -257,6 +257,7 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
   function stagePoint(source: BodyId, latitude: number, longitude: number) {
     setPoints(previous => ({ ...previous, [source]: { latitude, longitude } }))
     engine.place({ body: source, latitude, longitude })
+    resources?.prefetchPoints([{ body: source, latitude, longitude }])
   }
 
   function pickPoint(source: BodyId, latitude: number, longitude: number) {
@@ -355,13 +356,12 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
 
 }
 
-function FilePreview({ assets, file, files, snapshotOnly, resources, run, onDiagnostics, onInsert, footer, onPreviewReady }: {
+function FilePreview({ assets, file, files, resources, run, onDiagnostics, onInsert, footer, onPreviewReady }: {
   onPreviewReady: (fileId: string) => void
   footer?: boolean
   assets: WorkspaceAssets
   file: string
   files: ReturnType<typeof resolveShaderFiles>
-  snapshotOnly?: boolean
   resources: EarthWorkspaceResources
   run?: SceneRun
   onDiagnostics: (fileId: string, diagnostics: WgslDiagnostic[] | undefined) => void
@@ -371,37 +371,46 @@ function FilePreview({ assets, file, files, snapshotOnly, resources, run, onDiag
   const diagnostics = useCallback((value: WgslDiagnostic[] | undefined) => onDiagnostics(file, value), [file, onDiagnostics])
   const insert = useCallback((text: string) => onInsert(file, text), [file, onInsert])
   const onReady = useCallback(() => onPreviewReady(file), [file, onPreviewReady])
-  return <SkyScene assets={assets} onReady={onReady} fileId={file} footer={footer} assembled={assembled} snapshotOnly={snapshotOnly} resources={resources}
+  return <SkyScene assets={assets} onReady={onReady} fileId={file} footer={footer} assembled={assembled} resources={resources}
     run={run} onDiagnostics={diagnostics} onInsert={insert} initialView={file === helloWorldExample.id ? helloWorldInitialView : undefined} />
 }
 
-type WorkspaceProps = { assets: WorkspaceAssets; onReady: () => void }
-
-const standaloneIntroKey = 'earth-connect-standalone-intro-seen'
+type WorkspaceProps = { assets: WorkspaceAssets; resources?: EarthWorkspaceResources; onReady: () => void }
 
 function StandaloneSkyWorkspace({ assets, onReady }: WorkspaceProps) {
-  const [showIntro] = useState(() => {
-    try { return localStorage.getItem(standaloneIntroKey) !== 'true' } catch { return true }
-  })
-  const sceneReady = useCallback((computed: boolean) => {
-    if (showIntro && computed) {
-      try { localStorage.setItem(standaloneIntroKey, 'true') } catch { /* Storage may be unavailable. */ }
-    }
-    onReady()
-  }, [showIntro, onReady])
+  const sceneReady = useCallback(() => { onReady() }, [onReady])
   return <main className="shared-sky">
-    <SkyScene assets={assets} assembled={showIntro ? introShader : undefined} preloadWorld={showIntro} onReady={sceneReady}
-      initialView={showIntro ? helloWorldInitialView : undefined} />
+    <SkyScene assets={assets} assembled={introShader} onReady={sceneReady} initialView={helloWorldInitialView} />
   </main>
 }
 
-export default function SharedSkyWorkspace({ assets, onReady }: WorkspaceProps) {
+export default function SharedSkyWorkspace({ assets, resources, onReady }: WorkspaceProps) {
   if (!WgslEditor) return <StandaloneSkyWorkspace assets={assets} onReady={onReady} />
-  return <ShaderWorkspace assets={assets} onReady={onReady} />
+  return <ShaderWorkspace assets={assets} resources={resources} onReady={onReady} />
 }
 
-function ShaderWorkspace({ assets, onReady }: WorkspaceProps) {
-  const [resources] = useState(createEarthWorkspaceResources)
+function initialPreviewFileId(files: readonly { id: string }[], activeFileId: string): string | undefined {
+  const valid = new Set(files.map(file => file.id))
+  try {
+    const saved = JSON.parse(localStorage.getItem('earth-connect-wgsl-editor-layout') ?? 'null') as {
+      groups?: { active?: string | { previewFileId?: string } | null; tabs?: (string | { previewFileId?: string } | null)[] }[]
+    } | null
+    if (saved && Array.isArray(saved.groups)) {
+      for (const group of saved.groups) {
+        if (group?.active && typeof group.active === 'object' && typeof group.active.previewFileId === 'string' && valid.has(group.active.previewFileId)) {
+          return group.active.previewFileId
+        }
+        if (group?.active === null && valid.has(activeFileId)) return activeFileId
+      }
+      // Saved layout explicitly exists with no active preview tab; don't prewarm one.
+      return undefined
+    }
+  } catch { /* Storage may be unavailable. */ }
+  return valid.has(activeFileId) ? activeFileId : undefined
+}
+
+function ShaderWorkspace({ assets, resources: sharedResources, onReady }: WorkspaceProps) {
+  const [resources] = useState(() => sharedResources ?? createEarthWorkspaceResources())
   const [workbenchFailed, setWorkbenchFailed] = useState(false)
   const [projectFiles, setProjectFiles] = useState(readShaderProject)
   const currentProject = useRef(projectFiles)
@@ -415,12 +424,49 @@ function ShaderWorkspace({ assets, onReady }: WorkspaceProps) {
   const [readyPreviews, setReadyPreviews] = useState<ReadonlySet<string>>(() => new Set())
   const [layoutReady, setLayoutReady] = useState(false)
   const [fallbackReady, setFallbackReady] = useState(false)
+  const [analyzerEnabled, setAnalyzerEnabled] = useState(false)
+  const [analyzerReady, setAnalyzerReady] = useState(false)
+  const onAnalyzerReady = useCallback(() => setAnalyzerReady(true), [])
   const [shaderRuns, setShaderRuns] = useState<Record<string, SceneRun>>({})
   const [sceneDiagnostics, setSceneDiagnostics] = useState<Record<string, WgslDiagnostic[]>>({})
+  const prewarmParking = useRef<HTMLDivElement>(null)
+  const prewarmedHosts = useRef(new Map<string, HTMLElement>())
+  const [initialPreview] = useState(() => {
+    startStartupSpan('monaco')
+    return initialPreviewFileId(projectFiles.files, projectFiles.activeFileId)
+  })
+
+  // Pre-mount the initial preview canvas into an offscreen parking container
+  // immediately so SurfaceRenderer, SolarScene, and the first WGSL score run in
+  // parallel with Monaco workbench initialization, then move seamlessly into
+  // the Monaco preview pane once it mounts.
+  useLayoutEffect(() => {
+    const parking = prewarmParking.current
+    if (!initialPreview || !parking) return
+    const host = document.createElement('div')
+    host.className = 'sky-preview-host'
+    parking.append(host)
+    const map = prewarmedHosts.current
+    map.set(initialPreview, host)
+    setHosts(previous => previous.has(initialPreview) ? previous : new Map(previous).set(initialPreview, host))
+    setOpenPreviews(previous => previous.includes(initialPreview) ? previous : [...previous, initialPreview])
+    setStartedPreviews(previous => previous.has(initialPreview) ? previous : new Set([...previous, initialPreview]))
+    return () => {
+      if (map.get(initialPreview) === host) {
+        map.delete(initialPreview)
+        host.remove()
+      }
+    }
+  }, [initialPreview])
+
+  const takePrewarmedHost = useCallback((fileId: string) => {
+    const host = prewarmedHosts.current.get(fileId)
+    if (host) prewarmedHosts.current.delete(fileId)
+    return host
+  }, [])
 
   const shaderFiles = useMemo(() => resolveShaderFiles(projectFiles, DEFAULT_SCORE_SHADER), [projectFiles])
   const diagnostics = useMemo(() => Object.values(sceneDiagnostics).flat(), [sceneDiagnostics])
-  const sampleFile = projectFiles.files.find(file => file.id === 'score')!
   const activeFile = projectFiles.activeFileId
   const onVisiblePreviews = useCallback((ids: readonly string[]) => {
     setVisiblePreviews(ids)
@@ -429,13 +475,62 @@ function ShaderWorkspace({ assets, onReady }: WorkspaceProps) {
   const onPreviewReady = useCallback((id: string) => {
     setReadyPreviews(previous => previous.has(id) ? previous : new Set([...previous, id]))
   }, [])
-  const onLayoutReady = useCallback(() => setLayoutReady(true), [])
+  const onLayoutReady = useCallback(() => {
+    // Discard any prewarmed preview host that the restored layout didn't claim.
+    if (prewarmedHosts.current.size) {
+      const unclaimed = [...prewarmedHosts.current.entries()]
+      prewarmedHosts.current.clear()
+      for (const [, host] of unclaimed) host.remove()
+      const ids = new Set(unclaimed.map(([id]) => id))
+      setHosts(previous => {
+        const next = new Map(previous)
+        for (const id of ids) next.delete(id)
+        return next
+      })
+      setOpenPreviews(previous => previous.filter(id => !ids.has(id)))
+    }
+    endStartupSpan('monaco')
+    setLayoutReady(true)
+  }, [])
   const onFallbackReady = useCallback(() => setFallbackReady(true), [])
   useEffect(() => {
     if (workbenchFailed ? fallbackReady : layoutReady && visiblePreviews.every(id => readyPreviews.has(id))) {
       onReady()
+      let frame2 = 0
+      const frame1 = requestAnimationFrame(() => {
+        frame2 = requestAnimationFrame(() => setAnalyzerEnabled(true))
+      })
+      return () => {
+        cancelAnimationFrame(frame1)
+        cancelAnimationFrame(frame2)
+      }
     }
   }, [workbenchFailed, fallbackReady, layoutReady, visiblePreviews, readyPreviews, onReady])
+  useEffect(() => {
+    if (!analyzerReady) return
+    const controller = new AbortController()
+    const { signal } = controller
+    const priority = new Set<string>([activeFile, ...openPreviews])
+    const ordered = [
+      ...shaderFiles.filter(file => priority.has(file.id)),
+      ...shaderFiles.filter(file => !file.closed && !priority.has(file.id)),
+    ]
+    void import('./planetaryShaderAnalysis.ts').then(async ({ analyzePlanetaryShader, mentionsPlanetaryName }) => {
+      for (const file of ordered) {
+        if (signal.aborted) return
+        const assembled = assembleShaderProject(selectShaderModule(shaderFiles, file.id)).source
+        if (mentionsPlanetaryName(assembled) < 0) continue
+        try {
+          const calls = await analyzePlanetaryShader(assembled, signal)
+          if (signal.aborted) return
+          if (calls.length) resources.prefetchPoints(calls)
+        } catch {
+          // Ignore incomplete edits or analysis errors during background prefetch.
+        }
+      }
+    }).catch(() => {})
+    return () => controller.abort()
+  }, [shaderFiles, activeFile, openPreviews, analyzerReady, resources])
   useEffect(() => { saveShaderProject(projectFiles) }, [projectFiles])
   useEffect(() => {
     try { localStorage.setItem(vimPreference, String(vim)) } catch { /* Storage may be unavailable. */ }
@@ -537,20 +632,23 @@ function ShaderWorkspace({ assets, onReady }: WorkspaceProps) {
   }, [])
 
   function renderPreview(fileId: string) {
-    const snapshotOnly = fileId === 'score' && sampleFile.source === null &&
-      selectShaderModule(shaderFiles, 'score').every(file => file.id === 'score' || !file.source.trim())
-    return <FilePreview key={fileId} assets={assets} file={fileId} onPreviewReady={workbenchFailed ? onFallbackReady : onPreviewReady} footer={!workbenchFailed} files={shaderFiles} snapshotOnly={snapshotOnly} resources={resources}
+    return <FilePreview key={fileId} assets={assets} file={fileId} onPreviewReady={workbenchFailed ? onFallbackReady : onPreviewReady} footer={!workbenchFailed} files={shaderFiles} resources={resources}
       run={shaderRuns[fileId]}
       onDiagnostics={updateDiagnostics} onInsert={insertPoint} />
   }
 
   return (
     <main className="shared-sky" data-with-editor="" data-workbench-failed={workbenchFailed ? '' : undefined}>
+      <div ref={prewarmParking} aria-hidden="true" style={{
+        position: 'fixed', left: 0, top: 0, width: '60vw', height: '100vh',
+        visibility: 'hidden', pointerEvents: 'none', zIndex: -1,
+      }} />
       {WgslEditor && <section className="sky-workbench" aria-label="Earth score query">
         <div className="sky-wgsl-panel">
           <ShaderEditorBoundary onError={() => setWorkbenchFailed(true)}>
             <Suspense fallback={null}>
               <WgslEditor onPreviewHost={onPreviewHost} onPreviewOpenChange={setOpenPreviews} onVisiblePreviews={onVisiblePreviews}
+                takePrewarmedHost={takePrewarmedHost} analyzerEnabled={analyzerEnabled} onAnalyzerReady={onAnalyzerReady}
                 onLayoutReady={onLayoutReady} onStartError={() => setWorkbenchFailed(true)}
                 files={shaderFiles} activeFileId={activeFile} onChange={changeShader} diagnostics={diagnostics}
                 onActiveFileChange={showFile} onCloseFile={closeFile}

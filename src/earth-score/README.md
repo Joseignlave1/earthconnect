@@ -7,7 +7,7 @@ Earth Score loads the frozen 4 km Earth Index measurements and scores all 35,550
 Use Node.js 24 or later. Run `npm ci` and `npm run build:compute` from the repository root. The standalone ES module, TypeScript declarations, decoder worker, and world data land in `exports/earth-score/`. Serve that directory over HTTPS or loopback HTTP and keep its relative paths intact. The regular application build uses its own output directory.
 
 ```ts
-import { loadEarthScore, SCORE_MISSING } from './earth-score/earth-score.mjs'
+import { DEFAULT_SCORE_SHADER, loadEarthScore, SCORE_MISSING } from './earth-score/earth-score.mjs'
 
 const earth = await loadEarthScore(device, {
   manifestUrl: new URL('./earth-score/world/manifest.json', import.meta.url),
@@ -15,17 +15,13 @@ const earth = await loadEarthScore(device, {
 })
 
 try {
-  await earth.dispatch()
+  await earth.dispatchShader(DEFAULT_SCORE_SHADER)
   const point = earth.layout.addressAt(-66.3, -24.2)
   if (point) {
     const { scores } = earth.chunks[point.chunk]
     // Bind scores as array<u32>. scores[point.row] is SCORE_MISSING or 0..65534.
     console.log(scores, point.row, SCORE_MISSING)
   }
-
-  const slope = earth.baseline.find(feature => feature.field === 'slope_mean_deg')!
-  await earth.dispatch({ slope_mean_deg: { target: slope.target + 0.25 } })
-  // Omitted overrides use the baseline. The same GPU buffers now hold the new scores.
 } finally {
   earth.destroy()
 }
@@ -43,7 +39,7 @@ Import `buildEarthQuery` from `src/earth-score/index.ts` in the app or from `ear
 const sample = await samplePoint(body, latitude, longitude, signal)
 const sampledCriteria = applySample(criteria, body, sample)
 const query = buildEarthQuery(sampledCriteria)
-await earth.dispatchQuery(query)
+await earth.dispatchShader(earth.queryShaderSource(query), signal)
 // Use earth.chunks[i].scores and earth.layout for the map.
 ```
 

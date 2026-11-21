@@ -1,15 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readFileSync } from 'node:fs'
-import { gunzipSync } from 'node:zlib'
-import { createHash } from 'node:crypto'
 import { cameraBasis, cameraMatrix, createMesh, EARTH_AXIS, EARTH_FLATTENING, FOV, grabCenter, grabRotation, orbitRotation, pickSurface, SurfacePicker, surfacePoint, type Camera, type Rotation, type Vec3 } from '../src/shader-test/geometry.ts'
 import { decodeTerrain, elevationAt, elevationPyramid, poleElevations } from '../src/shader-test/terrain.ts'
 import { solarPosition } from '../src/shader-test/sun.ts'
 import { contourDetail } from '../src/shader-test/contours.ts'
 import { maxPyramid, noiseTexture, perlin } from '../src/shader-test/noise.ts'
 import { CELL, MISSING, RADIUS, SIZE, cellAddress, tileRow, tileX, worldTiles } from '../src/shader-test/world-grid.ts'
-import { decodeScoreSnapshot } from '../src/shader-test/score-snapshot.ts'
 import { AUTO_POSITIONS, normalizedScore, palettePosition, resolveScoreStyle, ScoreDistribution, scoreAtPalette, scorePalette } from '../src/shader-test/score-style.ts'
 import { computedScoreLayout } from '../src/shader-test/computed-scores.ts'
 import { createLayout } from '../src/earth-score/layout.ts'
@@ -153,46 +150,6 @@ test('empty candidate sets stay empty and automatic glow does not wash out tied 
   assert.ok(style.emissionScale < .02)
   const manual = resolveScoreStyle(plateau,{ ...autoControls,colorMode: 'manual' })
   assert.equal(manual.emissionScale,1)
-})
-
-test('the mountain-basin snapshot preserves all API scores through predictive compression', () => {
-  const compressed = readFileSync(new URL('../public/data/surface-basins.bin',import.meta.url)), bytes = gunzipSync(compressed)
-  const dataset = decodeScoreSnapshot(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset + bytes.byteLength))
-  assert.equal(dataset.histogram.reduce((total,count) => total + count,0),dataset.valid)
-  assert.ok(dataset.histogram[dataset.best] > 0)
-  assert.equal(dataset.tiles.length,460)
-  assert.equal(dataset.valid,29024686)
-  assert.equal(dataset.best,65329)
-  assert.equal(dataset.snapshot!.params.elevation,3000)
-  assert.equal(dataset.snapshot!.params.precip_max,250)
-  assert.equal(dataset.snapshot!.encoding,'row-delta-byteplanes')
-  const hash = createHash('sha256')
-  for (const tile of dataset.tiles) hash.update(new Uint8Array(tile.levels[0].scores.buffer))
-  assert.equal(hash.digest('hex'),'6979ca6b00557fc89a19da7045cf2397483c7540b46546afbdcce8e525aee94d')
-  assert.ok(compressed.length < 17_000_000)
-})
-
-test('the frozen real-data snapshot preserves every API score byte and rejects incompatible grids', () => {
-  const compressed = readFileSync(new URL('../public/data/surface-scores.bin',import.meta.url))
-  const bytes = gunzipSync(compressed), buffer = bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset + bytes.byteLength)
-  const dataset = decodeScoreSnapshot(buffer), snapshot = dataset.snapshot!
-  assert.equal(dataset.histogram.reduce((total,count) => total + count,0),dataset.valid)
-  assert.ok(dataset.histogram[dataset.best] > 0)
-  assert.equal(dataset.tiles.length,460)
-  assert.equal(dataset.valid,9718601)
-  assert.equal(dataset.best,65534)
-  assert.equal(snapshot.params.scale,8)
-  const hash = createHash('sha256')
-  for (const tile of dataset.tiles) hash.update(new Uint8Array(tile.levels[0].scores.buffer))
-  assert.equal(hash.digest('hex'),'19b6b4446ffc7be5c10a122e13536510158b76da16bd68904787efcfd2b4424a')
-  assert.ok(compressed.length < 3_000_000)
-  assert.throws(() => decodeScoreSnapshot(new ArrayBuffer(8)),/header/)
-  assert.throws(() => decodeScoreSnapshot(buffer.slice(0,-2)),/grid/)
-  const view = new DataView(buffer), json = new TextDecoder().decode(new Uint8Array(buffer,8,view.getUint32(4,true)))
-  const at = 8 + new TextEncoder().encode(json.slice(0,json.indexOf('"tileSize":278')) + '"tileSize":27').length
-  assert.equal(view.getUint8(at),'8'.charCodeAt(0))
-  view.setUint8(at,'9'.charCodeAt(0))
-  assert.throws(() => decodeScoreSnapshot(buffer),/grid/)
 })
 
 test('contour families reveal continuously with scale and finer families follow the major ones', () => {

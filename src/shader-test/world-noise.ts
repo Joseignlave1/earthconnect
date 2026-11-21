@@ -1,6 +1,5 @@
 import { maxPyramid, perlin } from './noise.ts'
 import { MISSING, RADIUS, SIZE, tileRow, tileX, worldTiles, type TileAddress } from './world-grid.ts'
-import type { SnapshotMetadata } from './score-snapshot.ts'
 
 export type WorldNoise = {
   tiles: (TileAddress & { levels: ReturnType<typeof maxPyramid> })[]
@@ -10,7 +9,6 @@ export type WorldNoise = {
   best: number
   bytes: number
   milliseconds: number
-  snapshot?: SnapshotMetadata
 }
 
 export function* generateWorldTiles(frequency: number, seed: number): Generator<[number,number], WorldNoise> {

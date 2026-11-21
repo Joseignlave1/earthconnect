@@ -1,4 +1,5 @@
 import type { WorkspaceAssets } from './workspaceAssets.ts'
+import type { TerrainLoader } from './earthWorkspaceResources.ts'
 import { FOV } from '../shader-test/geometry.ts'
 import { fullscreenVertex, shaderModule } from '../shader-test/gpu.ts'
 import { PlanetTerrainRenderer, type PlanetTerrain } from './planetTerrain.ts'
@@ -133,6 +134,59 @@ struct Vertex { @builtin(position) position: vec4f, @location(0) color: vec4f, }
 export type SourcePoint = { latitude: number; longitude: number }
 export type SolarLabel = { id: BodyId; x: number; y: number }
 
+type SolarPipelines = {
+  skyPipeline: GPURenderPipeline
+  bodyPipeline: GPURenderPipeline
+  orbitPipeline: GPURenderPipeline
+  haloPipeline: GPURenderPipeline
+}
+
+const solarPipelines = new WeakMap<GPUDevice, Promise<SolarPipelines>>()
+
+function getSolarPipelines(device: GPUDevice): Promise<SolarPipelines> {
+  let pending = solarPipelines.get(device)
+  if (!pending) {
+    pending = (async () => {
+      const [sky,body,orbit,halo] = await Promise.all([
+        shaderModule(device,'Inertial sky',skyShader),
+        shaderModule(device,'Solar bodies',bodyShader),
+        shaderModule(device,'Planetary paths',orbitShader),
+        shaderModule(device,'Sunlight halo',haloShader),
+      ])
+      const color: GPUColorTargetState = { format: 'rgba16float' }
+      const depth: GPUDepthStencilState = { format: 'depth32float',depthWriteEnabled: true,depthCompare: 'greater' }
+      const common = { layout: 'auto' as const,multisample: { count: 4 } }
+      const [skyPipeline,bodyPipeline,orbitPipeline,haloPipeline] = await Promise.all([
+        device.createRenderPipelineAsync({ ...common,label: 'Inertial sky',
+          vertex: { module: sky,entryPoint: 'screenVertex' },fragment: { module: sky,entryPoint: 'skyFragment',targets: [color] },
+          depthStencil: { ...depth,depthWriteEnabled: false,depthCompare: 'always' },
+        }),
+        device.createRenderPipelineAsync({ ...common,label: 'Sun and planet disks',
+          vertex: { module: body,entryPoint: 'bodyVertex' },fragment: { module: body,entryPoint: 'bodyFragment',targets: [color] },depthStencil: depth,
+        }),
+        device.createRenderPipelineAsync({ ...common,label: 'Ephemeris orbit paths',
+          vertex: { module: orbit,entryPoint: 'orbitVertex',buffers: [{
+            arrayStride: 32,attributes: [{ shaderLocation: 0,offset: 0,format: 'float32x4' },{ shaderLocation: 1,offset: 16,format: 'float32x4' }],
+          }] },fragment: { module: orbit,entryPoint: 'orbitFragment',targets: [{ ...color,blend: {
+            color: { srcFactor: 'one',dstFactor: 'one-minus-src-alpha' },alpha: { srcFactor: 'one',dstFactor: 'one-minus-src-alpha' },
+          } }] },
+          primitive: { topology: 'line-list' },depthStencil: { ...depth,depthWriteEnabled: false },
+        }),
+        device.createRenderPipelineAsync({ ...common,label: 'Solar halo with occlusion',
+          vertex: { module: halo,entryPoint: 'screenVertex' },fragment: { module: halo,entryPoint: 'haloFragment',targets: [{ ...color,blend: {
+            color: { srcFactor: 'one',dstFactor: 'one' },alpha: { srcFactor: 'zero',dstFactor: 'one' },
+          } }] },
+          depthStencil: { ...depth,depthWriteEnabled: false },
+        }),
+      ])
+      return { skyPipeline,bodyPipeline,orbitPipeline,haloPipeline }
+    })()
+    solarPipelines.set(device, pending)
+    void pending.catch(() => { if (solarPipelines.get(device) === pending) solarPipelines.delete(device) })
+  }
+  return pending
+}
+
 export class SolarScene {
   readonly bodies
   private terrain?: PlanetTerrainRenderer
@@ -147,50 +201,20 @@ export class SolarScene {
   private readonly orbitData: Float32Array<ArrayBuffer>
   private skyGroup: GPUBindGroup
   private skyTexture: GPUTexture
+  private skyOwned = true
   private readonly skySampler: GPUSampler
   private readonly haloGroup: GPUBindGroup
   private readonly bodyGroup: GPUBindGroup
 
-  static async create(device: GPUDevice,date: Date,invalidate: () => void,onError: (error: Error) => void,camera: SolarCamera | undefined, assetUrl: WorkspaceAssets['url']) {
-    const [sky,body,orbit,halo] = await Promise.all([
-      shaderModule(device,'Inertial sky',skyShader),
-      shaderModule(device,'Solar bodies',bodyShader),
-      shaderModule(device,'Planetary paths',orbitShader),
-      shaderModule(device,'Sunlight halo',haloShader),
-    ])
-    const color: GPUColorTargetState = { format: 'rgba16float' }
-    const depth: GPUDepthStencilState = { format: 'depth32float',depthWriteEnabled: true,depthCompare: 'greater' }
-    const common = { layout: 'auto' as const,multisample: { count: 4 } }
-    const [skyPipeline,bodyPipeline,orbitPipeline,haloPipeline] = await Promise.all([
-      device.createRenderPipelineAsync({ ...common,label: 'Inertial sky',
-        vertex: { module: sky,entryPoint: 'screenVertex' },fragment: { module: sky,entryPoint: 'skyFragment',targets: [color] },
-        depthStencil: { ...depth,depthWriteEnabled: false,depthCompare: 'always' },
-      }),
-      device.createRenderPipelineAsync({ ...common,label: 'Sun and planet disks',
-        vertex: { module: body,entryPoint: 'bodyVertex' },fragment: { module: body,entryPoint: 'bodyFragment',targets: [color] },depthStencil: depth,
-      }),
-      device.createRenderPipelineAsync({ ...common,label: 'Ephemeris orbit paths',
-        vertex: { module: orbit,entryPoint: 'orbitVertex',buffers: [{
-          arrayStride: 32,attributes: [{ shaderLocation: 0,offset: 0,format: 'float32x4' },{ shaderLocation: 1,offset: 16,format: 'float32x4' }],
-        }] },fragment: { module: orbit,entryPoint: 'orbitFragment',targets: [{ ...color,blend: {
-          color: { srcFactor: 'one',dstFactor: 'one-minus-src-alpha' },alpha: { srcFactor: 'one',dstFactor: 'one-minus-src-alpha' },
-        } }] },
-        primitive: { topology: 'line-list' },depthStencil: { ...depth,depthWriteEnabled: false },
-      }),
-      device.createRenderPipelineAsync({ ...common,label: 'Solar halo with occlusion',
-        vertex: { module: halo,entryPoint: 'screenVertex' },fragment: { module: halo,entryPoint: 'haloFragment',targets: [{ ...color,blend: {
-          color: { srcFactor: 'one',dstFactor: 'one' },alpha: { srcFactor: 'zero',dstFactor: 'one' },
-        } }] },
-        depthStencil: { ...depth,depthWriteEnabled: false },
-      }),
-    ])
-    return new SolarScene(device,date,skyPipeline,bodyPipeline,orbitPipeline,haloPipeline,invalidate,onError,camera ?? new SolarCamera(),assetUrl)
+  static async create(device: GPUDevice,date: Date,invalidate: () => void,onError: (error: Error) => void,camera: SolarCamera | undefined, assetUrl: WorkspaceAssets['url'], terrainLoader?: TerrainLoader) {
+    const { skyPipeline,bodyPipeline,orbitPipeline,haloPipeline } = await getSolarPipelines(device)
+    return new SolarScene(device,date,skyPipeline,bodyPipeline,orbitPipeline,haloPipeline,invalidate,onError,camera ?? new SolarCamera(),assetUrl,terrainLoader)
   }
 
   private constructor(private readonly device: GPUDevice,date: Date,private readonly skyPipeline: GPURenderPipeline,
     private readonly bodyPipeline: GPURenderPipeline,private readonly orbitPipeline: GPURenderPipeline,
     private readonly haloPipeline: GPURenderPipeline,private readonly invalidate: () => void,private readonly onError: (error: Error) => void,
-    readonly camera: SolarCamera, private readonly assetUrl: WorkspaceAssets['url']) {
+    readonly camera: SolarCamera, private readonly assetUrl: WorkspaceAssets['url'], private readonly terrainLoader?: TerrainLoader) {
     this.bodies = solarSystemAt(date)
     this.orbits = ids.flatMap(id => {
       const vertices = orbitPolyline(id,date)
@@ -216,10 +240,11 @@ export class SolarScene {
     const { signal } = this.controller
     void this.assetUrl('textures/nasa-deep-star-map.webp', signal)
       .then(url => loadSkyMap(device,signal,url)).then(texture => {
-      if (signal.aborted) { texture.destroy(); return }
+      if (signal.aborted) return
       const group = this.bindSky(texture)
-      this.skyTexture.destroy()
+      if (this.skyOwned) this.skyTexture.destroy()
       this.skyTexture = texture
+      this.skyOwned = false
       this.skyGroup = group
     }).catch(() => {
       // Keep rendering the planets over dark space if the atlas is unavailable.
@@ -242,7 +267,7 @@ export class SolarScene {
     if (this.loadingTerrain || this.terrain || this.controller.signal.aborted) return
     this.loadingTerrain = true
     const { signal } = this.controller
-    void PlanetTerrainRenderer.create(this.device,signal,this.assetUrl).then(terrain => {
+    void PlanetTerrainRenderer.create(this.device,signal,this.assetUrl,this.terrainLoader).then(terrain => {
       if (signal.aborted) { terrain.destroy(); return }
       this.terrain = terrain
       this.invalidate()
@@ -380,7 +405,7 @@ export class SolarScene {
   destroy() {
     this.controller.abort()
     this.terrain?.destroy()
-    this.skyTexture.destroy()
+    if (this.skyOwned) this.skyTexture.destroy()
     this.viewBuffer.destroy()
     this.bodyBuffer.destroy()
     this.orbitBuffer.destroy()
