@@ -16,13 +16,23 @@ const embedded = await Promise.all(assets.map(async ([name, path, contentType]) 
   return `export const ${name} = "data:${contentType};base64,${bytes.toString('base64')}"`
 }))
 const assetModule = '\0surface-lab-assets'
+const noZstdPlugin = {
+  name: 'stub-zstd-for-surface-lab',
+  enforce: 'pre',
+  resolveId(id) {
+    if (id === '../earth-score/decode.ts') return '\0no-zstd'
+  },
+  load(id) {
+    if (id === '\0no-zstd') return 'export function decompressZstd() { throw new Error("Zstd terrain is unavailable in standalone Surface Lab.") }'
+  },
+}
 const result = await build({
   configFile: false,
   root,
   publicDir: false,
   logLevel: 'warn',
   define: { 'import.meta.env.VITE_SURFACE_LAB_STANDALONE': JSON.stringify('true') },
-  plugins: [{
+  plugins: [noZstdPlugin, {
     name: 'embed-surface-lab-assets',
     enforce: 'pre',
     resolveId(id, importer) {
@@ -35,6 +45,7 @@ const result = await build({
       if (id === assetModule) return [...embedded, 'export const scoreManifestUrl = ""'].join('\n')
     },
   }],
+  worker: { plugins: () => [noZstdPlugin] },
   build: {
     write: false,
     minify: true,
@@ -51,7 +62,8 @@ const outputs = (Array.isArray(result) ? result : [result]).flatMap((item) => it
 const scripts = outputs.filter((item) => item.type === 'chunk')
 const styles = outputs.filter((item) => item.type === 'asset' && item.fileName.endsWith('.css'))
 const unexpected = outputs.filter((item) => item.type === 'asset' && !item.fileName.endsWith('.css'))
-if (scripts.length !== 1 || scripts[0].imports.length || scripts[0].dynamicImports.length || unexpected.length) {
+if (scripts.length !== 1 || scripts[0].imports.length ||
+    scripts[0].dynamicImports.some(file => file !== scripts[0].fileName) || unexpected.length) {
   throw new Error('The standalone export must contain one script and no external assets or imports.')
 }
 

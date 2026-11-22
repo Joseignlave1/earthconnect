@@ -1,7 +1,7 @@
 {
   "format": "earth-connect-assets-v1",
-  "runtimeFileCount": 43,
-  "runtimeBytes": 223313041,
+  "runtimeFileCount": 45,
+  "runtimeBytes": 281776918,
   "scoreManifest": {
     "key": "compute-data/world/manifest-6aa2a505b289ca126ab57af9e33ddfdc205841427f7124dd729b5d3b4dee95e9.json",
     "bytes": 16947,
@@ -346,13 +346,10 @@
       "role": "runtime"
     },
     "textures/earth-blue-marble.jpg": {
-      "key": "assets/textures/earth-blue-marble-b4c4aa7b8ee94975390aa42685c1a0beb942b6b608fe52e2a095bfcd57087f9f.jpg",
-      "bytes": 436887,
-      "sha256": "b4c4aa7b8ee94975390aa42685c1a0beb942b6b608fe52e2a095bfcd57087f9f",
-      "etag": "44bd5f4a39893386555bd7a49578fd76",
-      "contentType": "image/jpeg",
-      "cacheControl": "public, max-age=31536000, immutable",
-      "role": "runtime"
+      "key": "assets/textures/earth-blue-marble-711cf6855db517fb564aaecad03c44fa6b66e5b7f0ba6f1e125979b07230a66d.jpg",
+      "bytes": 2718424,
+      "sha256": "711cf6855db517fb564aaecad03c44fa6b66e5b7f0ba6f1e125979b07230a66d",
+      "contentType": "image/jpeg"
     },
     "textures/earth-terrain.bin": {
       "key": "assets/textures/earth-terrain-6d8e660505be35808e8befaf3e8faa7ad5deba64e68d4627821cacbecd7462a7.bin",
@@ -364,22 +361,16 @@
       "role": "runtime"
     },
     "textures/mars-terrain.bin": {
-      "key": "assets/textures/mars-terrain-d96b6a29c4ef8595cab5f53adbc8d4acff976ac41769d8e8c94a1468afeac239.bin",
-      "bytes": 1890506,
-      "sha256": "d96b6a29c4ef8595cab5f53adbc8d4acff976ac41769d8e8c94a1468afeac239",
-      "etag": "c8c0770f0749afbf89f0d5b811a3b781",
-      "contentType": "application/octet-stream",
-      "cacheControl": "public, max-age=31536000, immutable",
-      "role": "runtime"
+      "key": "assets/textures/mars-terrain-980391977e57294fc6f0c8a96101595e20ac1c51d56dc8531d8be75212f7ef4a.bin",
+      "bytes": 24331055,
+      "sha256": "980391977e57294fc6f0c8a96101595e20ac1c51d56dc8531d8be75212f7ef4a",
+      "contentType": "application/octet-stream"
     },
     "textures/moon-terrain.bin": {
-      "key": "assets/textures/moon-terrain-147d0873a8761291210d999caff4d6feddf92c4f1f5c2554b9c931f5af0aa666.bin",
-      "bytes": 2130165,
-      "sha256": "147d0873a8761291210d999caff4d6feddf92c4f1f5c2554b9c931f5af0aa666",
-      "etag": "ec011dd9b903dc8582d2fbd9182aa62c",
-      "contentType": "application/octet-stream",
-      "cacheControl": "public, max-age=31536000, immutable",
-      "role": "runtime"
+      "key": "assets/textures/moon-terrain-5867393706df1d5701d733537889984d9ad99fa7bf7948476f2d7d6e535927c0.bin",
+      "bytes": 29818446,
+      "sha256": "5867393706df1d5701d733537889984d9ad99fa7bf7948476f2d7d6e535927c0",
+      "contentType": "application/octet-stream"
     },
     "textures/nasa-deep-star-map.webp": {
       "key": "assets/textures/nasa-deep-star-map-7bd5cb88a1304c210459b7a7adbcb77abdf5cac06be8b7fc9f273498d83069be.webp",
@@ -398,6 +389,18 @@
       "contentType": "application/json",
       "cacheControl": "public, max-age=31536000, immutable",
       "role": "score-manifest"
+    },
+    "textures/moon-albedo.webp": {
+      "key": "assets/textures/moon-albedo-d8162111f13fcabed4b3a31dac3ca07da269702a2e950ce97136ad57d36abfd4.webp",
+      "bytes": 4684300,
+      "sha256": "d8162111f13fcabed4b3a31dac3ca07da269702a2e950ce97136ad57d36abfd4",
+      "contentType": "image/webp"
+    },
+    "textures/mars-albedo.webp": {
+      "key": "assets/textures/mars-albedo-033a46e3a6f21f422eb9dcc5b56944f0a2586ba456c871116a0ee34ff30f5041.webp",
+      "bytes": 1369210,
+      "sha256": "033a46e3a6f21f422eb9dcc5b56944f0a2586ba456c871116a0ee34ff30f5041",
+      "contentType": "image/webp"
     }
   },
   "metadata": {

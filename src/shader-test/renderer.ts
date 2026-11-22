@@ -3,11 +3,11 @@ import { TerrainLighting } from './lighting.ts'
 import { solarPosition } from './sun.ts'
 import { GpuTimer, GPU_STAGES, type GpuTimings, type TimingResult } from './gpu-timing.ts'
 import { resolveScoreStyle, ScoreDistribution, type ColorMode } from './score-style.ts'
-import { PostProcess } from './postprocess.ts'
+import { LOUPE_TEXTURE_SIZE, PostProcess, type LoupeOverlay } from './postprocess.ts'
 import { motionBlurUniforms } from './motion-blur.ts'
 import { shaderModule, uploadBuffer, writeTextureChunked, fullscreenVertex } from './gpu.ts'
 import { surfaceShader } from './surface-shader.ts'
-import { cameraBasis, cameraMatrix, createMesh, EARTH_AXIS, ease, FOV, grabCenter, grabRotation, orbitRotation, surfacePoint, SurfacePicker, type Camera, type Rotation, type Selection, type Vec3 } from './geometry.ts'
+import { cameraBasis, cameraMatrix, createMesh, EARTH_AXIS, ease, FOV, grabCenter, orbitRotation, surfacePoint, SurfacePicker, type Camera, type Rotation, type Selection, type Vec3 } from './geometry.ts'
 import { contourDetail } from './contours.ts'
 import { cellAddress, MISSING, RADIUS, SIZE, tileRow, tileX, worldTiles } from './world-grid.ts'
 import type { WorldNoise } from './world-noise.ts'
@@ -158,8 +158,14 @@ export class SurfaceRenderer {
   private bindings!: GPUBindGroup
   private annotationUniform!: GPUBuffer
   private annotationBindings!: GPUBindGroup
+  private loupeUniform!: GPUBuffer
+  private loupeBindings!: GPUBindGroup
+  private loupeUniformValues = new Float32Array(52)
   private uniformBuffer!: GPUBuffer
   private uniformValues = new Float32Array(52)
+  private shiftDown = false
+  private loupeZoom: number | null = null
+  private lockedLoupe: { rx: number; ry: number; radiusCss: number; zoom: number; dirty: boolean; matrix?: Float32Array } | null = null
   private readonly sun = solarPosition(new Date(performance.timeOrigin))
   private lighting!: TerrainLighting
   private post!: PostProcess
@@ -287,6 +293,8 @@ export class SurfaceRenderer {
     canvas.addEventListener('pointercancel', this.pointerCancel)
     canvas.addEventListener('wheel', this.wheel, { passive: false })
     canvas.addEventListener('keydown', this.keyDown)
+    window.addEventListener('keydown', this.shiftKey)
+    window.addEventListener('keyup', this.shiftKey)
     window.addEventListener('blur', this.pointerBlur)
     this.invalidate()
   }
@@ -353,6 +361,7 @@ export class SurfaceRenderer {
     if (this.destroyed || this.device !== device) return
     this.uniformBuffer = device.createBuffer({ label: 'Surface parameters',size: this.uniformValues.byteLength,usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
     this.annotationUniform = device.createBuffer({ label: 'Annotation parameters',size: this.uniformValues.byteLength,usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
+    this.loupeUniform = device.createBuffer({ label: 'Optical loupe surface parameters',size: this.uniformValues.byteLength,usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
     const sharedGpu = getSharedMeshGpu(device)
     this.vertexBuffer = sharedGpu.vertexBuffer
     this.indexBuffer = sharedGpu.indexBuffer
@@ -412,6 +421,7 @@ export class SurfaceRenderer {
     ] })
     this.bindings = bind(this.uniformBuffer)
     this.annotationBindings = bind(this.annotationUniform)
+    this.loupeBindings = bind(this.loupeUniform)
   }
 
   private uploadTerrain() {
@@ -433,7 +443,7 @@ export class SurfaceRenderer {
     if (this.terrainOwned) this.terrainTexture.destroy()
     this.terrainTexture = texture
     this.terrainOwned = false
-    this.lighting.setTerrain(this.terrainTexture)
+    this.lighting.setTerrain(this.terrainTexture,this.options.relief)
     this.bindResources()
     this.canvas.dataset.terrainReady = 'true'
   }
@@ -676,10 +686,11 @@ export class SurfaceRenderer {
     else this.invalidateDisplay()
   }
 
-  resetCamera() { this.cameraHistory = undefined; this.rotation = [0,0,0,1]; this.center = [0,0,0]; this.grab = null; this.zoom = 1; this.invalidate() }
+  resetCamera() { this.cameraHistory = undefined; this.lockedLoupe = null; this.rotation = [0,0,0,1]; this.center = [0,0,0]; this.grab = null; this.zoom = 1; this.invalidate() }
 
   focusSolarBody(focus: SolarFocus) {
     if (!this.solarSettings || this.solarFocus === focus) return
+    this.lockedLoupe = null
     this.pendingSolarProjection = undefined
     if (this.options.morph !== 1 || this.projectionFrame) {
       cancelAnimationFrame(this.projectionFrame)
@@ -704,7 +715,7 @@ export class SurfaceRenderer {
 
   setSourcePoint(body: SourceBody,point: SourcePoint) {
     this.sourcePoints[body] = point
-    this.invalidate(false)
+    this.invalidateOverlay()
   }
 
   retrySolarTerrain() { this.solar?.loadTerrain() }
@@ -714,6 +725,7 @@ export class SurfaceRenderer {
       this.pendingSolarProjection = projection
       return
     }
+    this.lockedLoupe = null
     const targetMorph = Number(projection === 'globe')
     if (this.options.morph === targetMorph && !this.projectionFrame) return
     cancelAnimationFrame(this.projectionFrame)
@@ -752,6 +764,7 @@ export class SurfaceRenderer {
 
   private focusScore(longitude: number, latitude: number) {
     this.cameraHistory = undefined
+    this.lockedLoupe = null
     this.rotation = viewRotation(longitude,latitude)
     this.center = [0,0,0]; this.grab = null; this.zoom = 12
     const elevation = this.terrain ? this.terrainHeight(longitude,latitude) : 0
@@ -785,6 +798,7 @@ export class SurfaceRenderer {
     this.dirty = true
     this.annotationsDirty ||= annotations
     this.displayDirty = true
+    if (this.lockedLoupe) this.lockedLoupe.dirty = true
     this.schedule()
   }
 
@@ -850,7 +864,11 @@ export class SurfaceRenderer {
     const renderEarth = !sceneFrame || solar!.drawEarth(sceneFrame,height)
     if (o.dataBoundary && !this.post.hasCurrentCoverage) annotations = true
     const cursor = this.cursor && document.elementFromPoint(this.cursor.x,this.cursor.y) === canvas ? this.cursor : null
-    const hover = cursor ? this.pickAt(cursor.x,cursor.y) : null
+    const hover = cursor
+      ? this.solarFocus === 'earth'
+        ? this.pickAt(cursor.x,cursor.y)
+        : this.pickSourceAt(cursor.x,cursor.y) ?? null
+      : null
     const metresPerPixel = 2 * Math.tan(FOV / 2) * (camera.distance - ease(o.morph)) * EARTH_AXIS / Math.max(1,canvas.clientHeight)
     const detail = contourDetail(metresPerPixel)
     if (redraw || annotations) {
@@ -871,6 +889,7 @@ export class SurfaceRenderer {
     this.timer?.beginFrame()
     const encoder = device.createCommandEncoder({ label: 'Surface lab frame' })
     const lighting = this.lighting.encode(encoder,o.relief)
+    if (lighting.rebound) this.bindResources()
     const drawMesh = (pass: GPURenderPassEncoder,pipeline: GPURenderPipeline,bindings: GPUBindGroup) => {
       pass.setPipeline(pipeline)
       pass.setBindGroup(0,bindings)
@@ -878,12 +897,13 @@ export class SurfaceRenderer {
       pass.drawIndexed(this.mesh.indices.length)
     }
     const pipelines = this.pipelines!
+    const clientHeight = Math.max(1,canvas.clientHeight)
     if (redraw) {
       const pass = this.post.begin(encoder,hdr,this.timer?.writes('surface'),Boolean(motion))
       if (sceneFrame) {
         const overview = this.solarFocus === 'system'
         const flightTarget = this.solarFocus !== 'system' && solar!.camera.flying ? this.solarFocus : undefined
-        solar!.draw(pass,sceneFrame,width,height,this.sourcePoints,overview,flightTarget)
+        solar!.draw(pass,sceneFrame,height,clientHeight,hdr,ratio,overview,flightTarget)
       }
       if (renderEarth) drawMesh(pass,pipelines.surface,this.bindings)
       if (sceneFrame) solar!.drawOrbits(pass,sceneFrame,this.solarFocus === 'system')
@@ -891,23 +911,125 @@ export class SurfaceRenderer {
       pass.end()
     }
     if (annotations) {
-      const pipeline = o.dataBoundary
+      const earthBoundary = o.dataBoundary && this.solarFocus === 'earth'
+      const pipeline = earthBoundary
         ? pipelines.coverage ??= device.createRenderPipeline(pipelines.coverageDescriptor)
         : pipelines.annotation
-      const pass = this.post.beginAnnotations(encoder,o.dataBoundary,this.timer?.writes('annotations'))
+      const pass = this.post.beginAnnotations(encoder,earthBoundary,this.timer?.writes('annotations'))
       if (renderEarth) drawMesh(pass,pipeline,this.annotationBindings)
+      if (sceneFrame && !earthBoundary) solar!.drawAnnotations(pass,sceneFrame,height)
       pass.end()
     }
+    const selectedPoint = this.solarFocus === 'earth'
+      ? this.selected
+      : (this.solarFocus === 'moon' || this.solarFocus === 'mars')
+        ? this.sourcePoints[this.solarFocus] ?? null
+        : null
     let spaceCursor: [number,number] | null = null
-    if (cursor && !hover) {
-      const rect = canvas.getBoundingClientRect()
-      spaceCursor = [(cursor.x - rect.left) * width / rect.width,(cursor.y - rect.top) * height / rect.height]
+    let loupeOverlay: LoupeOverlay | null = null
+    const rect = canvas.getBoundingClientRect()
+    const locked = !flying ? this.lockedLoupe : null
+    const scanning = !locked && this.shiftDown && Boolean(cursor) && Boolean(hover) && !flying && !this.gesture?.moved && this.pointers.size <= 1
+    if (locked || (scanning && cursor)) {
+      const loupeRadiusCss = locked ? locked.radiusCss : 76
+      const loupeZoom = locked ? locked.zoom : this.effectiveLoupeZoom()
+      const centerClientX = locked ? rect.left + locked.rx : cursor!.x
+      const centerClientY = locked ? rect.top + locked.ry : cursor!.y
+      const needsRender = !locked || locked.dirty || redraw
+      const baseMatrix = needsRender
+        ? (this.solarFocus === 'earth'
+          ? (sceneFrame ? solar!.earthMatrix(sceneFrame) : cameraMatrix(camera))
+          : (sceneFrame && (this.solarFocus === 'moon' || this.solarFocus === 'mars') ? solar!.sourceMatrix(sceneFrame,this.solarFocus) : null))
+        : null
+      if (!needsRender || baseMatrix) {
+        let loupeMatrix = locked?.matrix ?? null
+        if (needsRender && baseMatrix) {
+          const [nx,ny] = this.pointerCoordinates(centerClientX,centerClientY)
+          const sx = (Math.max(1,rect.width) / (2 * loupeRadiusCss)) * loupeZoom
+          const sy = (Math.max(1,rect.height) / (2 * loupeRadiusCss)) * loupeZoom
+          loupeMatrix = zoomProjectionMatrix(baseMatrix,nx,ny,sx,sy)
+          const loupeRatio = LOUPE_TEXTURE_SIZE / (2 * loupeRadiusCss)
+          const loupePass = this.post.beginLoupe(encoder,hdr)
+          if (sceneFrame) solar!.drawLoupeSky(loupePass,sceneFrame,nx,ny,1 / sx,1 / sy)
+          if (this.solarFocus === 'earth') {
+            const lu = this.loupeUniformValues
+            lu.set(this.uniformValues)
+            lu.set(loupeMatrix,0)
+            lu[35] = loupeRatio
+            lu.set(contourDetail(metresPerPixel / loupeZoom),36)
+            device.queue.writeBuffer(this.loupeUniform,0,lu)
+            drawMesh(loupePass,pipelines.surface,this.loupeBindings)
+          } else if (sceneFrame && (this.solarFocus === 'moon' || this.solarFocus === 'mars')) {
+            const bodyMetrics = solar!.bodyMarkerMetrics(sceneFrame,this.solarFocus,clientHeight)
+            const bodyMpp = bodyMetrics.scale * solar!.bodies[this.solarFocus].radius * 1000 / loupeZoom
+            solar!.drawLoupe(loupePass,this.solarFocus,loupeMatrix,bodyMpp,hdr,loupeRatio)
+          }
+          loupePass.end()
+          if (locked) { locked.dirty = false; locked.matrix = loupeMatrix }
+        }
+        let selectedInLoupe: [number,number] | null = null
+        if (selectedPoint && loupeMatrix) {
+          const pos = this.solarFocus === 'earth'
+            ? this.selected?.position ?? null
+            : (this.solarFocus === 'moon' || this.solarFocus === 'mars')
+              ? solar!.sourcePosition(this.solarFocus,selectedPoint)
+              : null
+          const eye = this.solarFocus === 'earth'
+            ? cameraBasis(camera).eye
+            : (sceneFrame && (this.solarFocus === 'moon' || this.solarFocus === 'mars')
+              ? solar!.sourceEye(sceneFrame,this.solarFocus)
+              : null)
+          if (pos && eye) {
+            const [px,py,pz] = pos
+            const r2 = px * px + py * py + pz * pz
+            const frontFacing = (this.solarFocus === 'earth' && o.morph < 1) ||
+              (px * (eye[0] - px) + py * (eye[1] - py) + pz * (eye[2] - pz) > -0.02 * r2)
+            if (frontFacing) {
+              const m = loupeMatrix
+              const cw = m[3] * px + m[7] * py + m[11] * pz + m[15]
+              if (cw > 0) {
+                const lx = (m[0] * px + m[4] * py + m[8] * pz + m[12]) / cw * loupeRadiusCss
+                const ly = -(m[1] * px + m[5] * py + m[9] * pz + m[13]) / cw * loupeRadiusCss
+                if (Math.hypot(lx,ly) <= loupeRadiusCss + 8) selectedInLoupe = [lx,ly]
+              }
+            }
+          }
+        }
+        const aimX = locked && cursor ? cursor.x - centerClientX : 0
+        const aimY = locked && cursor ? cursor.y - centerClientY : 0
+        loupeOverlay = {
+          x: (centerClientX - rect.left) * width / Math.max(1,rect.width),
+          y: (centerClientY - rect.top) * height / Math.max(1,rect.height),
+          radiusCss: loupeRadiusCss,
+          aimX,
+          aimY,
+          locked: Boolean(locked),
+          zoom: loupeZoom,
+          selected: selectedInLoupe,
+        }
+      }
     }
-    const markers = [(this.selected?.longitude ?? 0) / 360 + .5,(this.selected?.latitude ?? 0) / 180 + .5,
-      (hover?.longitude ?? 0) / 360 + .5,(hover?.latitude ?? 0) / 180 + .5,
-      Number(Boolean(this.selected && this.solarFocus === 'earth' && !solar?.camera.flying)),Number(Boolean(hover)),ease(o.morph),metresPerPixel / EARTH_AXIS]
+    if (cursor && !hover && !loupeOverlay) {
+      spaceCursor = [(cursor.x - rect.left) * width / Math.max(1,rect.width),(cursor.y - rect.top) * height / Math.max(1,rect.height)]
+    }
+    const earthMetrics = sceneFrame && o.morph === 1
+      ? solar!.bodyMarkerMetrics(sceneFrame,'earth',clientHeight)
+      : { scale: metresPerPixel / EARTH_AXIS,alpha: 1 }
+    const moonMetrics = sceneFrame ? solar!.bodyMarkerMetrics(sceneFrame,'moon',clientHeight) : { scale: 1,alpha: 0 }
+    const marsMetrics = sceneFrame ? solar!.bodyMarkerMetrics(sceneFrame,'mars',clientHeight) : { scale: 1,alpha: 0 }
+    const hoverBody = this.solarFocus === 'earth' ? 0 : this.solarFocus === 'moon' ? 1 : this.solarFocus === 'mars' ? 2 : -1
+    const hoverScale = hoverBody === 0 ? earthMetrics.scale : hoverBody === 1 ? moonMetrics.scale : hoverBody === 2 ? marsMetrics.scale : metresPerPixel / EARTH_AXIS
+    const moonPoint = this.sourcePoints.moon
+    const marsPoint = this.sourcePoints.mars
+    const markers = [
+      (hover?.longitude ?? 0) / 360 + .5,(hover?.latitude ?? 0) / 180 + .5,Number(Boolean(hover && !loupeOverlay)),hoverScale,
+      ease(o.morph),0,0,0,
+      (this.selected?.longitude ?? 0) / 360 + .5,(this.selected?.latitude ?? 0) / 180 + .5,this.selected ? earthMetrics.alpha : 0,earthMetrics.scale,
+      (moonPoint?.longitude ?? 0) / 360 + .5,(moonPoint?.latitude ?? 0) / 180 + .5,moonPoint ? moonMetrics.alpha : 0,moonMetrics.scale,
+      (marsPoint?.longitude ?? 0) / 360 + .5,(marsPoint?.latitude ?? 0) / 180 + .5,marsPoint ? marsMetrics.alpha : 0,marsMetrics.scale,
+    ]
     const built = this.post.finish(encoder,this.context.getCurrentTexture().createView(),{
-      hdr,exposure: o.exposure,glow: o.bloom,ratio,dataBoundary: o.dataBoundary,cursor: spaceCursor,markers,motion,
+      hdr,exposure: o.exposure,glow: o.bloom,ratio,dataBoundary: o.dataBoundary,cursor: spaceCursor,hoverBody,markers,loupe: loupeOverlay,motion,
     },redraw,display || annotations,this.timer ?? undefined)
     this.timer?.encode(encoder)
     device.queue.submit([encoder.finish()])
@@ -940,7 +1062,8 @@ export class SurfaceRenderer {
     if (built.bloom) canvas.dataset.bloomBuilds = String(Number(canvas.dataset.bloomBuilds || 0) + 1)
     if (built.composition) canvas.dataset.displayBuilds = String(Number(canvas.dataset.displayBuilds || 0) + 1)
     canvas.dataset.idle = String(!this.dirty && !this.annotationsDirty && !this.displayDirty && !this.overlayDirty)
-    canvas.dataset.cursor = cursor ? hover ? 'surface' : 'space' : 'hidden'
+    canvas.dataset.cursor = loupeOverlay ? (loupeOverlay.locked ? 'loupe-locked' : 'loupe') : cursor ? hover ? 'surface' : 'space' : 'hidden'
+    canvas.dataset.loupeZoom = loupeOverlay ? loupeOverlay.zoom.toFixed(2) : ''
     canvas.dataset.ready = String(Boolean(this.distribution))
     canvas.dataset.draws = String(Number(canvas.dataset.draws || 0) + 1)
     if (sceneFrame) {
@@ -1000,10 +1123,46 @@ export class SurfaceRenderer {
     }
   }
 
+  private effectiveLoupeZoom() {
+    return this.loupeZoom ?? Math.max(2.2,Math.min(5.5,5.5 / Math.pow(Math.max(1,this.zoom),.16)))
+  }
+
+  private isInsideLockedLoupe(clientX: number, clientY: number, margin = 0) {
+    const locked = this.lockedLoupe
+    if (!locked) return false
+    const rect = this.canvas.getBoundingClientRect()
+    return Math.hypot(clientX - (rect.left + locked.rx), clientY - (rect.top + locked.ry)) <= locked.radiusCss + margin
+  }
+
+  private loupeWorldPoint(clientX: number, clientY: number): [number, number] {
+    const locked = this.lockedLoupe
+    if (!locked) return [clientX, clientY]
+    const rect = this.canvas.getBoundingClientRect()
+    const cx = rect.left + locked.rx, cy = rect.top + locked.ry
+    if (Math.hypot(clientX - cx, clientY - cy) > locked.radiusCss + 4) return [clientX, clientY]
+    return [cx + (clientX - cx) / locked.zoom, cy + (clientY - cy) / locked.zoom]
+  }
+
+  private shiftKey = (event: KeyboardEvent) => {
+    if (event.key === 'Escape' && this.lockedLoupe) {
+      this.lockedLoupe = null
+      this.invalidateOverlay()
+      return
+    }
+    const next = event.shiftKey
+    if (next === this.shiftDown) return
+    this.shiftDown = next
+    if (this.cursor) this.invalidateOverlay()
+  }
+
   private trackCursor(event: PointerEvent) {
+    this.shiftDown = event.shiftKey
     if (event.pointerType === 'touch') this.cursor = null
     else if (this.cursor) { this.cursor.x = event.clientX; this.cursor.y = event.clientY }
     else this.cursor = { x: event.clientX, y: event.clientY }
+    if (this.lockedLoupe && this.pointers.size === 0 && !this.isInsideLockedLoupe(event.clientX, event.clientY, 10)) {
+      this.lockedLoupe = null
+    }
     this.invalidateOverlay()
   }
 
@@ -1014,6 +1173,8 @@ export class SurfaceRenderer {
 
   private pointerBlur = () => {
     this.cameraHistory = undefined
+    this.shiftDown = false
+    this.lockedLoupe = null
     this.cursor = null; this.pendingMove = null; this.grab = null; this.gesture = null
     for (const id of this.pointers.keys()) if (this.canvas.hasPointerCapture(id)) this.canvas.releasePointerCapture(id)
     this.pointers.clear()
@@ -1046,7 +1207,8 @@ export class SurfaceRenderer {
 
   private regrab() {
     const pointer = this.pointers.size === 1 ? [...this.pointers.values()][0] : null
-    this.grab = pointer ? { ...pointer, camera: this.camera(), position: this.pickAt(pointer.x,pointer.y)?.position ?? null } : null
+    const position = pointer && this.options.morph < 1 ? this.pickAt(pointer.x,pointer.y)?.position ?? null : null
+    this.grab = pointer ? { ...pointer, camera: this.camera(), position } : null
   }
 
   private pointerDown = (event: PointerEvent) => {
@@ -1067,14 +1229,18 @@ export class SurfaceRenderer {
     this.trackCursor(event)
     const previous = this.pointers.get(event.pointerId)
     if (!previous) return
-    if (this.gesture && Math.hypot(event.clientX - this.gesture.startX, event.clientY - this.gesture.startY) > 4) this.gesture.moved = true
+    if (this.gesture && Math.hypot(event.clientX - this.gesture.startX, event.clientY - this.gesture.startY) > 4) {
+      this.gesture.moved = true
+      if (this.lockedLoupe) this.lockedLoupe = null
+    }
     if (this.pointers.size > 1) {
+      if (this.lockedLoupe) this.lockedLoupe = null
       const other = [...this.pointers.entries()].find(([id]) => id !== event.pointerId)![1]
       const old = Math.hypot(previous.x - other.x, previous.y - other.y)
       const next = Math.hypot(event.clientX - other.x, event.clientY - other.y)
       if (old > 0) this.setZoom(this.zoom * next / old)
       this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
-    } else {
+    } else if ((!this.lockedLoupe && !this.shiftDown) || this.gesture?.moved) {
       // Mouse reports can greatly outnumber display frames. Keep the newest
       // position; solve the exact anchor once, immediately before drawing it.
       if (!this.pendingMove) this.pendingMove = { id: event.pointerId, x: event.clientX, y: event.clientY }
@@ -1092,10 +1258,9 @@ export class SurfaceRenderer {
     // Solve against mouse-down, not the previous frame. Returning to a cursor
     // position restores the same orientation regardless of the intervening path.
     const camera = this.grab?.camera ?? this.camera()
-    if (this.grab?.position) {
+    if (this.options.morph < 1 && this.grab?.position) {
       const [nx,ny] = this.pointerCoordinates(pending.x,pending.y)
-      if (this.options.morph === 1) this.rotation = grabRotation(camera,this.grab.position,nx,ny)
-      else this.center = grabCenter(camera,this.grab.position,nx,ny)
+      this.center = grabCenter(camera,this.grab.position,nx,ny)
     } else {
       const scale = 2 * Math.tan(FOV / 2) * Math.max(.001,camera.distance - ease(this.options.morph)) / Math.max(1,this.canvas.clientHeight)
       this.rotation = orbitRotation(camera.rotation ?? this.rotation,(pending.x - (this.grab?.x ?? previous.x)) * scale,(pending.y - (this.grab?.y ?? previous.y)) * scale)
@@ -1108,7 +1273,8 @@ export class SurfaceRenderer {
     if (body === 'earth' || body === 'system' || this.solar?.camera.flying) return
     const frame = this.solar?.camera.frame
     if (!frame) return
-    const [nx,ny] = this.pointerCoordinates(clientX,clientY)
+    const [px,py] = this.loupeWorldPoint(clientX,clientY)
+    const [nx,ny] = this.pointerCoordinates(px,py)
     const point = this.solar?.pickSource(frame,body,nx,ny)
     if (point) return { body, ...point }
   }
@@ -1119,8 +1285,30 @@ export class SurfaceRenderer {
     this.applyPendingMove()
     if (!this.pointers.has(event.pointerId)) return
     if (this.pointers.size === 1 && this.gesture && !this.gesture.moved) {
+      if (event.button === 0 && !this.lockedLoupe && this.shiftDown && !this.solar?.camera.flying) {
+        const hit = this.solarFocus === 'earth'
+          ? this.pickAt(event.clientX,event.clientY)
+          : this.pickSourceAt(event.clientX,event.clientY)
+        if (hit) {
+          const rect = this.canvas.getBoundingClientRect()
+          this.lockedLoupe = {
+            rx: event.clientX - rect.left,
+            ry: event.clientY - rect.top,
+            radiusCss: 76,
+            zoom: this.effectiveLoupeZoom(),
+            dirty: true,
+          }
+          this.invalidateOverlay()
+          this.pointers.delete(event.pointerId)
+          this.regrab()
+          if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId)
+          if (!this.pointers.size) this.gesture = null
+          return
+        }
+      }
+      const [px,py] = this.loupeWorldPoint(event.clientX,event.clientY)
       if (this.solarFocus === 'earth') {
-        this.selected = this.pickAt(event.clientX,event.clientY)
+        this.selected = this.pickAt(px,py)
         if (this.selected && this.terrain) this.selected.elevation = elevationAt(this.terrain,this.selected.longitude * Math.PI / 180,this.selected.latitude * Math.PI / 180)
         this.reportPickedScore(this.selected)
       } else {
@@ -1179,7 +1367,21 @@ export class SurfaceRenderer {
     this.applyPendingMove()
     event.preventDefault()
     if (this.solar?.camera.flying) return
-    const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.canvas.clientHeight : 1)
+    const deltaScale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.canvas.clientHeight : 1
+    if (event.shiftKey || this.isInsideLockedLoupe(event.clientX, event.clientY, 4)) {
+      const raw = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX
+      const current = this.lockedLoupe?.zoom ?? this.effectiveLoupeZoom()
+      const next = Math.max(1.5, Math.min(24, current * Math.exp(-raw * deltaScale * .0018)))
+      this.loupeZoom = next
+      if (this.lockedLoupe) {
+        this.lockedLoupe.zoom = next
+        this.lockedLoupe.dirty = true
+      }
+      this.invalidateOverlay()
+      return
+    }
+    if (this.lockedLoupe) this.lockedLoupe = null
+    const delta = event.deltaY * deltaScale
     this.setZoom(this.zoom * Math.exp(-delta * .001))
     this.regrab()
     this.invalidate()
@@ -1206,6 +1408,7 @@ export class SurfaceRenderer {
 
   private releaseGpuResources() {
     this.cameraHistory = undefined
+    this.lockedLoupe = null
     if (this.hasSolarLabels) this.canvas.dispatchEvent(new CustomEvent('solarlabels',{ detail: [] }))
     this.hasSolarLabels = false
     this.solar?.destroy()
@@ -1218,7 +1421,7 @@ export class SurfaceRenderer {
     this.scoreMap = null
     if (this.spareScoreMap) destroyScoreTextures(this.spareScoreMap)
     this.spareScoreMap = null
-    this.uniformBuffer?.destroy(); this.annotationUniform?.destroy()
+    this.uniformBuffer?.destroy(); this.annotationUniform?.destroy(); this.loupeUniform?.destroy()
     this.timer?.destroy(); this.timer = null
     this.lighting?.destroy(); this.post?.destroy()
     this.pipelines = null
@@ -1244,6 +1447,8 @@ export class SurfaceRenderer {
     this.canvas.removeEventListener('pointercancel',this.pointerCancel)
     this.canvas.removeEventListener('wheel',this.wheel)
     this.canvas.removeEventListener('keydown',this.keyDown)
+    window.removeEventListener('keydown',this.shiftKey)
+    window.removeEventListener('keyup',this.shiftKey)
     window.removeEventListener('blur',this.pointerBlur)
     this.canvas.classList.remove('custom-cursor')
     this.releaseGpuResources()
@@ -1251,6 +1456,19 @@ export class SurfaceRenderer {
     this.deviceErrors?.abort()
     this.deviceLease?.release()
   }
+}
+
+function zoomProjectionMatrix(base: Float32Array, nx: number, ny: number, sx: number, sy: number) {
+  const out = new Float32Array(16)
+  for (let col = 0; col < 4; col++) {
+    const o = col * 4
+    const x = base[o], y = base[o + 1], z = base[o + 2], w = base[o + 3]
+    out[o] = sx * (x - nx * w)
+    out[o + 1] = sy * (y - ny * w)
+    out[o + 2] = z
+    out[o + 3] = w
+  }
+  return out
 }
 
 function viewRotation(longitude: number,latitude: number) {

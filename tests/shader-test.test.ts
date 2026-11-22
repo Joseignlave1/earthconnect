@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readFileSync } from 'node:fs'
 import { cameraBasis, cameraMatrix, createMesh, EARTH_AXIS, EARTH_FLATTENING, FOV, grabCenter, grabRotation, orbitRotation, pickSurface, SurfacePicker, surfacePoint, type Camera, type Rotation, type Vec3 } from '../src/shader-test/geometry.ts'
-import { decodeTerrain, elevationAt, elevationPyramid, poleElevations } from '../src/shader-test/terrain.ts'
+import { decodeTerrain, decodeTerrainEct2Payload, elevationAt, elevationPyramid, packRg8Levels, poleElevations } from '../src/shader-test/terrain.ts'
 import { solarPosition } from '../src/shader-test/sun.ts'
 import { contourDetail } from '../src/shader-test/contours.ts'
 import { maxPyramid, noiseTexture, perlin } from '../src/shader-test/noise.ts'
@@ -356,6 +356,49 @@ test('display elevation levels converge to one height at each pole without chang
     assert.equal(new Set(heights).size,1)
     assert.equal(new Set(coasts).size,1)
   }
+})
+
+test('isotropic polar elevation pyramids damp longitudinal spikes near poles without altering the equator', () => {
+  const width = 64, height = 32
+  const pixels = new Uint8ClampedArray(width * height * 4)
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const heightMetres = (x % 2 === 0 ? 500 : -500)
+    const code = 32768 + heightMetres
+    const i = (y * width + x) * 4
+    pixels[i] = code >> 8; pixels[i + 1] = code & 255; pixels[i + 2] = 128; pixels[i + 3] = 255
+  }
+  const levels = elevationPyramid({ pixels, width, height }, true)
+  const eqRow = Math.floor(height / 2)
+  assert.equal(levels[0].values[eqRow * width], 500)
+  assert.equal(levels[0].values[eqRow * width + 1], -500)
+  let polarPeak = 0
+  for (let x = 0; x < width; x++) polarPeak = Math.max(polarPeak, Math.abs(levels[0].values[width + x]))
+  assert.ok(polarPeak < 25, `expected high-frequency polar oscillation to be damped, got ${polarPeak}`)
+})
+
+test('ECT2 delta-shuffled payload round-trips signed elevations and packs rg8 levels', () => {
+  const width = 4, height = 3
+  const elevations = [-9000, -1200, 0, 5400, -300, 120, 8848, 21000, -50, 42, -1, 1000]
+  const codes = elevations.map(h => h + 32768)
+  const payload = new Uint8Array(width * height * 2)
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const i = y * width + x
+    const pred = y === 0 ? (x === 0 ? 32768 : codes[i - 1]) : (x === 0 ? codes[i - width] : (codes[i - 1] + codes[i - width]) >> 1)
+    const delta = (codes[i] - pred) & 0xffff
+    const signed = delta >= 32768 ? delta - 65536 : delta
+    const zz = ((signed << 1) ^ (signed >> 31)) & 0xffff
+    payload[i] = zz >> 8
+    payload[width * height + i] = zz & 0xff
+  }
+  const terrain = decodeTerrainEct2Payload(width, height, 3, payload)
+  assert.equal(terrain.stride, 2)
+  assert.equal(terrain.polarSmoothed, true)
+  for (let i = 0; i < elevations.length; i++) {
+    const decoded = terrain.pixels[i * 2] * 256 + terrain.pixels[i * 2 + 1] - 32768
+    assert.equal(decoded, elevations[i])
+  }
+  const packed = packRg8Levels(elevationPyramid(terrain, true))
+  assert.equal(packed[0].data.byteLength, width * height * 2)
 })
 
 test('raycasting selects the visible surface, misses the background and follows the morph', () => {

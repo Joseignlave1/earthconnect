@@ -68,6 +68,34 @@ function unpack(zstd: Decoder, scratch: Scratch, frame: ArrayBuffer, { packedByt
   return new Uint8Array(zstd.memory.buffer, scratch.outputPtr, packedBytes).slice().buffer
 }
 
+let sharedZstdModule: Promise<WebAssembly.Module> | undefined
+
+export async function decompressZstd(frame: ArrayBuffer, outputBytes: number, signal?: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
+  sharedZstdModule ??= compileZstdModule().catch(error => {
+    sharedZstdModule = undefined
+    throw error
+  })
+  const zstd = await loadDecoder(await sharedZstdModule, signal)
+  signal?.throwIfAborted()
+  const inputPtr = zstd.allocate(frame.byteLength)
+  if (!inputPtr) throw new Error('Unable to allocate Zstd input buffer')
+  const outputPtr = zstd.allocate(outputBytes)
+  if (!outputPtr) {
+    zstd.release(inputPtr, frame.byteLength)
+    throw new Error('Unable to allocate Zstd output buffer')
+  }
+  try {
+    new Uint8Array(zstd.memory.buffer, inputPtr, frame.byteLength).set(new Uint8Array(frame))
+    const status = zstd.decode(inputPtr, frame.byteLength, outputPtr, outputBytes)
+    if (status === 1) throw new Error('Incorrect Zstd frame content size')
+    if (status !== 0) throw new Error('Zstd decompression or checksum failed')
+    return new Uint8Array(zstd.memory.buffer, outputPtr, outputBytes).slice()
+  } finally {
+    zstd.release(outputPtr, outputBytes)
+    zstd.release(inputPtr, frame.byteLength)
+  }
+}
+
 export function createDecoder(signal?: AbortSignal) {
   let decoder: Promise<Decoder> | undefined
   const scratch: Scratch = { inputPtr: 0, inputCap: 0, outputPtr: 0, outputCap: 0 }

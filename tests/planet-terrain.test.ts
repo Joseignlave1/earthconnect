@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { gunzipSync } from 'node:zlib'
-import { decodeTerrain } from '../src/shader-test/terrain.ts'
+import { gunzipSync, zstdDecompressSync } from 'node:zlib'
+import { decodeTerrain, decodeTerrainEct2Payload } from '../src/shader-test/terrain.ts'
 import { buildPlanetTerrain, type TerrainBody } from '../src/workspace/planetTerrain.ts'
 import { bodyRadius } from '../src/workspace/solarSystem.ts'
 
@@ -10,7 +10,13 @@ const radians = Math.PI / 180
 
 function sceneTerrain(body: TerrainBody) {
   const url = new URL(`../public/textures/${body}-terrain.bin`, import.meta.url)
-  const raw = Uint8Array.from(gunzipSync(readFileSync(url))).buffer
+  const file = readFileSync(url)
+  if (file.byteLength >= 16 && file.readUInt32BE(0) === 0x45435432) {
+    const width = file.readUInt32LE(4), height = file.readUInt32LE(8), flags = file.readUInt32LE(12)
+    const payload = new Uint8Array(zstdDecompressSync(file.subarray(16)))
+    return buildPlanetTerrain(body, decodeTerrainEct2Payload(width, height, flags, payload))
+  }
+  const raw = Uint8Array.from(gunzipSync(file)).buffer
   return buildPlanetTerrain(body, decodeTerrain(raw))
 }
 
@@ -29,7 +35,7 @@ test('the LOLA overview joins the antimeridian and closes the poles', () => {
 })
 
 test('the mesh and coordinates use the solar scene radius and displayed relief', () => {
-  for (const [body, exaggeration] of [['moon', 3], ['mars', 4]] as const) {
+  for (const [body, exaggeration] of [['moon', 2.2], ['mars', 3.0]] as const) {
     const mesh = sceneTerrain(body)
     assert.equal(mesh.radius, bodyRadius(body))
     const atPrimeMeridian = mesh.positionAt(0, 0)

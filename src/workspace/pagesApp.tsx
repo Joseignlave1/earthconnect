@@ -23,8 +23,8 @@ function createOpener(devicePool?: ReturnType<typeof createSurfaceDevicePool>, r
       .then(() => endStartupSpan('earth-terrain'), () => undefined)
     startStartupSpan('solar-terrain')
     void Promise.all([
-      resources.acquireTerrain('textures/moon-terrain.bin', 'rgba8unorm', s => assets.url('textures/moon-terrain.bin', s), signal),
-      resources.acquireTerrain('textures/mars-terrain.bin', 'rgba8unorm', s => assets.url('textures/mars-terrain.bin', s), signal),
+      resources.acquireTerrain('textures/moon-terrain.bin', 'rg8unorm', s => assets.url('textures/moon-terrain.bin', s), signal),
+      resources.acquireTerrain('textures/mars-terrain.bin', 'rg8unorm', s => assets.url('textures/mars-terrain.bin', s), signal),
     ]).then(() => endStartupSpan('solar-terrain'), () => undefined)
     // Start acquiring the WebGPU device and decoding the 36 world chunks
     // immediately in parallel with Monaco workbench initialization.

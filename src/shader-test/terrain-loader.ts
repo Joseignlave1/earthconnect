@@ -1,5 +1,5 @@
 import {
-  elevationPyramid, loadTerrain, packRg32FloatLevels, packRgba8Levels, poleElevations,
+  elevationPyramid, loadTerrain, packRg32FloatLevels, packRg8Levels, packRgba8Levels, poleElevations,
   type PackedTerrainLevel, type Terrain, type TerrainPackFormat, type TerrainWorkerRequest, type TerrainWorkerResponse,
 } from './terrain.ts'
 import { createTerrainWorker } from './terrain-worker-factory.ts'
@@ -11,11 +11,12 @@ export type PreparedTerrain<F extends TerrainPackFormat> = {
 }
 
 async function prepareTerrainOnMainThread<F extends TerrainPackFormat>(url: string, format: F, signal: AbortSignal): Promise<PreparedTerrain<F>> {
-  const terrain = await loadTerrain(url, signal)
+  const { decompressZstd } = await import('../earth-score/decode.ts')
+  const terrain = await loadTerrain(url, signal, decompressZstd)
   signal.throwIfAborted()
   const poles = poleElevations(terrain)
-  const levels = elevationPyramid(terrain)
-  const packed = (format === 'rg32float' ? packRg32FloatLevels(levels) : packRgba8Levels(levels)) as PreparedTerrain<F>['levels']
+  const levels = elevationPyramid(terrain, format !== 'rg32float')
+  const packed = (format === 'rg32float' ? packRg32FloatLevels(levels) : format === 'rg8unorm' ? packRg8Levels(levels) : packRgba8Levels(levels)) as PreparedTerrain<F>['levels']
   return { terrain, poles, levels: packed }
 }
 

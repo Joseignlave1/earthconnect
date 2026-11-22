@@ -17,8 +17,8 @@ const colors: Record<BodyId, Vec3> = {
   mercury: [.17,.14,.12],
   venus: [.57,.46,.27],
   earth: [.10,.19,.39],
-  moon: [.32,.30,.32],
-  mars: [.53,.26,.16],
+  moon: [.18,.185,.20],
+  mars: [.24,.075,.032],
   jupiter: [.62,.46,.35],
   saturn: [.59,.49,.36],
   uranus: [.24,.45,.50],
@@ -26,10 +26,11 @@ const colors: Record<BodyId, Vec3> = {
 }
 
 const commonShader = `
-struct View { right: vec4f, up: vec4f, back: vec4f, light: vec4f, }
+struct View { right: vec4f, up: vec4f, back: vec4f, light: vec4f, crop: vec4f, }
 @group(0) @binding(0) var<uniform> view: View;
 fn viewRay(point: vec2f) -> vec3f {
-  let p = vec2f(point.x * view.right.w, point.y) * view.up.w;
+  let mapped = view.crop.xy + point * view.crop.zw;
+  let p = vec2f(mapped.x * view.right.w, mapped.y) * view.up.w;
   return normalize(vec3f(p,-1.));
 }
 `
@@ -97,10 +98,13 @@ struct Pixel { @location(0) color: vec4f, @builtin(frag_depth) depth: f32, }
   if (depth <= view.back.w) { discard; }
   let physicalNormal = (dir * (intersection - middle) - offset) / radius;
   let normal = select(-dir,physicalNormal,gap >= 0.);
-  let diffuse = clamp(dot(normal,normalize(view.light.xyz - position)),0.,1.);
+  let sunDir = normalize(view.light.xyz - position);
+  let sunDot = dot(normal,sunDir);
+  let daylight = smoothstep(-.035,.045,sunDot);
+  let diffuse = daylight * max(0.,sunDot);
   let glint = 1. - smoothstep(.16,1.,length(offset) / max(worldRadius,.001));
   let edge = select(mix(1.,glint,body.flags.z),1.,gap >= 0.);
-  let surface = body.color.xyz * (edge * select(.60 + .30 * diffuse,.18 + .90 * diffuse,gap >= 0.) + .84 * glint * body.flags.z);
+  let surface = body.color.xyz * (edge * select(.60 + .30 * diffuse,.18 + .88 * diffuse,gap >= 0.) + .84 * glint * body.flags.z);
   let sun = body.color.xyz * (.63 + .37 * max(0.,-dot(normal,dir)));
   let radiance = select(surface,sun,body.color.w > .5);
   return Pixel(vec4f(radiance,1.),view.back.w / depth);
@@ -194,12 +198,16 @@ export class SolarScene {
   skySettled = false
   private readonly controller = new AbortController()
   private readonly viewBuffer: GPUBuffer
+  private readonly loupeViewBuffer: GPUBuffer
+  private readonly viewScratch = new Float32Array(20)
+  private readonly loupeViewScratch = new Float32Array(20)
   private readonly bodyBuffer: GPUBuffer
   private readonly orbitBuffer: GPUBuffer
   private readonly orbits: { id: BodyId; vertices: readonly Vec3[] }[]
   private readonly bodyData = new Float32Array(ids.length * 12)
   private readonly orbitData: Float32Array<ArrayBuffer>
   private skyGroup: GPUBindGroup
+  private loupeSkyGroup: GPUBindGroup
   private skyTexture: GPUTexture
   private skyOwned = true
   private readonly skySampler: GPUSampler
@@ -222,7 +230,8 @@ export class SolarScene {
     })
     this.orbitData = new Float32Array(this.orbits.reduce((count,path) => count + (path.vertices.length - 1) * 16,0))
     this.orbitBuffer = device.createBuffer({ label: 'Camera-relative orbit lines',size: this.orbitData.byteLength,usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.VERTEX })
-    this.viewBuffer = device.createBuffer({ label: 'Heliocentric camera basis',size: 64,usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM })
+    this.viewBuffer = device.createBuffer({ label: 'Heliocentric camera basis',size: 80,usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM })
+    this.loupeViewBuffer = device.createBuffer({ label: 'Loupe sky camera basis',size: 80,usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM })
     this.bodyBuffer = device.createBuffer({ label: 'Solar system centers in camera space',size: this.bodyData.byteLength,usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE })
     this.skySampler = device.createSampler({
       addressModeU: 'repeat',addressModeV: 'clamp-to-edge',minFilter: 'linear',magFilter: 'linear',mipmapFilter: 'linear',maxAnisotropy: 4,
@@ -231,7 +240,8 @@ export class SolarScene {
       label: 'Dark sky placeholder',size: [1,1],format: 'rgba8unorm-srgb',usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
     })
     device.queue.writeTexture({ texture: this.skyTexture },new Uint8Array([6,6,7,255]),{},[1,1])
-    this.skyGroup = this.bindSky(this.skyTexture)
+    this.skyGroup = this.bindSky(this.viewBuffer,this.skyTexture)
+    this.loupeSkyGroup = this.bindSky(this.loupeViewBuffer,this.skyTexture)
     this.haloGroup = device.createBindGroup({ layout: haloPipeline.getBindGroupLayout(0),entries: [{ binding: 0,resource: { buffer: this.viewBuffer } }] })
     this.bodyGroup = device.createBindGroup({ layout: bodyPipeline.getBindGroupLayout(0),entries: [
       { binding: 0,resource: { buffer: this.viewBuffer } },{ binding: 1,resource: { buffer: this.bodyBuffer } },
@@ -241,11 +251,13 @@ export class SolarScene {
     void this.assetUrl('textures/nasa-deep-star-map.webp', signal)
       .then(url => loadSkyMap(device,signal,url)).then(texture => {
       if (signal.aborted) return
-      const group = this.bindSky(texture)
+      const group = this.bindSky(this.viewBuffer,texture)
+      const loupeGroup = this.bindSky(this.loupeViewBuffer,texture)
       if (this.skyOwned) this.skyTexture.destroy()
       this.skyTexture = texture
       this.skyOwned = false
       this.skyGroup = group
+      this.loupeSkyGroup = loupeGroup
     }).catch(() => {
       // Keep rendering the planets over dark space if the atlas is unavailable.
     }).finally(() => {
@@ -255,9 +267,9 @@ export class SolarScene {
     })
   }
 
-  private bindSky(texture: GPUTexture) {
+  private bindSky(buffer: GPUBuffer,texture: GPUTexture) {
     return this.device.createBindGroup({ layout: this.skyPipeline.getBindGroupLayout(0),entries: [
-      { binding: 0,resource: { buffer: this.viewBuffer } },{ binding: 1,resource: texture.createView() },{ binding: 2,resource: this.skySampler },
+      { binding: 0,resource: { buffer } },{ binding: 1,resource: texture.createView() },{ binding: 2,resource: this.skySampler },
     ] })
   }
 
@@ -291,13 +303,15 @@ export class SolarScene {
 
   earthMatrix(frame: SolarFrame) { return bodyMatrix(frame,this.bodies.earth,6378.137) }
 
-  draw(pass: GPURenderPassEncoder,frame: SolarFrame,width: number,height: number,points: Partial<Record<SourceBody,SourcePoint>>,overview: boolean,flightTarget?: SourceBody | 'earth') {
+  draw(pass: GPURenderPassEncoder,frame: SolarFrame,height: number,clientHeight: number,hdr: boolean,pixelRatio: number,overview: boolean,flightTarget?: SourceBody | 'earth') {
     const queue = this.device.queue
     const tangent = Math.tan(FOV / 2)
-    queue.writeBuffer(this.viewBuffer,0,new Float32Array([
-      ...frame.right,frame.aspect,...frame.up,tangent,...frame.back,frame.near,
-      ...relativeToEye(frame,this.bodies.sun.center),tangent * 2 / height,
-    ]))
+    this.viewScratch.set(frame.right,0); this.viewScratch[3] = frame.aspect
+    this.viewScratch.set(frame.up,4); this.viewScratch[7] = tangent
+    this.viewScratch.set(frame.back,8); this.viewScratch[11] = frame.near
+    this.viewScratch.set(relativeToEye(frame,this.bodies.sun.center),12); this.viewScratch[15] = tangent * 2 / height
+    this.viewScratch.set([0,0,1,1],16)
+    queue.writeBuffer(this.viewBuffer,0,this.viewScratch)
     pass.setPipeline(this.skyPipeline)
     pass.setBindGroup(0,this.skyGroup)
     pass.draw(3)
@@ -329,7 +343,9 @@ export class SolarScene {
 
     for (const id of sources) {
       if (this.terrain?.getTerrain(id) && this.detailed(frame,id,height)) {
-        this.terrain.draw(pass,id,bodyMatrix(frame,this.bodies[id],1),this.sunlight(id),points[id],[width,height])
+        const metrics = this.bodyMarkerMetrics(frame,id,clientHeight)
+        const metresPerPixel = metrics.scale * this.bodies[id].radius * 1000
+        this.terrain.draw(pass,id,bodyMatrix(frame,this.bodies[id],1),this.sunlight(id),metresPerPixel,hdr,pixelRatio)
       }
     }
   }
@@ -338,6 +354,60 @@ export class SolarScene {
     pass.setPipeline(this.haloPipeline)
     pass.setBindGroup(0,this.haloGroup)
     pass.draw(3)
+  }
+
+  drawAnnotations(pass: GPURenderPassEncoder,frame: SolarFrame,height: number) {
+    for (const body of sources) {
+      if (this.terrain?.getTerrain(body) && this.detailed(frame,body,height)) {
+        this.terrain.drawAnnotation(pass,body,bodyMatrix(frame,this.bodies[body],1))
+      }
+    }
+  }
+
+  bodyMarkerMetrics(frame: SolarFrame,id: SourceBody | 'earth',clientHeight: number) {
+    const body = this.bodies[id]
+    const radius = id === 'earth' ? 6378.137 : body.radius
+    const distance = length(subtract(frame.eye,body.center))
+    const tanHalf = Math.tan(FOV / 2)
+    const h = Math.max(1,clientHeight)
+    const scale = 2 * tanHalf * Math.max(.001,distance / radius - 1) / h
+    const radiusPx = (radius / Math.max(radius,distance)) * h / (2 * tanHalf)
+    const t = Math.max(0,Math.min(1,(radiusPx - 12) / 22))
+    const alpha = t * t * (3 - 2 * t)
+    return { scale,alpha }
+  }
+
+  sourceMatrix(frame: SolarFrame,body: SourceBody) { return bodyMatrix(frame,this.bodies[body],1) }
+
+  sourcePosition(body: SourceBody,point: SourcePoint): Vec3 | null {
+    const terrain = this.terrain?.getTerrain(body)
+    if (!terrain) return null
+    const rad = Math.PI / 180
+    return terrain.positionAt(point.longitude * rad,point.latitude * rad)
+  }
+
+  sourceEye(frame: SolarFrame,body: SourceBody): Vec3 {
+    const state = this.bodies[body]
+    return worldToGeographic(state,subtract(frame.eye,state.center))
+  }
+
+  drawLoupeSky(pass: GPURenderPassEncoder,frame: SolarFrame,nx: number,ny: number,invSx: number,invSy: number) {
+    const tangent = Math.tan(FOV / 2)
+    this.loupeViewScratch.set(frame.right,0); this.loupeViewScratch[3] = frame.aspect
+    this.loupeViewScratch.set(frame.up,4); this.loupeViewScratch[7] = tangent
+    this.loupeViewScratch.set(frame.back,8); this.loupeViewScratch[11] = frame.near
+    this.loupeViewScratch.set([0,0,0,0],12)
+    this.loupeViewScratch.set([nx,ny,invSx,invSy],16)
+    this.device.queue.writeBuffer(this.loupeViewBuffer,0,this.loupeViewScratch)
+    pass.setPipeline(this.skyPipeline)
+    pass.setBindGroup(0,this.loupeSkyGroup)
+    pass.draw(3)
+  }
+
+  drawLoupe(pass: GPURenderPassEncoder,body: SourceBody,matrix: Float32Array,metresPerPixel: number,hdr: boolean,pixelRatio: number) {
+    if (this.terrain?.getTerrain(body)) {
+      this.terrain.drawLoupe(pass,body,matrix,this.sunlight(body),metresPerPixel,hdr,pixelRatio)
+    }
   }
 
   labels(frame: SolarFrame): SolarLabel[] {
@@ -407,31 +477,55 @@ export class SolarScene {
     this.terrain?.destroy()
     if (this.skyOwned) this.skyTexture.destroy()
     this.viewBuffer.destroy()
+    this.loupeViewBuffer.destroy()
     this.bodyBuffer.destroy()
     this.orbitBuffer.destroy()
   }
 }
 
-// Ray/triangle intersection on the exact indexed vertex positions in the pass.
-function pickTerrain({ indices,positions }: PlanetTerrain,eye: Vec3,ray: Vec3) {
+function intersectsBlock(block: { min: Vec3; max: Vec3 },eye: Vec3,ray: Vec3,nearest: number) {
+  let near = 0, far = nearest
+  for (let axis = 0; axis < 3; axis++) {
+    const min = block.min[axis] - 1e-6, max = block.max[axis] + 1e-6
+    if (Math.abs(ray[axis]) < 1e-12) {
+      if (eye[axis] < min || eye[axis] > max) return false
+    } else {
+      const a = (min - eye[axis]) / ray[axis], b = (max - eye[axis]) / ray[axis]
+      near = Math.max(near,Math.min(a,b)); far = Math.min(far,Math.max(a,b))
+      if (near > far) return false
+    }
+  }
+  return true
+}
+
+// Ray/triangle intersection on the exact indexed vertex positions in the pass,
+// accelerated by 8x8-cell bounding blocks for interactive 120 Hz hover picking.
+function pickTerrain({ columns,indices,positions,blocks }: PlanetTerrain,eye: Vec3,ray: Vec3) {
   const [ox,oy,oz] = eye, [dx,dy,dz] = ray
   let nearest = Infinity
-  for (let i = 0; i < indices.length; i += 3) {
-    const a = indices[i] * 3,b = indices[i + 1] * 3,c = indices[i + 2] * 3
-    const ax = positions[a],ay = positions[a + 1],az = positions[a + 2]
-    const ex = positions[b] - ax,ey = positions[b + 1] - ay,ez = positions[b + 2] - az
-    const fx = positions[c] - ax,fy = positions[c + 1] - ay,fz = positions[c + 2] - az
-    const px = dy * fz - dz * fy,py = dz * fx - dx * fz,pz = dx * fy - dy * fx
-    const determinant = ex * px + ey * py + ez * pz
-    if (Math.abs(determinant) < 1e-8) continue
-    const sx = ox - ax,sy = oy - ay,sz = oz - az
-    const u = (sx * px + sy * py + sz * pz) / determinant
-    if (u < -1e-8 || u > 1 + 1e-8) continue
-    const qx = sy * ez - sz * ey,qy = sz * ex - sx * ez,qz = sx * ey - sy * ex
-    const v = (dx * qx + dy * qy + dz * qz) / determinant
-    if (v < -1e-8 || u + v > 1 + 1e-8) continue
-    const distance = dot([fx,fy,fz],[qx,qy,qz]) / determinant
-    if (distance > 0 && distance < nearest) nearest = distance
+  for (const block of blocks) {
+    if (!intersectsBlock(block,eye,ray,nearest)) continue
+    for (let row = block.y; row < block.endY; row++) for (let col = block.x; col < block.endX; col++) {
+      const base = (row * columns + col) * 6
+      for (let tri = 0; tri < 6; tri += 3) {
+        const i = base + tri
+        const a = indices[i] * 3,b = indices[i + 1] * 3,c = indices[i + 2] * 3
+        const ax = positions[a],ay = positions[a + 1],az = positions[a + 2]
+        const ex = positions[b] - ax,ey = positions[b + 1] - ay,ez = positions[b + 2] - az
+        const fx = positions[c] - ax,fy = positions[c + 1] - ay,fz = positions[c + 2] - az
+        const px = dy * fz - dz * fy,py = dz * fx - dx * fz,pz = dx * fy - dy * fx
+        const determinant = ex * px + ey * py + ez * pz
+        if (Math.abs(determinant) < 1e-8) continue
+        const sx = ox - ax,sy = oy - ay,sz = oz - az
+        const u = (sx * px + sy * py + sz * pz) / determinant
+        if (u < -1e-8 || u > 1 + 1e-8) continue
+        const qx = sy * ez - sz * ey,qy = sz * ex - sx * ez,qz = sx * ey - sy * ex
+        const v = (dx * qx + dy * qy + dz * qz) / determinant
+        if (v < -1e-8 || u + v > 1 + 1e-8) continue
+        const distance = dot([fx,fy,fz],[qx,qy,qz]) / determinant
+        if (distance > 0 && distance < nearest) nearest = distance
+      }
+    }
   }
   return nearest
 }

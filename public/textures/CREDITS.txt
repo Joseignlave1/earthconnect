@@ -10,12 +10,11 @@ NASA Blue Marble: Next Generation, July 2004, with topography.
 Credit: NASA Earth Observatory. Blue Marble: Next Generation was produced
 by Reto Stockli, NASA Earth Observatory (NASA Goddard Space Flight Center).
 
-Source and original 5400 x 2700 JPEG:
+Source and original 21600 x 10800 JPEG:
 https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography/
-https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography/july/world.topo.200407.3x5400x2700.jpg
+https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography/july/world.topo.200407.3x21600x10800.jpg
 
-Bundled 4096 x 2048 rendition downloaded from NASA's image service:
-https://assets.science.nasa.gov/dynamicimage/assets/science/esd/eo/images/bmng/bmng-topography/july/world.topo.200407.3x5400x2700.jpg?w=4096&h=2048&fit=clip
+Bundled 8192 x 4096 progressive JPEG downsampled with Lanczos filtering.
 
 Used only as a geographic visual reference underneath synthetic Perlin scores.
 
@@ -58,30 +57,39 @@ Reproduction: scripts/prepare-terrain.py (temporary rasterio/numpy/Pillow/SciPy 
 moon-terrain.bin
 
 NASA Lunar Reconnaissance Orbiter Lunar Orbiter Laser Altimeter (LOLA),
-global cylindrical Gridded Data Record LDEM_16, 16 samples per degree.
+global cylindrical Gridded Data Record LDEM_64, 64 samples per degree.
 Credit: NASA / GSFC and the LOLA Science Team, distributed by NASA PDS.
-Elevations reference the 1737.4 km sphere. The label documents a 0.5 m scale
-per little-endian signed sample.
-https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/cylindrical/img/ldem_16.img
-https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/cylindrical/img/ldem_16.lbl
+Elevations reference the 1737.4 km sphere (0.5 m per little-endian signed sample).
+https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/cylindrical/img/ldem_64.img
+
+moon-albedo.webp
+
+NASA Scientific Visualization Studio CGI Moon Kit (2019), LRO Wide Angle Camera
+global color mosaic (lroc_color_poles_8k.tif, 8192 x 4096, public domain).
+Credit: NASA's Scientific Visualization Studio / Ernie Wright / LROC Team.
+https://svs.gsfc.nasa.gov/4720
+https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_poles_8k.tif
 
 mars-terrain.bin
 
 NASA Mars Global Surveyor Mars Orbiter Laser Altimeter (MOLA) Mission
-Experiment Gridded Data Record, global 16 samples per degree, MEGT90N000EB.
+Experiment Gridded Data Record, global 32 samples per degree, MEGT90N000FB.
 Credit: NASA and the MOLA Science Team, distributed by NASA PDS.
 Signed big-endian samples are metres relative to the MOLA areoid.
-https://pds-geosciences.wustl.edu/mgs/urn-nasa-pds-mgs_mola_topography_derived/meg016/megt90n000eb.img
-https://pds-geosciences.wustl.edu/mgs/urn-nasa-pds-mgs_mola_topography_derived/meg016/megt90n000eb.xml
+https://pds-geosciences.wustl.edu/mgs/urn-nasa-pds-mgs_mola_topography_derived/meg032/megt90n000fb.img
 
-Both display overviews average 4 × 4 source cells to a 1440 × 720 global,
-planetocentric equirectangular grid centered at 0° longitude. Pixel edges span
-180°W to 180°E and 90°N to 90°S, with samples at cell centers. ECT1 stores
-signed elevation in whole metres as R × 256 + G − 32768; B and A carry no
-planetary measurement. Download the two PDS IMG files and run
-scripts/prepare-planet-terrain.py with the Moon file first to reproduce them.
-Display relief is exaggerated on a sphere and uses the source dataset's
-elevation datum. Measurements are sampled from the overview in metres.
+mars-albedo.webp
+
+USGS Astrogeology Science Center / NASA Mars Viking Global Color Mosaic (925 m/px,
+Simple Cylindrical Mars, public domain), Lanczos-resampled to 8192 x 4096 WebP.
+Credit: USGS Astrogeology Science Center / NASA Viking Mission.
+https://planetarymaps.usgs.gov/mosaic/Mars_Viking_ClrMosaic_global_925m.tif
+
+Both planetary display DEMs are area-averaged to an 8192 x 4096 global
+planetocentric equirectangular grid centered at 0° longitude, isotropically
+filtered along polar longitudes to prevent orbital cross-track spokes, and stored
+in ECT2 format (16-byte header + Zstd-compressed byte-shuffled 2D-predicted
+uint16 signed metres). Run scripts/prepare-planet-terrain.py to reproduce them.
 
 nasa-deep-star-map.webp
 

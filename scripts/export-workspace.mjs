@@ -21,7 +21,13 @@ const image = `${terrain}earth-blue-marble.jpg`
 const earth = `${terrain}earth-terrain.bin`
 const sky = `${terrain}nasa-deep-star-map.webp`
 const textures = [image, earth, sky]
-const assets = [...textures, `${terrain}moon-terrain.bin`, `${terrain}mars-terrain.bin`]
+const assets = [
+  ...textures,
+  `${terrain}moon-terrain.bin`,
+  `${terrain}mars-terrain.bin`,
+  `${terrain}moon-albedo.webp`,
+  `${terrain}mars-albedo.webp`,
+]
 const virtualAsset = '\0workspace-asset:'
 
 const wasm = await readFile(resolve(root, 'src/earth-score/zstd.wasm'))

@@ -11,6 +11,10 @@ const renderPaths = [
   'textures/mars-terrain.bin',
   'textures/nasa-deep-star-map.webp',
 ]
+const optionalRenderPaths = new Set([
+  'textures/moon-albedo.webp',
+  'textures/mars-albedo.webp',
+])
 // Legacy CDN releases still list the removed basins snapshot in their manifest totals.
 const ignoredPaths = new Set(['data/surface-basins.bin'])
 const hashPattern = /^[a-f0-9]{64}$/
@@ -35,7 +39,7 @@ function parseRelease(value: unknown, etag: string | null): Release {
   for (const [path, value] of Object.entries(assets)) {
     const item = value as Partial<Asset> | undefined
     const ignored = ignoredPaths.has(path)
-    if (!ignored && !renderPaths.includes(path) && path !== scorePath && !/^compute-data\/world\/chunk-\d+\.zst$/.test(path)) {
+    if (!ignored && !renderPaths.includes(path) && !optionalRenderPaths.has(path) && path !== scorePath && !/^compute-data\/world\/chunk-\d+\.zst$/.test(path)) {
       throw new Error(`Unexpected Earth data file ${path}.`)
     }
     if (!item || typeof item.sha256 !== 'string' || !hashPattern.test(item.sha256) ||
@@ -203,8 +207,32 @@ function releaseSource(release: Release, lifetime: AbortSignal) {
       worldFiles.set(asset.key, asset)
     }
   }
-  const assets = workspaceAssets((path, signal) => {
+  const localDevCache = import.meta.env.DEV ? new Map<string, Promise<Blob | undefined>>() : undefined
+  const readLocalDevTexture = (path: string, signal: AbortSignal) => {
+    if (!localDevCache || !path.startsWith('textures/')) return undefined
+    let pending = localDevCache.get(path)
+    if (!pending) {
+      pending = fetch(`${import.meta.env.BASE_URL}${path}`, { cache: 'no-store' })
+        .then(res => res.ok ? res.blob() : undefined)
+        .catch(() => undefined)
+      localDevCache.set(path, pending)
+    }
+    return new Promise<Blob | undefined>((resolve, reject) => {
+      if (signal.aborted) return reject(signal.reason)
+      const abort = () => reject(signal.reason)
+      signal.addEventListener('abort', abort, { once: true })
+      void pending!.then(value => {
+        signal.removeEventListener('abort', abort)
+        resolve(value)
+      })
+    })
+  }
+  const assets = workspaceAssets(async (path, signal) => {
     lifetime.throwIfAborted()
+    if (localDevCache && path.startsWith('textures/')) {
+      const local = await readLocalDevTexture(path, AbortSignal.any([signal, lifetime]))
+      if (local) return local
+    }
     const slot = slots.get(path)
     if (!slot) throw new Error(`Workspace data is missing ${path}.`)
     return slot.blob ?? waitForBlob(slot.pending, AbortSignal.any([signal, lifetime]))
@@ -263,6 +291,8 @@ function orderedPaths(files: Record<string, Asset>) {
     'textures/earth-blue-marble.jpg',
     'textures/nasa-deep-star-map.webp',
     'textures/earth-terrain.bin',
+    'textures/moon-albedo.webp',
+    'textures/mars-albedo.webp',
     'textures/moon-terrain.bin',
     'textures/mars-terrain.bin',
   ].filter(path => Object.hasOwn(files, path))

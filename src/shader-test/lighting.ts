@@ -103,10 +103,12 @@ type LightingPipelines = {
 }
 
 type SharedSlopes = { texture: GPUTexture; built: boolean }
+type SharedIllumination = { texture: GPUTexture; built: boolean }
 
 type DeviceLightingCache = {
   pipelines?: Promise<LightingPipelines>
   slopes: WeakMap<GPUTexture, SharedSlopes>
+  illuminations: WeakMap<GPUTexture, Map<string, SharedIllumination>>
   created: GPUTexture[]
 }
 
@@ -116,7 +118,7 @@ function getLightingCache(device: GPUDevice): DeviceLightingCache {
   let entry = lightingCache.get(device)
   if (!entry) {
     const created: GPUTexture[] = []
-    entry = { slopes: new WeakMap(), created }
+    entry = { slopes: new WeakMap(), illuminations: new WeakMap(), created }
     lightingCache.set(device, entry)
     void device.lost.then(() => {
       for (const texture of created) texture.destroy()
@@ -157,17 +159,24 @@ function getLightingPipelines(device: GPUDevice): Promise<LightingPipelines> {
 
 export class TerrainLighting {
   texture: GPUTexture
+  private textureOwned = true
+  private terrain: GPUTexture | null = null
   private slopes: SharedSlopes | null = null
+  private illumination: SharedIllumination | null = null
+  private sunKey: string
+  private uniformScratch: Float32Array<ArrayBuffer>
   private uniforms: GPUBuffer
   private gradientPipeline!: GPUComputePipeline
   private bakePipeline!: GPURenderPipeline
   private mipPipeline!: GPURenderPipeline
-  private gradientGroup!: GPUBindGroup
+  private gradientGroup: GPUBindGroup | null = null
   private bakeGroup!: GPUBindGroup
   private mipGroups: GPUBindGroup[] = []
   private exaggeration: number | null = null
 
-  constructor(private device: GPUDevice,private sun: readonly number[]) {
+  constructor(private device: GPUDevice,sun: readonly number[]) {
+    this.sunKey = sun.join(',')
+    this.uniformScratch = new Float32Array([sun[0],sun[1],sun[2],0])
     this.uniforms = device.createBuffer({ label: 'Frozen solar lighting',size: 16,usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
     this.texture = device.createTexture({ label: 'Lighting placeholder',size: [1,1],format: 'r8unorm',usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST })
     device.queue.writeTexture({ texture: this.texture },new Uint8Array([220]),{},[1,1])
@@ -178,12 +187,44 @@ export class TerrainLighting {
     this.gradientPipeline = gradientPipeline; this.bakePipeline = bakePipeline; this.mipPipeline = mipPipeline
   }
 
-  setTerrain(terrain: GPUTexture) {
+  private bindIllumination(exaggeration: number) {
+    if (!this.terrain || !this.slopes) return false
+    const cache = getLightingCache(this.device)
+    let byKey = cache.illuminations.get(this.terrain)
+    if (!byKey) {
+      byKey = new Map()
+      cache.illuminations.set(this.terrain,byKey)
+    }
+    const key = `${this.sunKey}|${exaggeration}`
+    let shared = byKey.get(key)
+    if (!shared) {
+      const { width,height } = this.slopes.texture
+      const texture = this.device.createTexture({ label: 'Baked solar illumination',size: [width,height],format: 'r8unorm',mipLevelCount: Math.floor(Math.log2(Math.max(width,height))) + 1,usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC })
+      shared = { texture,built: false }
+      byKey.set(key,shared)
+      cache.created.push(texture)
+    }
+    if (this.illumination === shared) return false
+    if (this.textureOwned) this.texture.destroy()
+    this.texture = shared.texture
+    this.textureOwned = false
+    this.illumination = shared
+    this.mipGroups = shared.built ? [] : Array.from({ length: shared.texture.mipLevelCount - 1 },(_,i) => this.device.createBindGroup({
+      layout: this.mipPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0,resource: { buffer: this.uniforms } },
+        { binding: 1,resource: shared.texture.createView({ baseMipLevel: i,mipLevelCount: 1 }) },
+      ],
+    }))
+    return true
+  }
+
+  setTerrain(terrain: GPUTexture,exaggeration = 20) {
     // One terrain mip of smoothing retains mountain relief without baking
     // native height-grid noise into lighting. Contours use full-precision data.
     const level = Math.min(1,terrain.mipLevelCount - 1)
     const width = Math.max(1,terrain.width >> level),height = Math.max(1,terrain.height >> level)
-    this.texture.destroy()
+    this.terrain = terrain
     const cache = getLightingCache(this.device)
     let shared = cache.slopes.get(terrain)
     if (!shared) {
@@ -193,38 +234,49 @@ export class TerrainLighting {
       cache.created.push(texture)
     }
     this.slopes = shared
-    this.texture = this.device.createTexture({ label: 'Baked solar illumination',size: [width,height],format: 'r8unorm',mipLevelCount: Math.floor(Math.log2(Math.max(width,height))) + 1,usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC })
-    this.gradientGroup = this.device.createBindGroup({ layout: this.gradientPipeline.getBindGroupLayout(0),entries: [
+    this.gradientGroup = shared.built ? null : this.device.createBindGroup({ layout: this.gradientPipeline.getBindGroupLayout(0),entries: [
       { binding: 0,resource: terrain.createView({ baseMipLevel: level,mipLevelCount: 1 }) },{ binding: 1,resource: shared.texture.createView() },
     ] })
-    const group = (pipeline: GPURenderPipeline,view: GPUTextureView) => this.device.createBindGroup({ layout: pipeline.getBindGroupLayout(0),entries: [
-      { binding: 0,resource: { buffer: this.uniforms } },{ binding: 1,resource: view },
+    this.bakeGroup = this.device.createBindGroup({ layout: this.bakePipeline.getBindGroupLayout(0),entries: [
+      { binding: 0,resource: { buffer: this.uniforms } },{ binding: 1,resource: shared.texture.createView() },
     ] })
-    this.bakeGroup = group(this.bakePipeline,shared.texture.createView())
-    this.mipGroups = Array.from({ length: this.texture.mipLevelCount - 1 },(_,i) => group(this.mipPipeline,this.texture.createView({ baseMipLevel: i,mipLevelCount: 1 })))
+    this.illumination = null
     this.exaggeration = null
+    this.bindIllumination(exaggeration)
   }
 
   encode(encoder: GPUCommandEncoder,exaggeration: number) {
-    if (!this.slopes || this.exaggeration === exaggeration) return { gradients: false,lighting: false }
+    if (!this.slopes || !this.terrain) return { gradients: false,lighting: false,rebound: false }
+    const rebound = this.bindIllumination(exaggeration)
+    if (this.exaggeration === exaggeration && this.illumination?.built) return { gradients: false,lighting: false,rebound }
     const gradients = !this.slopes.built
-    if (gradients) {
+    if (gradients && this.gradientGroup) {
       const pass = encoder.beginComputePass({ label: 'Cache terrain gradients' })
       pass.setPipeline(this.gradientPipeline); pass.setBindGroup(0,this.gradientGroup)
       pass.dispatchWorkgroups(Math.ceil(this.slopes.texture.width / 8),Math.ceil(this.slopes.texture.height / 8)); pass.end()
       this.slopes.built = true
+      this.gradientGroup = null
     }
-    this.device.queue.writeBuffer(this.uniforms,0,new Float32Array([...this.sun,exaggeration]))
-    for (let level = 0; level < this.texture.mipLevelCount; level++) {
-      const pass = encoder.beginRenderPass({ label: level === 0 ? 'Bake solar illumination' : `Lighting mip ${level}`,colorAttachments: [{
-        view: this.texture.createView({ baseMipLevel: level,mipLevelCount: 1 }),loadOp: 'clear',storeOp: 'store',
-      }] })
-      pass.setPipeline(level === 0 ? this.bakePipeline : this.mipPipeline)
-      pass.setBindGroup(0,level === 0 ? this.bakeGroup : this.mipGroups[level - 1]); pass.draw(3); pass.end()
+    const lighting = !this.illumination!.built
+    if (lighting) {
+      this.uniformScratch[3] = exaggeration
+      this.device.queue.writeBuffer(this.uniforms,0,this.uniformScratch)
+      for (let level = 0; level < this.texture.mipLevelCount; level++) {
+        const pass = encoder.beginRenderPass({ label: level === 0 ? 'Bake solar illumination' : `Lighting mip ${level}`,colorAttachments: [{
+          view: this.texture.createView({ baseMipLevel: level,mipLevelCount: 1 }),loadOp: 'clear',storeOp: 'store',
+        }] })
+        pass.setPipeline(level === 0 ? this.bakePipeline : this.mipPipeline)
+        pass.setBindGroup(0,level === 0 ? this.bakeGroup : this.mipGroups[level - 1]); pass.draw(3); pass.end()
+      }
+      this.illumination!.built = true
+      this.mipGroups = []
     }
     this.exaggeration = exaggeration
-    return { gradients,lighting: true }
+    return { gradients,lighting,rebound }
   }
 
-  destroy() { this.texture.destroy(); this.uniforms.destroy() }
+  destroy() {
+    if (this.textureOwned) this.texture.destroy()
+    this.uniforms.destroy()
+  }
 }

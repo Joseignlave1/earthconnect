@@ -215,7 +215,7 @@ struct AnnotationOutput { @location(0) uv: vec2f, @location(1) coverage: f32, }
   let coast = terrainAt(uv,uvDx,uvDy,0.).g;
   if (u.flags.w < .5) { background = select(background,vec3f(.055,.065,.075),coast < 0.); }
   let interval = select(u.contour.x,u.contour.y,height < 0.);
-  let contour = terrainContours(height,vec2f(dpdx(height),dpdy(height)),interval,u.detail.xy);
+  let contour = terrainContours(height,vec2f(dpdx(height),dpdy(height)),interval,u.detail.xy,u.contour.w,1.);
   let contourColor = select(vec3f(.37,.40,.43),vec3f(.20,.30,.38),height < 0.);
   background = mix(background,contourColor,contour * u.contour.z);
   let coastPixels = abs(coast) / max(.0001,fwidth(coast));

@@ -30,6 +30,8 @@ exports/
 /public/textures/earth-blue-marble.jpg
 /public/textures/earth-elevation.png
 /public/textures/earth-terrain.bin
+/public/textures/mars-albedo.webp
 /public/textures/mars-terrain.bin
+/public/textures/moon-albedo.webp
 /public/textures/moon-terrain.bin
 /public/textures/nasa-deep-star-map.webp
