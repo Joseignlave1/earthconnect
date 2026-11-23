@@ -1,4 +1,4 @@
-"""Build the 8K display DEMs (ECT2) and albedo textures from NASA/USGS sources.
+"""Build the 4K display DEMs (ECT2) and 8K albedo textures from NASA/USGS sources.
 
 See public/textures/CREDITS.txt for dataset citations and source URLs.
 """
@@ -117,6 +117,12 @@ def encode_ect2(elevations: np.ndarray, output: Path, zstd_level: int = 19) -> N
 def prepare_albedo(source: Path, output: Path, dst_w: int, dst_h: int, fmt: str, quality: int, neutralize_viking_blue: bool = False) -> None:
     """Resize a 0°-centered global albedo mosaic to (dst_w, dst_h) and close polar rows."""
     im = Image.open(source).convert("RGB")
+    src_arr = np.asarray(im, dtype=np.uint8)
+    if float(src_arr[:, 0].mean()) < 10.0 and float(src_arr[:, 1].mean()) > 20.0:
+        src_arr = src_arr.copy()
+        src_arr[:, 0] = ((src_arr[:, -1].astype(np.uint16) + src_arr[:, 1].astype(np.uint16) + 1) >> 1).astype(np.uint8)
+        im.close()
+        im = Image.fromarray(src_arr, mode="RGB")
     if im.size != (dst_w, dst_h):
         im = im.resize((dst_w, dst_h), Image.Resampling.LANCZOS)
     arr = np.asarray(im, dtype=np.uint8).copy()
@@ -153,8 +159,8 @@ def main() -> None:
     parser.add_argument("--moon-albedo", type=Path, help="LRO WAC lroc_color_poles_8k.tif")
     parser.add_argument("--mars-albedo", type=Path, help="USGS Mars_Viking_ClrMosaic_global_925m.tif")
     parser.add_argument("--earth-albedo", type=Path, help="NASA Blue Marble world.topo.200407.3x21600x10800.jpg")
-    parser.add_argument("--dem-width", type=int, default=8192)
-    parser.add_argument("--dem-height", type=int, default=4096)
+    parser.add_argument("--dem-width", type=int, default=4096)
+    parser.add_argument("--dem-height", type=int, default=2048)
     parser.add_argument("--albedo-width", type=int, default=8192)
     parser.add_argument("--albedo-height", type=int, default=4096)
     parser.add_argument("--output", type=Path, default=Path("public/textures"))

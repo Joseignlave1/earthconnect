@@ -1,3 +1,4 @@
+import { raceAbort } from '../shader-test/gpu.ts'
 import { workspaceAssets, type WorkspaceAssets } from './workspaceAssets.ts'
 import { endStartupSpan, startStartupSpan } from './startupTiming.ts'
 
@@ -11,9 +12,16 @@ const renderPaths = [
   'textures/mars-terrain.bin',
   'textures/nasa-deep-star-map.webp',
 ]
+const earthTilePaths = Array.from({ length: 8 }, (_, index) => `textures/earth-tiles-${index}.bin`)
+const planetTilePaths = [
+  ...Array.from({ length: 4 }, (_, index) => `textures/moon-tiles-${index}.bin`),
+  ...Array.from({ length: 4 }, (_, index) => `textures/mars-tiles-${index}.bin`),
+]
+const allTilePaths = [...earthTilePaths, ...planetTilePaths]
 const optionalRenderPaths = new Set([
   'textures/moon-albedo.webp',
   'textures/mars-albedo.webp',
+  ...allTilePaths,
 ])
 // Legacy CDN releases still list the removed basins snapshot in their manifest totals.
 const ignoredPaths = new Set(['data/surface-basins.bin'])
@@ -182,20 +190,8 @@ async function validateScoreManifest(blob: Blob, worldFiles: ReadonlyMap<string,
   }
 }
 
-function waitForBlob(pending: Promise<Blob>, signal: AbortSignal) {
-  return new Promise<Blob>((resolve, reject) => {
-    if (signal.aborted) return reject(signal.reason)
-    const abort = () => reject(signal.reason)
-    signal.addEventListener('abort', abort, { once: true })
-    void pending.then(blob => {
-      signal.removeEventListener('abort', abort)
-      resolve(blob)
-    })
-  })
-}
-
 function releaseSource(release: Release, lifetime: AbortSignal) {
-  const slots = new Map<string, { blob?: Blob; pending: Promise<Blob>; resolve: (blob: Blob) => void }>()
+  const slots = new Map<string, { blob?: Blob; pending?: Promise<Blob>; resolve?: (blob: Blob) => void }>()
   const worldFiles = new Map<string, Asset>()
   for (const [path, asset] of Object.entries(release.files)) {
     let resolve!: (blob: Blob) => void
@@ -207,36 +203,33 @@ function releaseSource(release: Release, lifetime: AbortSignal) {
       worldFiles.set(asset.key, asset)
     }
   }
-  const localDevCache = import.meta.env.DEV ? new Map<string, Promise<Blob | undefined>>() : undefined
-  const readLocalDevTexture = (path: string, signal: AbortSignal) => {
-    if (!localDevCache || !path.startsWith('textures/')) return undefined
-    let pending = localDevCache.get(path)
+  const localDevUrlCache = import.meta.env.DEV ? new Map<string, Promise<string | undefined>>() : undefined
+  const resolveLocalDevTextureUrl = (path: string, signal: AbortSignal) => {
+    if (!localDevUrlCache || !path.startsWith('textures/')) return Promise.resolve(undefined)
+    let pending = localDevUrlCache.get(path)
     if (!pending) {
-      pending = fetch(`${import.meta.env.BASE_URL}${path}`, { cache: 'no-store' })
-        .then(res => res.ok ? res.blob() : undefined)
+      const url = `${import.meta.env.BASE_URL}${path}`
+      pending = fetch(url, { method: 'HEAD', cache: 'no-store' })
+        .then(res => res.ok ? url : undefined)
         .catch(() => undefined)
-      localDevCache.set(path, pending)
+      localDevUrlCache.set(path, pending)
     }
-    return new Promise<Blob | undefined>((resolve, reject) => {
-      if (signal.aborted) return reject(signal.reason)
-      const abort = () => reject(signal.reason)
-      signal.addEventListener('abort', abort, { once: true })
-      void pending!.then(value => {
-        signal.removeEventListener('abort', abort)
-        resolve(value)
-      })
-    })
+    return raceAbort(pending, signal)
   }
   const assets = workspaceAssets(async (path, signal) => {
     lifetime.throwIfAborted()
-    if (localDevCache && path.startsWith('textures/')) {
-      const local = await readLocalDevTexture(path, AbortSignal.any([signal, lifetime]))
-      if (local) return local
+    const combined = AbortSignal.any([signal, lifetime])
+    if (localDevUrlCache && path.startsWith('textures/')) {
+      const direct = await resolveLocalDevTextureUrl(path, combined)
+      if (direct) {
+        const res = await fetch(direct, { signal: combined, cache: 'no-store' })
+        if (res.ok) return await res.blob()
+      }
     }
     const slot = slots.get(path)
     if (!slot) throw new Error(`Workspace data is missing ${path}.`)
-    return slot.blob ?? waitForBlob(slot.pending, AbortSignal.any([signal, lifetime]))
-  })
+    return slot.blob ?? raceAbort(slot.pending!, combined)
+  }, localDevUrlCache ? (path, signal) => resolveLocalDevTextureUrl(path, AbortSignal.any([signal, lifetime])) : undefined)
   lifetime.addEventListener('abort', () => {
     assets.dispose()
     slots.clear()
@@ -248,7 +241,13 @@ function releaseSource(release: Release, lifetime: AbortSignal) {
       lifetime.throwIfAborted()
       const slot = slots.get(path)!
       slot.blob = blob
-      slot.resolve(blob)
+      slot.resolve?.(blob)
+      slot.pending = undefined
+      slot.resolve = undefined
+    },
+    replaceBlob(path: string, blob: Blob) {
+      const slot = slots.get(path)
+      if (slot && slot.blob) slot.blob = blob
     },
   }
 }
@@ -296,8 +295,9 @@ function orderedPaths(files: Record<string, Asset>) {
     'textures/moon-terrain.bin',
     'textures/mars-terrain.bin',
   ].filter(path => Object.hasOwn(files, path))
-  const chunks = Object.keys(files).filter(path => !priority.includes(path) && !ignoredPaths.has(path))
-  return [...priority, ...chunks]
+  const tiles = allTilePaths.filter(path => Object.hasOwn(files, path))
+  const chunks = Object.keys(files).filter(path => !priority.includes(path) && !tiles.includes(path) && !ignoredPaths.has(path))
+  return [...priority, ...chunks, ...tiles]
 }
 
 async function revalidateInBackground(saved: Release) {
@@ -408,13 +408,22 @@ async function prepareRelease(signal: AbortSignal, progress: (state: DownloadPro
       const writes = new Set<Promise<void>>()
       let persisted = true
       onAssets?.(source.assets)
-      async function persist(asset: Asset, blob: Blob) {
+      async function persist(path: string, asset: Asset, blob: Blob) {
         // Bound completed files waiting on IndexedDB without blocking
         // consumers that already received a verified copy.
         while (writes.size >= writeBacklog) await Promise.race(writes)
         transfer.throwIfAborted()
-        const write = accessCache(cache, 'files', asset.sha256, blob).then(savedBlob => {
-          if (!savedBlob) persisted = false
+        const write = accessCache(cache, 'files', asset.sha256, blob).then(async savedBlob => {
+          if (!savedBlob) {
+            persisted = false
+            return
+          }
+          // Replace the RAM-backed Blob with the disk-backed IndexedDB Blob so
+          // Chromium's browser process can release downloaded bytes immediately.
+          const diskBlob = await accessCache<Blob>(cache, 'files', asset.sha256)
+          if (diskBlob instanceof Blob && diskBlob.size === asset.bytes) {
+            source.replaceBlob(path, diskBlob)
+          }
         }).finally(() => writes.delete(write))
         writes.add(write)
       }
@@ -451,7 +460,7 @@ async function prepareRelease(signal: AbortSignal, progress: (state: DownloadPro
             transfer.throwIfAborted()
             const verification = verifyAsset(asset, bytes, transfer).then(async blob => {
               await source.publish(path, blob)
-              await persist(asset, blob)
+              await persist(path, asset, blob)
             }).catch(error => controller.abort(error)).finally(() => verifications.delete(verification))
             verifications.add(verification)
           }

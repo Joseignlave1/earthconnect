@@ -1,6 +1,6 @@
 import type { SolarFrame } from '../workspace/solarCamera.ts'
 import { colorShader } from './color.ts'
-import { FOV } from './geometry.ts'
+import { equalEarthShader, FOV } from './geometry.ts'
 import { fullscreenVertex } from './gpu.ts'
 
 const tangent = Math.tan(FOV / 2)
@@ -67,6 +67,7 @@ struct WorldMarkers {
 @group(0) @binding(3) var<uniform> markers: WorldMarkers;
 @group(0) @binding(4) var geography: texture_2d<f32>;
 ${colorShader}
+${equalEarthShader}
 
 struct Depth {
   closest: f32,
@@ -95,8 +96,7 @@ fn worldTangent(uv: vec2f, point: vec2f, bodyMorph: f32, unitPerPixel: f32) -> v
   let direction = vec3f(cos(angles.y) * sin(angles.x), sin(angles.y), cos(angles.y) * cos(angles.x));
   let anchor = vec3f(cos(origin.y) * sin(origin.x), sin(origin.y), cos(origin.y) * cos(origin.x));
   if (bodyMorph > .5 && dot(direction, anchor) < 0.) { return vec2f(1e5, 1e5); }
-  let delta = uv.x - point.x;
-  let planeDelta = vec2f((delta - floor(delta + .5)) * 6.283185307, direction.y - anchor.y);
+  let planeDelta = equalEarth(angles.x, angles.y) - equalEarth(origin.x, origin.y);
   let east = vec3f(cos(origin.x), 0., -sin(origin.x));
   let north = cross(anchor, east);
   let offset = direction - anchor;
@@ -105,8 +105,9 @@ fn worldTangent(uv: vec2f, point: vec2f, bodyMorph: f32, unitPerPixel: f32) -> v
 
 // Composite placed world markers into linear HDR taps so they blur along the
 // planet's exact 3D velocity with full depth-aware silhouette protection.
-fn sampleWorld(pixel: vec2i) -> vec4f {
+fn sampleWorld(pixel: vec2i, anyMarker: bool) -> vec4f {
   let s = textureLoad(scene, pixel, 0);
+  if (!anyMarker) { return s; }
   let coordinates = textureLoad(geography, pixel, 0).rg;
   if (coordinates.y == -1.) { return s; }
   let bodyId = i32(floor(coordinates.x * .5));
@@ -151,7 +152,8 @@ fn sampleWorld(pixel: vec2i) -> vec4f {
 @fragment fn blurFragment(input: ScreenVertex) -> @location(0) vec4f {
   let size = vec2f(textureDimensions(scene));
   let pixel = vec2i(input.position.xy);
-  let color = sampleWorld(pixel);
+  let anyMarker = markers.selEarth.z > .005 || markers.selMoon.z > .005 || markers.selMars.z > .005;
+  let color = sampleWorld(pixel, anyMarker);
   let center = readDepth(pixel);
   // A resolved silhouette may blend sky with terrain or two different bodies.
   // Keep its 4x coverage intact and never use mixed colors to shade either layer.
@@ -184,7 +186,7 @@ fn sampleWorld(pixel: vec2i) -> vec4f {
       let separation = abs(depth.closest - center.closest) / max(depth.closest, center.closest);
       weight *= 1. - smoothstep(.025, .12, separation);
     }
-    sum += sampleWorld(q) * weight;
+    sum += sampleWorld(q, anyMarker) * weight;
     weights += weight;
   }
   return sum / weights;

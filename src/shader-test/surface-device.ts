@@ -1,12 +1,24 @@
+export const WEBGPU_UNAVAILABLE_MESSAGE =
+  'Earth Connect requires WebGPU. Open this page in Chrome, Edge, or Safari 26+, or enable dom.webgpu.enabled in Firefox (about:config).'
+
 type SurfaceDevice = { device: GPUDevice; adapter: GPUAdapter }
 type DeviceEntry = { ready: Promise<SurfaceDevice>; users: number; lost: Set<(info: GPUDeviceLostInfo) => void> }
 
 async function createSurfaceDevice(): Promise<SurfaceDevice> {
-  const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' })
-  if (!adapter) throw new Error('Could not initialize a WebGPU adapter.')
-  const requiredFeatures = (['float32-filterable', 'timestamp-query'] as const)
+  if (!navigator.gpu) throw new Error(WEBGPU_UNAVAILABLE_MESSAGE)
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
+    ?? await navigator.gpu.requestAdapter()
+  if (!adapter) {
+    throw new Error('WebGPU is enabled, but no compatible GPU adapter was found. Make sure hardware acceleration is turned on in your browser settings.')
+  }
+  const requiredFeatures = (['float32-filterable'] as const)
     .filter(feature => adapter.features.has(feature))
-  return { adapter, device: await adapter.requestDevice({ requiredFeatures }) }
+  try {
+    return { adapter, device: await adapter.requestDevice({ requiredFeatures }) }
+  } catch (error) {
+    if (!requiredFeatures.length) throw error
+    return { adapter, device: await adapter.requestDevice() }
+  }
 }
 
 export function createSurfaceDevicePool() {

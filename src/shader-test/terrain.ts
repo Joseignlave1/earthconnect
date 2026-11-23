@@ -5,8 +5,8 @@ export type Terrain = {
   stride?: 2 | 4
   polarSmoothed?: boolean
 }
-export type TerrainZstdDecompressor = (frame: ArrayBuffer, outputBytes: number, signal?: AbortSignal) => Promise<Uint8Array<ArrayBuffer>>
-export type TerrainPackFormat = 'rg32float' | 'rgba8unorm' | 'rg8unorm'
+type TerrainZstdDecompressor = (frame: ArrayBuffer, outputBytes: number, signal?: AbortSignal) => Promise<Uint8Array<ArrayBuffer>>
+export type TerrainPackFormat = 'rg32float' | 'rg8unorm'
 export type PackedTerrainLevel<T extends Float32Array<ArrayBuffer> | Uint8Array<ArrayBuffer> = Float32Array<ArrayBuffer> | Uint8Array<ArrayBuffer>> = {
   data: T
   width: number
@@ -28,20 +28,6 @@ export function packRg32FloatLevels(levels: ReturnType<typeof elevationPyramid>)
   })
 }
 
-export function packRgba8Levels(levels: ReturnType<typeof elevationPyramid>): PackedTerrainLevel<Uint8Array<ArrayBuffer>>[] {
-  return levels.map(({ values, width, height }) => {
-    // Normalized linear filtering commutes with the affine two-channel decode.
-    // Generate each mip from real metres before packing.
-    const data = new Uint8Array(width * height * 4)
-    for (let i = 0; i < values.length; i++) {
-      const code = Math.max(0, Math.min(65535, Math.round(values[i] + 32768)))
-      data[i * 4] = code >> 8
-      data[i * 4 + 1] = code & 255
-    }
-    return { data, width, height }
-  })
-}
-
 export function packRg8Levels(levels: ReturnType<typeof elevationPyramid>): PackedTerrainLevel<Uint8Array<ArrayBuffer>>[] {
   return levels.map(({ values, width, height }) => {
     const data = new Uint8Array(width * height * 2)
@@ -52,6 +38,59 @@ export function packRg8Levels(levels: ReturnType<typeof elevationPyramid>): Pack
     }
     return { data, width, height }
   })
+}
+
+// Low-memory rg8unorm mip builder for offline-smoothed ECT2 DEMs: reuses level 0's
+// packed 2-byte pixels directly without allocating a 128 MiB Float32Array at full 8K.
+export function packRg8PyramidDirect(terrain: Terrain): PackedTerrainLevel<Uint8Array<ArrayBuffer>>[] {
+  if ((terrain.stride ?? 4) !== 2 || !terrain.polarSmoothed) {
+    return packRg8Levels(elevationPyramid(terrain, true))
+  }
+  let width = terrain.width, height = terrain.height
+  const level0 = new Uint8Array(terrain.pixels.buffer as ArrayBuffer, terrain.pixels.byteOffset, terrain.pixels.byteLength)
+  const levels: PackedTerrainLevel<Uint8Array<ArrayBuffer>>[] = [{ data: level0, width, height }]
+  let prev = level0
+  while (width > 1 || height > 1) {
+    const w = Math.max(1, width >> 1), h = Math.max(1, height >> 1)
+    const next = new Uint8Array(w * h * 2)
+    for (let y = 0; y < h; y++) {
+      const sy0 = Math.floor(y * height / h), sy1 = Math.floor((y + 1) * height / h)
+      for (let x = 0; x < w; x++) {
+        const sx0 = Math.floor(x * width / w), sx1 = Math.floor((x + 1) * width / w)
+        let sum = 0, count = 0
+        for (let sy = sy0; sy < sy1; sy++) {
+          const rowOff = sy * width
+          for (let sx = sx0; sx < sx1; sx++) {
+            const i = (rowOff + sx) * 2
+            sum += prev[i] * 256 + prev[i + 1]
+            count++
+          }
+        }
+        const code = Math.max(0, Math.min(65535, Math.round(sum / count)))
+        const o = (y * w + x) * 2
+        next[o] = code >> 8
+        next[o + 1] = code & 255
+      }
+    }
+    // Close polar rows to their average code.
+    for (const row of new Set([0, h - 1])) {
+      let sum = 0
+      for (let x = 0; x < w; x++) {
+        const i = (row * w + x) * 2
+        sum += next[i] * 256 + next[i + 1]
+      }
+      const code = Math.max(0, Math.min(65535, Math.round(sum / w)))
+      const hi = code >> 8, lo = code & 255
+      for (let x = 0; x < w; x++) {
+        const i = (row * w + x) * 2
+        next[i] = hi
+        next[i + 1] = lo
+      }
+    }
+    levels.push({ data: next, width: w, height: h })
+    prev = next; width = w; height = h
+  }
+  return levels
 }
 
 // ECT1: magic, uint32 little-endian width/height, then packed RGBA data bytes.
@@ -67,18 +106,25 @@ export function decodeTerrain(buffer: ArrayBuffer): Terrain {
 }
 
 // ECT2: big-endian magic 0x45435432, LE uint32 width/height/flags, then Zstd-compressed
-// byte-shuffled zigzag 2D-predicted uint16 metres (2 bytes/px, no coast channel).
+// byte-shuffled zigzag 2D-predicted uint16 metres (2 bytes/px), plus optional 2D-predicted
+// uint8 signed coast distance channel when flags & 4 (3 bytes/px -> stride 4 RGBA).
 export function decodeTerrainEct2Payload(width: number, height: number, flags: number, payload: Uint8Array): Terrain {
   const count = width * height
-  if (!width || !height || width > 16384 || height > 16384 || payload.byteLength !== count * 2) {
+  const hasCoast = Boolean(flags & 4)
+  const payloadStride = hasCoast ? 3 : 2
+  if (!width || !height || width > 16384 || height > 16384 || payload.byteLength !== count * payloadStride) {
     throw new Error('Invalid ECT2 terrain payload dimensions or length.')
   }
-  const pixels = new Uint8ClampedArray(count * 2)
+  const stride: 2 | 4 = hasCoast ? 4 : 2
+  const pixels = new Uint8ClampedArray(count * stride)
   if (flags & 1) {
     const prevRow = new Uint16Array(width)
+    const prevCoast = hasCoast ? new Uint8Array(width) : null
+    const coastOffset = count * 2
     for (let y = 0; y < height; y++) {
       const rowOff = y * width
       let left = 32768
+      let leftCoast = 128
       for (let x = 0; x < width; x++) {
         const i = rowOff + x
         const zz = (payload[i] << 8) | payload[count + i]
@@ -87,14 +133,32 @@ export function decodeTerrainEct2Payload(width: number, height: number, flags: n
         const code = (pred + signed) & 0xffff
         left = code
         prevRow[x] = code
-        pixels[i * 2] = code >> 8
-        pixels[i * 2 + 1] = code & 255
+        const o = i * stride
+        pixels[o] = code >> 8
+        pixels[o + 1] = code & 255
+        if (prevCoast) {
+          const czz = payload[coastOffset + i]
+          const cs = (czz >>> 1) ^ -(czz & 1)
+          const cpred = y === 0 ? (x === 0 ? 128 : leftCoast) : (x === 0 ? prevCoast[0] : (leftCoast + prevCoast[x]) >> 1)
+          const ccode = (cpred + cs) & 0xff
+          leftCoast = ccode
+          prevCoast[x] = ccode
+          pixels[o + 2] = ccode
+          pixels[o + 3] = 255
+        }
       }
+    }
+  } else if (hasCoast) {
+    for (let i = 0; i < count; i++) {
+      pixels[i * 4] = payload[i * 3]
+      pixels[i * 4 + 1] = payload[i * 3 + 1]
+      pixels[i * 4 + 2] = payload[i * 3 + 2]
+      pixels[i * 4 + 3] = 255
     }
   } else {
     pixels.set(payload)
   }
-  return { pixels, width, height, stride: 2, polarSmoothed: Boolean(flags & 2) }
+  return { pixels, width, height, stride, polarSmoothed: Boolean(flags & 2) }
 }
 
 export async function decodeTerrainEct2(buffer: ArrayBuffer, decompress: TerrainZstdDecompressor, signal?: AbortSignal): Promise<Terrain> {
@@ -102,7 +166,8 @@ export async function decodeTerrainEct2(buffer: ArrayBuffer, decompress: Terrain
   if (buffer.byteLength < 16 || view.getUint32(0) !== 0x45435432) throw new Error('Invalid ECT2 terrain header.')
   const width = view.getUint32(4, true), height = view.getUint32(8, true), flags = view.getUint32(12, true)
   if (!width || !height || width > 16384 || height > 16384) throw new Error('Invalid ECT2 terrain dimensions.')
-  const payload = await decompress(buffer.slice(16), width * height * 2, signal)
+  const payloadStride = (flags & 4) ? 3 : 2
+  const payload = await decompress(buffer.slice(16), width * height * payloadStride, signal)
   return decodeTerrainEct2Payload(width, height, flags, payload)
 }
 
@@ -202,17 +267,39 @@ export function elevationPyramid(terrain: Terrain, isotropicPoles = false) {
     const w = Math.max(1,width >> 1), h = Math.max(1,height >> 1)
     const next = new Float32Array(w * h)
     const nextCoast = hasCoast ? new Float32Array(w * h) : new Float32Array(0)
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      let sum = 0, coastSum = 0, count = 0
-      for (let sy = Math.floor(y * height / h); sy < Math.floor((y + 1) * height / h); sy++) {
-        for (let sx = Math.floor(x * width / w); sx < Math.floor((x + 1) * width / w); sx++) {
-          sum += values[sy * width + sx]
-          if (hasCoast) coastSum += coast[sy * width + sx]
-          count++
+    if (width === w * 2 && height === h * 2) {
+      for (let y = 0; y < h; y++) {
+        const r0 = (y * 2) * width
+        const r1 = r0 + width
+        const dstRow = y * w
+        if (hasCoast) {
+          for (let x = 0; x < w; x++) {
+            const x0 = x * 2
+            const i0 = r0 + x0, i1 = r1 + x0
+            next[dstRow + x] = (values[i0] + values[i0 + 1] + values[i1] + values[i1 + 1]) * .25
+            nextCoast[dstRow + x] = (coast[i0] + coast[i0 + 1] + coast[i1] + coast[i1 + 1]) * .25
+          }
+        } else {
+          for (let x = 0; x < w; x++) {
+            const x0 = x * 2
+            const i0 = r0 + x0, i1 = r1 + x0
+            next[dstRow + x] = (values[i0] + values[i0 + 1] + values[i1] + values[i1 + 1]) * .25
+          }
         }
       }
-      next[y * w + x] = sum / count
-      if (hasCoast) nextCoast[y * w + x] = coastSum / count
+    } else {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        let sum = 0, coastSum = 0, count = 0
+        for (let sy = Math.floor(y * height / h); sy < Math.floor((y + 1) * height / h); sy++) {
+          for (let sx = Math.floor(x * width / w); sx < Math.floor((x + 1) * width / w); sx++) {
+            sum += values[sy * width + sx]
+            if (hasCoast) coastSum += coast[sy * width + sx]
+            count++
+          }
+        }
+        next[y * w + x] = sum / count
+        if (hasCoast) nextCoast[y * w + x] = coastSum / count
+      }
     }
     if (smoothRuntime) smoothPolarLongitudes(next,w,h)
     closePoles(next,w,h); closePoles(nextCoast,w,h)

@@ -10,15 +10,70 @@ export const EARTH_FLATTENING = 1 / 298.257223563
 
 export function ease(value: number) { return value * value * (3 - 2 * value) }
 
-// Lambert cylindrical equal-area at 0° standard latitude, opening at ±180°.
+// Equal Earth (Šavrič et al., 2018): strictly equal-area pseudocylindrical projection (~2.05:1).
+const EE_A1 = 1.340264
+const EE_A2 = -0.081106
+const EE_A3 = 0.000893
+const EE_A4 = 0.003796
+const EE_M = Math.sqrt(3) / 2
+const EE_X_SCALE = 2 / Math.sqrt(3)
+export const EQUAL_EARTH_HALF_WIDTH = Math.PI * EE_X_SCALE / EE_A1
+export const EQUAL_EARTH_HALF_HEIGHT = (() => {
+  const t = Math.PI / 3, t2 = t * t, t6 = t2 * t2 * t2
+  return t * (EE_A1 + EE_A2 * t2 + t6 * (EE_A3 + EE_A4 * t2))
+})()
+
+export function equalEarthProject(longitude: number, latitude: number): [number, number] {
+  const theta = Math.asin(Math.max(-1, Math.min(1, EE_M * Math.sin(latitude))))
+  const t2 = theta * theta, t6 = t2 * t2 * t2
+  const d = EE_A1 + 3 * EE_A2 * t2 + t6 * (7 * EE_A3 + 9 * EE_A4 * t2)
+  return [
+    EE_X_SCALE * longitude * Math.cos(theta) / d,
+    theta * (EE_A1 + EE_A2 * t2 + t6 * (EE_A3 + EE_A4 * t2)),
+  ]
+}
+
+export function equalEarthInverse(x: number, y: number): { lon: number; lat: number } | null {
+  if (Math.abs(y) > EQUAL_EARTH_HALF_HEIGHT) return null
+  let theta = y / EE_A1
+  let d = EE_A1
+  for (let i = 0; i < 6; i++) {
+    const t2 = theta * theta, t6 = t2 * t2 * t2
+    d = EE_A1 + 3 * EE_A2 * t2 + t6 * (7 * EE_A3 + 9 * EE_A4 * t2)
+    const f = theta * (EE_A1 + EE_A2 * t2 + t6 * (EE_A3 + EE_A4 * t2)) - y
+    theta -= f / d
+  }
+  const cosT = Math.cos(theta)
+  if (cosT < 1e-9) return null
+  const lon = x * d * EE_M / cosT
+  if (Math.abs(lon) > Math.PI) return null
+  const lat = Math.asin(Math.max(-1, Math.min(1, Math.sin(theta) / EE_M)))
+  return { lon, lat }
+}
+
+export const equalEarthShader = `
+fn equalEarth(lon: f32,lat: f32) -> vec2f {
+  let theta = asin(clamp(.8660254038 * sin(lat),-1.,1.));
+  let t2 = theta * theta;
+  let t6 = t2 * t2 * t2;
+  let d = 1.340264 - .243318 * t2 + t6 * (.006251 + .034164 * t2);
+  return vec2f(
+    1.1547005384 * lon * cos(theta) / d,
+    theta * (1.340264 - .081106 * t2 + t6 * (.000893 + .003796 * t2)),
+  );
+}
+`
+
+// Equal Earth flat map opening at ±180°, morphing smoothly to the WGS84 ellipsoid.
 export function surfacePoint(longitude: number, latitude: number, morph: number, elevation = 0, exaggeration = 1): Vec3 {
   const cos = Math.abs(latitude) === Math.PI / 2 ? 0 : Math.cos(latitude), sin = Math.sin(latitude)
   const e2 = EARTH_FLATTENING * (2 - EARTH_FLATTENING)
   const n = 1 / Math.sqrt(1 - e2 * sin * sin)
   const height = Math.max(0, elevation) / EARTH_AXIS * exaggeration
+  const [px, py] = equalEarthProject(longitude, latitude)
   return [
-    longitude * (1 - morph) + (n + height) * cos * Math.sin(longitude) * morph,
-    sin * (1 - morph) + (n * (1 - e2) + height) * sin * morph,
+    px * (1 - morph) + (n + height) * cos * Math.sin(longitude) * morph,
+    py * (1 - morph) + (n * (1 - e2) + height) * sin * morph,
     height * (1 - morph) + (n + height) * cos * Math.cos(longitude) * morph,
   ]
 }

@@ -1,7 +1,7 @@
 import { colorShader } from './color.ts'
 import { coverageShader } from './coverage.ts'
+import { equalEarthShader } from './geometry.ts'
 import { fullscreenVertex, shaderModule } from './gpu.ts'
-import type { GpuTimer } from './gpu-timing.ts'
 import { motionBlurShader, type MotionBlurUniforms } from './motion-blur.ts'
 
 const bindings = `
@@ -23,7 +23,10 @@ const bloomShader = `${fullscreenVertex}${bindings}
 fn bright(uv: vec2f) -> vec3f {
   let c = textureSampleLevel(source,linearSampler,uv,0.).rgb;
   let peak = max(c.r,max(c.g,c.b));
-  return c * max(0.,peak - 1.) / max(peak,.0001);
+  // C1 quadratic soft knee over [0.80 .. 1.20] avoids hard threshold popping during zoom.
+  let soft = clamp(peak - .80,0.,.40);
+  let contrib = max(peak - 1.,soft * soft / .80);
+  return c * contrib / max(peak,.0001);
 }
 @fragment fn bloomFragment(input: ScreenVertex) -> @location(0) vec4f {
   let uv = input.uv;
@@ -58,14 +61,14 @@ ${coverageShader}
 }`
 const presentationShader = `${fullscreenVertex}${bindings}
 @group(0) @binding(3) var geography: texture_2d<f32>;
+${equalEarthShader}
 fn surfaceTangent(uv: vec2f, point: vec2f, bodyMorph: f32, unitPerPixel: f32) -> vec2f {
   let angles = (uv - .5) * vec2f(6.283185307, 3.141592654);
   let origin = (point - .5) * vec2f(6.283185307, 3.141592654);
   let direction = vec3f(cos(angles.y) * sin(angles.x), sin(angles.y), cos(angles.y) * cos(angles.x));
   let anchor = vec3f(cos(origin.y) * sin(origin.x), sin(origin.y), cos(origin.y) * cos(origin.x));
   if (bodyMorph > .5 && dot(direction, anchor) < 0.) { return vec2f(1e5, 1e5); }
-  let delta = uv.x - point.x;
-  let planeDelta = vec2f((delta - floor(delta + .5)) * 6.283185307, direction.y - anchor.y);
+  let planeDelta = equalEarth(angles.x, angles.y) - equalEarth(origin.x, origin.y);
   let east = vec3f(cos(origin.x), 0., -sin(origin.x));
   let north = cross(anchor, east);
   let offset = direction - anchor;
@@ -438,7 +441,7 @@ export class PostProcess {
     return true
   }
 
-  beginAnnotations(encoder: GPUCommandEncoder,includeCoverage: boolean,timestampWrites?: GPURenderPassTimestampWrites) {
+  beginAnnotations(encoder: GPUCommandEncoder,includeCoverage: boolean) {
     const colorAttachments: GPURenderPassColorAttachment[] = [{ view: this.geography.createView(),clearValue: [0,-1,0,0],loadOp: 'clear',storeOp: 'store' }]
     if (includeCoverage) {
       if (!this.stableCoverage) {
@@ -448,7 +451,7 @@ export class PostProcess {
       colorAttachments.push({ view: this.stableCoverage.createView(),clearValue: [0,0,0,0],loadOp: 'clear',storeOp: 'store' })
     }
     this.coverageValid = includeCoverage
-    return encoder.beginRenderPass({ label: 'Geographic annotations',timestampWrites,colorAttachments,
+    return encoder.beginRenderPass({ label: 'Geographic annotations',colorAttachments,
       depthStencilAttachment: { view: this.annotationDepth.createView(),depthClearValue: this.reverseDepth ? 0 : 1,depthLoadOp: 'clear',depthStoreOp: 'discard' } })
   }
 
@@ -484,14 +487,14 @@ export class PostProcess {
     })
   }
 
-  begin(encoder: GPUCommandEncoder,hdr: boolean,timestampWrites?: GPURenderPassTimestampWrites,storeDepth = false) {
-    return encoder.beginRenderPass({ label: '4x MSAA Earth surface',timestampWrites,colorAttachments: [{
+  begin(encoder: GPUCommandEncoder,hdr: boolean,storeDepth = false) {
+    return encoder.beginRenderPass({ label: '4x MSAA Earth surface',colorAttachments: [{
       view: this.multisample.createView(),resolveTarget: this.scene.createView(),
       clearValue: this.transparent ? [0,0,0,0] : hdr ? [.018 / 12.92,.026 / 12.92,.039 / 12.92,1] : [.018,.026,.039,1],loadOp: 'clear',storeOp: 'discard',
     }],depthStencilAttachment: { view: this.depth.createView(),depthClearValue: this.reverseDepth ? 0 : 1,depthLoadOp: 'clear',depthStoreOp: storeDepth ? 'store' : 'discard' } })
   }
 
-  finish(encoder: GPUCommandEncoder,output: GPUTextureView,p: Presentation,redrawSurface: boolean,rebuildDisplay: boolean,timer?: GpuTimer) {
+  finish(encoder: GPUCommandEncoder,output: GPUTextureView,p: Presentation,redrawSurface: boolean,rebuildDisplay: boolean) {
     const willBlur = redrawSurface && Boolean(p.motion && this.motionPipeline && this.motionUniform)
     const c = this.compositeScratch
     c[0] = 0; c[1] = 0; c[2] = 0; c[3] = Number(p.hdr)
@@ -511,17 +514,17 @@ export class PostProcess {
         this.bloomScratch[2] = Number(i === 0)
         this.bloomScratch[3] = 0
         this.device.queue.writeBuffer(this.uniforms[i],0,this.bloomScratch)
-        const pass = encoder.beginRenderPass({ label: `Bloom pass ${i}`,timestampWrites: i === 1 ? undefined : timer?.writes('bloom',i === 0 ? 'begin' : 'end'),colorAttachments: [{ view: this.bloom[i % 2].createView(),loadOp: 'clear',storeOp: 'store' }] })
+        const pass = encoder.beginRenderPass({ label: `Bloom pass ${i}`,colorAttachments: [{ view: this.bloom[i % 2].createView(),loadOp: 'clear',storeOp: 'store' }] })
         pass.setPipeline(this.bloomPipeline); pass.setBindGroup(0,i === 0 && motion ? this.motionBloomGroup! : this.bloomGroups[i]); pass.draw(3); pass.end()
       }
       this.bloomValid = true
     }
     const composition = rebuildDisplay || redrawSurface || rebuildBloom || motionChanged
     if (composition) {
-      const pass = encoder.beginRenderPass({ label: 'Cache tone map and coverage',timestampWrites: timer?.writes('composition'),colorAttachments: [{ view: this.display.createView(),loadOp: 'clear',storeOp: 'store' }] })
+      const pass = encoder.beginRenderPass({ label: 'Cache tone map and coverage',colorAttachments: [{ view: this.display.createView(),loadOp: 'clear',storeOp: 'store' }] })
       pass.setPipeline(this.compositionPipeline); pass.setBindGroup(0,motion ? this.motionCompositionGroup! : this.compositionGroup); pass.draw(3); pass.end()
     }
-    const pass = encoder.beginRenderPass({ label: 'Present cached surface and markers',timestampWrites: timer?.writes('presentation'),colorAttachments: [{ view: output,loadOp: 'clear',storeOp: 'store' }] })
+    const pass = encoder.beginRenderPass({ label: 'Present cached surface and markers',colorAttachments: [{ view: output,loadOp: 'clear',storeOp: 'store' }] })
     pass.setPipeline(this.presentationPipeline); pass.setBindGroup(0,this.presentationGroup); pass.draw(3)
     if (p.loupe && this.loupeGroup) {
       const sel = p.loupe.selected

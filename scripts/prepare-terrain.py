@@ -1,12 +1,12 @@
 """uv run --with rasterio --with numpy --with pillow --with scipy scripts/prepare-terrain.py [--reuse-elevation]."""
 from pathlib import Path
 import argparse
-import gzip
-import struct
 import numpy as np
 from PIL import Image
 import rasterio
 from scipy import ndimage
+
+from ect_terrain import encode_ect2_with_coast, load_earth_coast
 
 SOURCE = 'https://data.source.coop/ausantarctic/gebco/GEBCO_2026.tif'
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,13 +60,9 @@ decoded = np.asarray(Image.open(destination)).astype(np.int32)
 assert np.array_equal(decoded[:, :, 0] * 256 + decoded[:, :, 1] - 32768, elevation)
 # The runtime consumes bytes, never image/canvas readback: privacy browsers may
 # deliberately perturb getImageData(), which corrupts the high elevation byte.
-rgba = np.full((*code.shape, 4), 255, dtype=np.uint8)
-rgba[:, :, :3] = rgb
-payload = b'ECT1' + struct.pack('<II', code.shape[1], code.shape[0]) + rgba.tobytes()
-# Avoid a .gz suffix: some static servers infer Content-Encoding and decompress
-# it in fetch(), while a data URL leaves it compressed. Keep one decoding path.
-binary.write_bytes(gzip.compress(payload, mtime=0))
-assert gzip.decompress(binary.read_bytes()) == payload
+binary.write_bytes(encode_ect2_with_coast(code, rgb[:, :, 2]))
+roundtrip_coast = load_earth_coast(binary)
+assert np.array_equal(roundtrip_coast, (rgb[:, :, 2].astype(np.float32) - 128.0) / 4.0)
 # Regression landmarks: lowlands, deep ocean and an enclosed negative basin.
 for longitude, latitude, is_land in [(-60, -10, True), (-100, 40, True), (-56, -33, True), (-30, 0, False), (51, 42, True)]:
     x = int((longitude + 180) / 360 * elevation.shape[1])

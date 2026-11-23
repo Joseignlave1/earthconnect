@@ -28,7 +28,6 @@ const assets = [
   `${terrain}moon-albedo.webp`,
   `${terrain}mars-albedo.webp`,
 ]
-const virtualAsset = '\0workspace-asset:'
 
 const wasm = await readFile(resolve(root, 'src/earth-score/zstd.wasm'))
 const manifest = offline ? JSON.parse(await read(`${world}manifest.json`)) : undefined
@@ -69,18 +68,6 @@ const result = await build({
   plugins: [
     react(),
     inlineDecoderWasm(),
-    {
-      name: 'omit-lab-render-assets',
-      enforce: 'pre',
-      resolveId(source) {
-        const path = source.slice(1, -4)
-        if (source.startsWith('/') && source.endsWith('?url') && assets.includes(path)) return virtualAsset + path
-      },
-      load(id) {
-        if (!id.startsWith(virtualAsset)) return
-        return 'export default ""'
-      },
-    },
     {
       name: 'use-embedded-workers',
       enforce: 'pre',

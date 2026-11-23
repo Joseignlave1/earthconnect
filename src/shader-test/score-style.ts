@@ -23,7 +23,7 @@ fn palettePosition(normalized: f32,band: f32,contrast: f32) -> f32 {
 
 const SCALE = 65534
 const clamp = (value: number) => Math.max(0,Math.min(1,value))
-export const AUTO_POSITIONS = [0,.22,.55,.82,1] as const
+export const AUTO_POSITIONS = [0,.22,.70,.90,1] as const
 export type ColorMode = 'auto' | 'manual' | 'locked'
 export type StyleControls = { colorMode: ColorMode; base: number; focus: number; topRange: number; emphasis: number }
 export type ScoreStyle = {
@@ -140,7 +140,7 @@ export const autoStyleShader = `
 fn autoPalette(score: f32,cutoff: f32,anchors: vec4f) -> f32 {
   if (score <= cutoff || anchors.w <= cutoff) { return 0.; }
   if (score < anchors.x) { return .22 * clamp((score - cutoff) / max(.0000001,anchors.x - cutoff),0.,1.); }
-  if (score < anchors.y) { return mix(.22,.55,clamp((score - anchors.x) / max(.0000001,anchors.y - anchors.x),0.,1.)); }
-  if (score < anchors.z) { return mix(.55,.82,clamp((score - anchors.y) / max(.0000001,anchors.z - anchors.y),0.,1.)); }
-  return mix(.82,1.,clamp((score - anchors.z) / max(.0000001,anchors.w - anchors.z),0.,1.));
+  if (score < anchors.y) { return mix(.22,.70,clamp((score - anchors.x) / max(.0000001,anchors.y - anchors.x),0.,1.)); }
+  if (score < anchors.z) { return mix(.70,.90,clamp((score - anchors.y) / max(.0000001,anchors.z - anchors.y),0.,1.)); }
+  return mix(.90,1.,clamp((score - anchors.z) / max(.0000001,anchors.w - anchors.z),0.,1.));
 }`

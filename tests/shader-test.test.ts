@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readFileSync } from 'node:fs'
-import { cameraBasis, cameraMatrix, createMesh, EARTH_AXIS, EARTH_FLATTENING, FOV, grabCenter, grabRotation, orbitRotation, pickSurface, SurfacePicker, surfacePoint, type Camera, type Rotation, type Vec3 } from '../src/shader-test/geometry.ts'
+import { cameraBasis, cameraMatrix, createMesh, EARTH_AXIS, EARTH_FLATTENING, EQUAL_EARTH_HALF_HEIGHT, EQUAL_EARTH_HALF_WIDTH, equalEarthInverse, equalEarthProject, FOV, grabCenter, grabRotation, orbitRotation, pickSurface, SurfacePicker, surfacePoint, type Camera, type Rotation, type Vec3 } from '../src/shader-test/geometry.ts'
 import { decodeTerrain, decodeTerrainEct2Payload, elevationAt, elevationPyramid, packRg8Levels, poleElevations } from '../src/shader-test/terrain.ts'
 import { solarPosition } from '../src/shader-test/sun.ts'
 import { contourDetail } from '../src/shader-test/contours.ts'
-import { maxPyramid, noiseTexture, perlin } from '../src/shader-test/noise.ts'
 import { CELL, MISSING, RADIUS, SIZE, cellAddress, tileRow, tileX, worldTiles } from '../src/shader-test/world-grid.ts'
 import { AUTO_POSITIONS, normalizedScore, palettePosition, resolveScoreStyle, ScoreDistribution, scoreAtPalette, scorePalette } from '../src/shader-test/score-style.ts'
 import { computedScoreLayout } from '../src/shader-test/computed-scores.ts'
 import { createLayout } from '../src/earth-score/layout.ts'
 import { parseManifest } from '../src/earth-score/manifest.ts'
+import { tileKey } from '../src/shader-test/earth-tiles.ts'
+import { paintTilePageTable, parseTilePackHeader, parseTilePackIndex } from '../src/shader-test/virtual-tiles.ts'
+import { planetTileKey } from '../src/workspace/planetTiles.ts'
 
 const camera: Camera = { yaw: 0, pitch: 0, distance: 6, aspect: 1.5 }
 const mesh = createMesh()
@@ -267,8 +269,19 @@ test('orbiting across the longitude seam picks the near surface including displa
 })
 
 test('the flat map covers the full world and the sphere closes its longitude seam', () => {
-  surfacePoint(Math.PI, 0, 0).forEach((value, index) => close(value, [Math.PI, 0, 0][index]))
-  surfacePoint(-Math.PI, 0, 0).forEach((value, index) => close(value, [-Math.PI, 0, 0][index]))
+  surfacePoint(Math.PI, 0, 0).forEach((value, index) => close(value, [EQUAL_EARTH_HALF_WIDTH, 0, 0][index]))
+  surfacePoint(-Math.PI, 0, 0).forEach((value, index) => close(value, [-EQUAL_EARTH_HALF_WIDTH, 0, 0][index]))
+  close(surfacePoint(0, Math.PI / 2, 0)[1], EQUAL_EARTH_HALF_HEIGHT)
+  close(surfacePoint(0, -Math.PI / 2, 0)[1], -EQUAL_EARTH_HALF_HEIGHT)
+  for (const [lon, lat] of [[-2.9, -1.4], [-1.2, 0.7], [0, 0], [2.4, 1.35], [Math.PI, -0.5]]) {
+    const [x, y] = equalEarthProject(lon, lat)
+    const inv = equalEarthInverse(x, y)
+    assert.ok(inv)
+    close(inv.lon, lon, 1e-9)
+    close(inv.lat, lat, 1e-9)
+  }
+  assert.equal(equalEarthInverse(EQUAL_EARTH_HALF_WIDTH + 0.1, 0), null)
+  assert.equal(equalEarthInverse(0, EQUAL_EARTH_HALF_HEIGHT + 0.01), null)
   for (const latitude of [-1.2, 0, 1.2]) {
     const left = surfacePoint(-Math.PI, latitude, 1), right = surfacePoint(Math.PI, latitude, 1)
     left.forEach((value, index) => close(value, right[index]))
@@ -401,6 +414,35 @@ test('ECT2 delta-shuffled payload round-trips signed elevations and packs rg8 le
   assert.equal(packed[0].data.byteLength, width * height * 2)
 })
 
+test('ECT2 delta-shuffled payload with coast channel round-trips elevation and coastline distance', () => {
+  const width = 4, height = 3
+  const elevations = [-4200, -100, 12, 850, -3500, -5, 40, 1200, -2800, 0, 180, 4000]
+  const coasts = [4, 120, 132, 240, 8, 126, 136, 250, 12, 128, 144, 255]
+  const codes = elevations.map(h => h + 32768)
+  const count = width * height
+  const payload = new Uint8Array(count * 3)
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const i = y * width + x
+    const pred = y === 0 ? (x === 0 ? 32768 : codes[i - 1]) : (x === 0 ? codes[i - width] : (codes[i - 1] + codes[i - width]) >> 1)
+    const delta = (codes[i] - pred) & 0xffff
+    const signed = delta >= 32768 ? delta - 65536 : delta
+    const zz = ((signed << 1) ^ (signed >> 31)) & 0xffff
+    payload[i] = zz >> 8
+    payload[count + i] = zz & 0xff
+    const cpred = y === 0 ? (x === 0 ? 128 : coasts[i - 1]) : (x === 0 ? coasts[i - width] : (coasts[i - 1] + coasts[i - width]) >> 1)
+    const cdelta = (coasts[i] - cpred) & 0xff
+    const csigned = cdelta >= 128 ? cdelta - 256 : cdelta
+    payload[count * 2 + i] = ((csigned << 1) ^ (csigned >> 31)) & 0xff
+  }
+  const terrain = decodeTerrainEct2Payload(width, height, 5, payload)
+  assert.equal(terrain.stride, 4)
+  for (let i = 0; i < count; i++) {
+    assert.equal(terrain.pixels[i * 4] * 256 + terrain.pixels[i * 4 + 1] - 32768, elevations[i])
+    assert.equal(terrain.pixels[i * 4 + 2], coasts[i])
+    assert.equal(terrain.pixels[i * 4 + 3], 255)
+  }
+})
+
 test('raycasting selects the visible surface, misses the background and follows the morph', () => {
   for (const morph of [0, .25, .5, .75, 1]) {
     const hit = pickSurface(0, 0, camera, morph, mesh)
@@ -424,28 +466,7 @@ test('rotated camera projection and picking agree at geographic mesh vertices', 
   }
 })
 
-test('maximum overviews retain isolated peaks, zeros and missingness even for odd dimensions', () => {
-  const levels = maxPyramid(Uint16Array.from([0, 0, 0, 0, 0, 0, 0, 0, 65000, 0, 0, 0, 0, 0, 65535]), 5, 3)
-  assert.equal(levels.at(-1)!.scores[0], 65000)
-  assert.equal(levels[1].scores[0], 0)
-  assert.equal(maxPyramid(new Uint16Array(4).fill(65535), 2, 2)[1].scores[0], 65535)
-  assert.equal(maxPyramid(Uint16Array.from([65535, 0, 65535, 0]), 2, 2)[1].scores[0], 0)
-})
-
-test('Perlin textures are deterministic, varied, and use valid uint16 score codes', () => {
-  const a = noiseTexture(64, 32, 3.5, 42), b = noiseTexture(64, 32, 3.5, 42), c = noiseTexture(64, 32, 3.5, 43)
-  assert.deepEqual(a, b)
-  assert.notDeepEqual(a.scores, c.scores)
-  assert.ok(new Set(a.scores).size > 1000)
-  assert.ok(a.best <= 65534 && a.best > 32767)
-  assert.ok(a.scores.every((value) => value < 65535))
-  const noise = perlin(42)
-  close(noise(.3, .5, .7), noise(256.3, .5, .7))
-  // Nearby directions on either side of the dateline must remain nearby in value.
-  close(noise(-.000001, .2, -1), noise(.000001, .2, -1), .00001)
-})
-
-test('the synthetic workload matches the real 4 km grid, tile count and packed byte count', () => {
+test('the production 4 km MODIS sinusoidal grid has exact tile and packed byte counts', () => {
   const tiles = worldTiles()
   assert.equal(tiles.length, 460)
   assert.equal(tiles.length * SIZE * SIZE, 35_550_640)
@@ -469,9 +490,6 @@ test('inspection addresses agree with native sinusoidal cell centers across lati
   assert.equal(cellAddress(181, 0), null)
   assert.equal(cellAddress(0, 91), null)
   assert.equal(cellAddress(NaN, 0), null)
-  const levels = maxPyramid(new Uint16Array(SIZE * SIZE).fill(MISSING), SIZE, SIZE)
-  assert.deepEqual(levels.map((level) => level.width), [278, 139, 69, 34, 17, 8, 4, 2, 1])
-  assert.equal(levels.at(-1)!.scores[0], MISSING)
 })
 
 
@@ -503,4 +521,40 @@ test('solar time uses the UTC instant, moves westward with time and rejects inva
   const afternoon = solarPosition(new Date('2024-06-20T13:00:00Z'))
   close(afternoon.longitude - noon.longitude,-15,.02)
   assert.throws(() => solarPosition(new Date(NaN)),/Invalid solar timestamp/)
+})
+
+test('ECVT1 virtual tile pack headers and indices parse cleanly and reject invalid payloads', () => {
+  const buf = new ArrayBuffer(16 + 2 * 12)
+  const view = new DataView(buf)
+  view.setUint32(0, 0x54564345, true) // 'ECVT'
+  view.setUint32(4, 1, true)
+  view.setUint32(8, 3, true)
+  view.setUint32(12, 2, true)
+  const k0 = tileKey(0, 20, 10)
+  const k1 = tileKey(2, 140, 58)
+  view.setUint32(16, k0, true)
+  view.setUint32(20, 40, true)
+  view.setUint32(24, 12345, true)
+  view.setUint32(28, k1, true)
+  view.setUint32(32, 12385, true)
+  view.setUint32(36, 23456, true)
+
+  const header = parseTilePackHeader(buf.slice(0, 16))
+  assert.deepEqual(header, { packId: 3, count: 2 })
+  const idx = parseTilePackIndex(buf.slice(16), header!.packId, header!.count)
+  assert.deepEqual(idx.get(k0), { packId: 3, offset: 40, length: 12345 })
+  assert.deepEqual(idx.get(k1), { packId: 3, offset: 12385, length: 23456 })
+  assert.notEqual(planetTileKey(0, 1, 5, 3), planetTileKey(1, 1, 5, 3))
+
+  const page = new Uint8Array(4 * 2 * 4)
+  paintTilePageTable(page, 4, 2, [
+    { level: 0, tx: 0, ty: 0 },
+    { level: 1, tx: 1, ty: 0 },
+  ])
+  assert.deepEqual([...page.slice(0, 4)], [0, 0, 255, 255])
+  assert.deepEqual([...page.slice(4, 8)], [1, 1, 0, 0])
+
+  view.setUint32(0, 0xdeadbeef, true)
+  assert.equal(parseTilePackHeader(buf.slice(0, 16)), null)
+  assert.equal(parseTilePackHeader(new ArrayBuffer(8)), null)
 })

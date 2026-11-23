@@ -41,10 +41,30 @@ test('compute score textures, distribution, peak, selection, cancellation and re
     page.on('pageerror',error => errors.push(error.message))
     await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/gpu-test`)
     const summary = await page.evaluate(async () => {
-      const [{ SurfaceRenderer }, { prepareComputedScores,destroyScoreTextures,readComputedScore }, { createLayout }, { maxPyramid }, { MISSING,SIZE }] = await Promise.all([
+      const [{ SurfaceRenderer }, { prepareComputedScores,destroyScoreTextures,readComputedScore }, { createLayout }, { MISSING,SIZE }] = await Promise.all([
         import('/src/shader-test/renderer.ts'),import('/src/shader-test/computed-scores.ts'),
-        import('/src/earth-score/layout.ts'),import('/src/shader-test/noise.ts'),import('/src/shader-test/world-grid.ts'),
+        import('/src/earth-score/layout.ts'),import('/src/shader-test/world-grid.ts'),
       ])
+      const maxPyramid = (scores, width, height) => {
+        const levels = [{ scores, width, height }]
+        while (width > 1 || height > 1) {
+          const w = Math.max(1, width >> 1), h = Math.max(1, height >> 1)
+          const next = new Uint16Array(w * h)
+          for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+            let best = 0, valid = false
+            for (let sy = Math.floor(y * height / h); sy < Math.floor((y + 1) * height / h); sy++) {
+              for (let sx = Math.floor(x * width / w); sx < Math.floor((x + 1) * width / w); sx++) {
+                const value = scores[sy * width + sx]
+                if (value !== 65535) { best = Math.max(best, value); valid = true }
+              }
+            }
+            next[y * w + x] = valid ? best : 65535
+          }
+          levels.push({ scores: next, width: w, height: h })
+          scores = next; width = w; height = h
+        }
+        return levels
+      }
       const check = (condition,message) => { if (!condition) throw new Error(message) }
       const canvas = document.querySelector('canvas')
       const renderErrors = []
@@ -164,11 +184,8 @@ test('compute score textures, distribution, peak, selection, cancellation and re
       const { renderer,device,canvas } = window.gpuTest
       return renderer.computeDevice && renderer.computeDevice !== device && !canvas.dataset.scoreName
     })
-    await page.evaluate(() => window.gpuTest.renderer.regenerate(6,42))
-    await page.waitForFunction(() => window.gpuTest.canvas.dataset.source === 'noise')
     await page.evaluate(async () => {
       const { renderer,makeFixture,canvas,description } = window.gpuTest
-      const noiseName = canvas.dataset.scoreName
       const fixture = makeFixture(renderer.computeDevice)
       const device = renderer.computeDevice
       try {
@@ -177,34 +194,15 @@ test('compute score textures, distribution, peak, selection, cancellation and re
         const interrupted = renderer.setComputedScores(fixture,description('interrupted')).then(() => false,() => true)
         device.destroy()
         if (!await interrupted) throw new Error('A query published after its device was lost')
-        Object.assign(window.gpuTest,{ noiseName,device })
+        window.gpuTest.device = device
       } finally {
         fixture.destroy()
       }
     })
     await page.waitForFunction(() => {
-      const { renderer,device,canvas,noiseName } = window.gpuTest
-      return renderer.computeDevice && renderer.computeDevice !== device && canvas.dataset.scoreName === noiseName &&
-        canvas.dataset.ready === 'true' && canvas.dataset.idle === 'true'
+      const { renderer,device,canvas } = window.gpuTest
+      return renderer.computeDevice && renderer.computeDevice !== device && !canvas.dataset.scoreName
     })
-    let blockedWorkers = 0
-    await page.route(/\/noise-worker\.ts\?worker_file/, route => {
-      blockedWorkers++
-      return route.fulfill({ contentType: 'text/html',body: '<!doctype html><title>Unexpected HTML</title>' })
-    })
-    await page.evaluate(() => {
-      const { renderer,canvas } = window.gpuTest
-      window.gpuTest.noise = { cells: canvas.dataset.cells,bestScore: canvas.dataset.bestScore }
-      renderer.regenerate(6,42)
-    })
-    await page.waitForFunction(() => /Generating 4 km noise · \d+ \/ \d+ tiles/.test(window.gpuTest.getStatus()))
-    await page.waitForFunction(() => window.gpuTest.getStatus().startsWith('Synthetic Perlin noise'))
-    const restored = await page.evaluate(() => {
-      const { canvas,noise } = window.gpuTest
-      return { expected: noise,actual: { cells: canvas.dataset.cells,bestScore: canvas.dataset.bestScore } }
-    })
-    assert.equal(blockedWorkers,1)
-    assert.deepEqual(restored.actual,restored.expected)
     const renderErrors = await page.evaluate(() => {
       window.gpuTest.renderer.destroy()
       return window.gpuTest.renderErrors

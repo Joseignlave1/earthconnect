@@ -42,8 +42,8 @@ export type EarthScoreOptions = Readonly<{
   readAsset?: (url: string | URL, signal: AbortSignal) => Promise<Response>
 }>
 
-const workerCount = Math.min(8, Math.max(4, (globalThis.navigator?.hardwareConcurrency || 4) - 1))
-const jobSlots = workerCount * 2
+const workerCount = Math.min(6, Math.max(3, Math.floor((globalThis.navigator?.hardwareConcurrency || 4) * 0.6)))
+const jobSlots = workerCount + 4
 const shaderChunksPerFence = 4
 
 // A caller can cancel while the shared queue is waiting on unrelated GPU work.
@@ -137,6 +137,7 @@ export async function loadEarthScore(device: GPUDevice, {
 
       for (let i = 0; i < jobSlots; i++) launch()
       const checks: Promise<unknown>[] = []
+      let uploaded = 0
       while (jobs.size) {
         const ready = await Promise.race(jobs.values())
         loading.throwIfAborted()
@@ -146,31 +147,35 @@ export async function loadEarthScore(device: GPUDevice, {
         jobs.delete(index)
         launch()
         const check = checkedGpu(device, () => {
-          const packedInput = device.createBuffer({
+          const inputBuffer = device.createBuffer({
             label: `Earth Score input ${index}`,
             size: packed.byteLength,
             usage: GPUBufferUsage.STORAGE,
             mappedAtCreation: true,
           })
-          buffers.add(packedInput)
-          new Uint8Array(packedInput.getMappedRange()).set(new Uint8Array(packed))
-          packedInput.unmap()
+          buffers.add(inputBuffer)
+          new Uint8Array(inputBuffer.getMappedRange()).set(new Uint8Array(packed))
+          inputBuffer.unmap()
           const scores = buffer(`Earth Score output ${index}`, range.rows * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC)
           const firstSiteOffset = index * firstSiteStride
           const defaultGroup = device.createBindGroup({
             layout: shaderBindings,
             entries: [
-              { binding: 0, resource: { buffer: packedInput } },
+              { binding: 0, resource: { buffer: inputBuffer } },
               { binding: 1, resource: { buffer: scores } },
               { binding: 2, resource: { buffer: lookup } },
               { binding: 3, resource: { buffer: emptyPoints } },
               { binding: 4, resource: { buffer: firstSites, offset: firstSiteOffset, size: 4 } },
             ],
           })
-          residents[index] = { output: Object.freeze({ ...range, packedInput, scores }), defaultGroup, firstSiteOffset }
+          residents[index] = { output: Object.freeze({ ...range, packedInput: inputBuffer, scores }), defaultGroup, firstSiteOffset }
         }, `Earth Score upload ${index}`)
         checks.push(check.then(() => undefined, error => error))
+        // Flush pending unmap copies every 4 chunks without stalling on a CPU/GPU fence
+        // so Dawn reclaims staging memory incrementally at full decode speed.
+        if ((++uploaded & 3) === 0) queue.submit([])
       }
+      if (uploaded & 3) queue.submit([])
       const completed = await waitForLoad(Promise.all(checks), loading)
       const error = completed.find(Boolean)
       if (error) throw error

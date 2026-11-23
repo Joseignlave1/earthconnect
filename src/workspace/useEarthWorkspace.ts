@@ -4,6 +4,8 @@ import { ScoreShaderError } from '../earth-score/custom-shader.ts'
 import { friendlyApiError } from '../earthIndexApi.ts'
 import type { BodyId } from '../explorerData.ts'
 import { SurfaceRenderer } from '../shader-test/renderer.ts'
+import { earthTilePath } from '../shader-test/earth-tiles.ts'
+import { planetTilePath, type PlanetTileBody } from './planetTiles.ts'
 import { scoreManifestUrl, type WorkspaceAssets } from './workspaceAssets.ts'
 import type { SolarFocus } from './solarCamera.ts'
 import { SolarScene } from './solarScene.ts'
@@ -112,6 +114,7 @@ export function useEarthWorkspace(
     const shared = resources ?? createEarthWorkspaceResources(undefined, lifecycle.signal)
     let renderer: SurfaceRenderer | undefined
     let creating = false
+    let surfaceFailed = false
     let world: World | undefined
     let current: { controller: AbortController; job: Job } | undefined
     let failed: Job | undefined
@@ -273,12 +276,24 @@ export function useEarthWorkspace(
     async function startRenderer() {
       if (creating) return
       creating = true
+      surfaceFailed = false
       try {
         renderer?.destroy()
         renderer = undefined
         delete canvas!.dataset.scoreName
         delete canvas!.dataset.source
         delete canvas!.dataset.frameSource
+        const loadTilePack = async (path: string, signal: AbortSignal) => {
+          try {
+            if (import.meta.env.DEV) {
+              const url = await assets.url(path, signal)
+              if (!url.startsWith('blob:')) return url
+            }
+            return await assets.blob(path, signal)
+          } catch {
+            return null
+          }
+        }
         const instance = await SurfaceRenderer.create(canvas!, (selection, score) => {
           const inspection = selection && {
             latitude: selection.latitude,
@@ -294,9 +309,17 @@ export function useEarthWorkspace(
         }, mapStatus, {
           signal: lifecycle.signal,
           acquireDevice: shared.acquireDevice,
-          solar: { createScene: SolarScene.create, assetUrl: assets.url, loadTerrain: shared.acquireTerrain, onSourcePick: (body,point) => reportSourcePick(body,point) },
+          solar: {
+            createScene: SolarScene.create,
+            assetUrl: assets.url,
+            loadTerrain: shared.acquireTerrain,
+            loadPlanetTilePack: (body: PlanetTileBody, packId: number, signal: AbortSignal) =>
+              loadTilePack(planetTilePath(body, packId), signal),
+            onSourcePick: (body,point) => reportSourcePick(body,point),
+          },
           assets: assets.url,
           loadTerrain: shared.acquireTerrain,
+          loadEarthTilePack: (packId, signal) => loadTilePack(earthTilePath(packId), signal),
           onDevice: preloadWorld ? prepareWorld : undefined,
           initialView,
         })
@@ -312,6 +335,8 @@ export function useEarthWorkspace(
       } catch (error) {
         releaseWorld()
         if (!lifecycle.signal.aborted) {
+          surfaceFailed = true
+          console.error('Could not initialize WebGPU surface:', error)
           reportFailure(errorMessage(error))
           update({ busy: false, surfaceFailed: true })
         }
@@ -330,7 +355,7 @@ export function useEarthWorkspace(
       update({ shaderSource: job.source, shaderDiagnostics: [] })
       if (!instance || !device) {
         resume = job
-        update({ busy: true, error: '', status: 'Waiting for WebGPU…' })
+        if (!surfaceFailed) update({ busy: true, error: '', status: 'Waiting for WebGPU…' })
         return
       }
       resume = undefined

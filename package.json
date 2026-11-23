@@ -10,7 +10,6 @@
     "lint": "eslint .",
     "fetch:assets": "node scripts/hydrate-assets.mjs",
     "test:shader": "npm run fetch:assets -- render && node --test tests/shader-test.test.ts tests/planet-terrain.test.ts tests/solar-camera.test.ts tests/solar-system.test.ts tests/wgsl-project.test.ts tests/planetary-point-cache.test.ts tests/planetary-shader-analysis.test.ts",
-    "export:shader": "node scripts/export-shader.mjs",
     "export:workspace": "node scripts/export-workspace.mjs",
     "preview": "vite preview",
     "build:compute": "node scripts/build-earth-score.mjs && tsc -p tsconfig.compute.json",

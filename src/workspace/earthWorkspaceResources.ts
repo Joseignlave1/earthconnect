@@ -1,5 +1,6 @@
 import { loadEarthScore, type EarthScore, type EarthScoreOptions } from '../earth-score/index.ts'
 import { samplePoint } from '../earthIndexApi.ts'
+import { raceAbort } from '../shader-test/gpu.ts'
 import { createSurfaceDevicePool } from '../shader-test/surface-device.ts'
 import type { TerrainPackFormat } from '../shader-test/terrain.ts'
 import { loadPreparedTerrain, type PreparedTerrain } from '../shader-test/terrain-loader.ts'
@@ -62,12 +63,7 @@ export function createEarthWorkspaceResources(acquireDevice = createSurfaceDevic
         if (terrains.get(key) === pending) terrains.delete(key)
       })
     }
-    return new Promise<PreparedTerrain<F>>((resolve, reject) => {
-      const abort = () => reject(signal.reason)
-      signal.addEventListener('abort', abort, { once: true })
-      if (signal.aborted) return abort()
-      void pending.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort))
-    })
+    return raceAbort(pending, signal)
   }
 
   return {

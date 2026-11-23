@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { loadWorkspaceRelease, type DownloadProgress } from './workspaceRelease.ts'
 import type { WorkspaceAssets } from './workspaceAssets.ts'
 import { markStartup, reportStartupTiming } from './startupTiming.ts'
+import { WEBGPU_UNAVAILABLE_MESSAGE } from '../shader-test/surface-device.ts'
 import './WorkspaceStartup.css'
 
 const decimal = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -73,6 +74,10 @@ export function WorkspaceStartup({ open, embedded, loadInitialRelease }: {
     const { signal } = controller
     const refresh = new URLSearchParams(window.location.search).get('refreshCache') === '1'
     async function start() {
+      if (!navigator.gpu) {
+        setError(WEBGPU_UNAVAILABLE_MESSAGE)
+        return
+      }
       // Let the browser paint the archive splash before decoding embedded files.
       if (embedded) {
         await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))

@@ -1,5 +1,5 @@
 import {
-  elevationPyramid, loadTerrain, packRg32FloatLevels, packRg8Levels, packRgba8Levels, poleElevations,
+  elevationPyramid, loadTerrain, packRg32FloatLevels, packRg8PyramidDirect, poleElevations,
   type PackedTerrainLevel, type Terrain, type TerrainPackFormat, type TerrainWorkerRequest, type TerrainWorkerResponse,
 } from './terrain.ts'
 import { createTerrainWorker } from './terrain-worker-factory.ts'
@@ -15,8 +15,9 @@ async function prepareTerrainOnMainThread<F extends TerrainPackFormat>(url: stri
   const terrain = await loadTerrain(url, signal, decompressZstd)
   signal.throwIfAborted()
   const poles = poleElevations(terrain)
-  const levels = elevationPyramid(terrain, format !== 'rg32float')
-  const packed = (format === 'rg32float' ? packRg32FloatLevels(levels) : format === 'rg8unorm' ? packRg8Levels(levels) : packRgba8Levels(levels)) as PreparedTerrain<F>['levels']
+  const packed = (format === 'rg8unorm'
+    ? packRg8PyramidDirect(terrain)
+    : packRg32FloatLevels(elevationPyramid(terrain, false))) as PreparedTerrain<F>['levels']
   return { terrain, poles, levels: packed }
 }
 

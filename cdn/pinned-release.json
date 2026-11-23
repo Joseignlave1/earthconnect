@@ -1,7 +1,7 @@
 {
   "format": "earth-connect-assets-v1",
-  "runtimeFileCount": 45,
-  "runtimeBytes": 281776918,
+  "runtimeFileCount": 60,
+  "runtimeBytes": 395386663,
   "scoreManifest": {
     "key": "compute-data/world/manifest-6aa2a505b289ca126ab57af9e33ddfdc205841427f7124dd729b5d3b4dee95e9.json",
     "bytes": 16947,
@@ -336,51 +336,6 @@
       "cacheControl": "public, max-age=31536000, immutable",
       "role": "runtime"
     },
-    "data/surface-basins.bin": {
-      "key": "assets/data/surface-basins-b7676da9558e6d3afb8999a00a2214fc46820eeeb3f8bacfece8290eec11ca6c.bin",
-      "bytes": 16617847,
-      "sha256": "b7676da9558e6d3afb8999a00a2214fc46820eeeb3f8bacfece8290eec11ca6c",
-      "etag": "dad3a3c14f139858fe267e654e8a572e",
-      "contentType": "application/octet-stream",
-      "cacheControl": "public, max-age=31536000, immutable",
-      "role": "runtime"
-    },
-    "textures/earth-blue-marble.jpg": {
-      "key": "assets/textures/earth-blue-marble-711cf6855db517fb564aaecad03c44fa6b66e5b7f0ba6f1e125979b07230a66d.jpg",
-      "bytes": 2718424,
-      "sha256": "711cf6855db517fb564aaecad03c44fa6b66e5b7f0ba6f1e125979b07230a66d",
-      "contentType": "image/jpeg"
-    },
-    "textures/earth-terrain.bin": {
-      "key": "assets/textures/earth-terrain-6d8e660505be35808e8befaf3e8faa7ad5deba64e68d4627821cacbecd7462a7.bin",
-      "bytes": 17659380,
-      "sha256": "6d8e660505be35808e8befaf3e8faa7ad5deba64e68d4627821cacbecd7462a7",
-      "etag": "ce274d0b2dcf816bca0456c3466d97a5",
-      "contentType": "application/octet-stream",
-      "cacheControl": "public, max-age=31536000, immutable",
-      "role": "runtime"
-    },
-    "textures/mars-terrain.bin": {
-      "key": "assets/textures/mars-terrain-980391977e57294fc6f0c8a96101595e20ac1c51d56dc8531d8be75212f7ef4a.bin",
-      "bytes": 24331055,
-      "sha256": "980391977e57294fc6f0c8a96101595e20ac1c51d56dc8531d8be75212f7ef4a",
-      "contentType": "application/octet-stream"
-    },
-    "textures/moon-terrain.bin": {
-      "key": "assets/textures/moon-terrain-5867393706df1d5701d733537889984d9ad99fa7bf7948476f2d7d6e535927c0.bin",
-      "bytes": 29818446,
-      "sha256": "5867393706df1d5701d733537889984d9ad99fa7bf7948476f2d7d6e535927c0",
-      "contentType": "application/octet-stream"
-    },
-    "textures/nasa-deep-star-map.webp": {
-      "key": "assets/textures/nasa-deep-star-map-7bd5cb88a1304c210459b7a7adbcb77abdf5cac06be8b7fc9f273498d83069be.webp",
-      "bytes": 1165688,
-      "sha256": "7bd5cb88a1304c210459b7a7adbcb77abdf5cac06be8b7fc9f273498d83069be",
-      "etag": "290a5d766ef5f8ea7155b1511b5b18b4",
-      "contentType": "image/webp",
-      "cacheControl": "public, max-age=31536000, immutable",
-      "role": "runtime"
-    },
     "compute-data/world/manifest.json": {
       "key": "compute-data/world/manifest-6aa2a505b289ca126ab57af9e33ddfdc205841427f7124dd729b5d3b4dee95e9.json",
       "bytes": 16947,
@@ -390,38 +345,215 @@
       "cacheControl": "public, max-age=31536000, immutable",
       "role": "score-manifest"
     },
+    "textures/earth-blue-marble.jpg": {
+      "key": "assets/textures/earth-blue-marble-711cf6855db517fb564aaecad03c44fa6b66e5b7f0ba6f1e125979b07230a66d.jpg",
+      "bytes": 2718424,
+      "sha256": "711cf6855db517fb564aaecad03c44fa6b66e5b7f0ba6f1e125979b07230a66d",
+      "etag": "aced23f3785428136b9bdd643a4537b1",
+      "contentType": "image/jpeg",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/earth-terrain.bin": {
+      "key": "assets/textures/earth-terrain-3dc5ac22c933eebb0e94720b31a5c768742d64205f14a2cdf2aaa9edcc775b26.bin",
+      "bytes": 8173539,
+      "sha256": "3dc5ac22c933eebb0e94720b31a5c768742d64205f14a2cdf2aaa9edcc775b26",
+      "etag": "e9324e29317e151e369111f9bb8434b1",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/earth-tiles-0.bin": {
+      "key": "assets/textures/earth-tiles-0-17979fdc6e9ae3793c18d25cad7b018d5dc85f98aff8fd0d8264bbf7cce36c05.bin",
+      "bytes": 14318932,
+      "sha256": "17979fdc6e9ae3793c18d25cad7b018d5dc85f98aff8fd0d8264bbf7cce36c05",
+      "etag": "de49eeeaeedf429d941084bc5bf7f2d7",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/earth-tiles-1.bin": {
+      "key": "assets/textures/earth-tiles-1-192adb3f627a831df603582bd6868c121eee7c8ffe27440bdd8b02ae5bf23f97.bin",
+      "bytes": 13295024,
+      "sha256": "192adb3f627a831df603582bd6868c121eee7c8ffe27440bdd8b02ae5bf23f97",
+      "etag": "6c4e748016dbb0f83a4b7a385225cfdc",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/earth-tiles-2.bin": {
+      "key": "assets/textures/earth-tiles-2-5f1257ec1d9d8795d816992c601efdf6d70280404f2fc15d959b3779dc4e7925.bin",
+      "bytes": 26083268,
+      "sha256": "5f1257ec1d9d8795d816992c601efdf6d70280404f2fc15d959b3779dc4e7925",
+      "etag": "173354f1a3cbc61207635929833ba29f",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/earth-tiles-3.bin": {
+      "key": "assets/textures/earth-tiles-3-be4e6306f6cf3031e7198eaf9502d0077b3184084b303411d7441f275b0e50f3.bin",
+      "bytes": 19345156,
+      "sha256": "be4e6306f6cf3031e7198eaf9502d0077b3184084b303411d7441f275b0e50f3",
+      "etag": "711fdf783d0ae816b2f34600a84754c5",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/earth-tiles-4.bin": {
+      "key": "assets/textures/earth-tiles-4-547ea31213705f35b2f733bac6cdcf94ccfe7989a093aa65b6c866aab4776ce0.bin",
+      "bytes": 3169220,
+      "sha256": "547ea31213705f35b2f733bac6cdcf94ccfe7989a093aa65b6c866aab4776ce0",
+      "etag": "daaf934fdb4e865d3de4376f129a1b77",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/earth-tiles-5.bin": {
+      "key": "assets/textures/earth-tiles-5-e42a3c39c9028ec1dd4702710278993b69cdf3a23da3ad6eb08612f838e5a3fc.bin",
+      "bytes": 11620332,
+      "sha256": "e42a3c39c9028ec1dd4702710278993b69cdf3a23da3ad6eb08612f838e5a3fc",
+      "etag": "c89af97eab59140ad2393813726f2243",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/earth-tiles-6.bin": {
+      "key": "assets/textures/earth-tiles-6-32e673097fc0a0c4a71dea8373d48c659783bf8ab1543a5158918c1bbe91fff5.bin",
+      "bytes": 7156298,
+      "sha256": "32e673097fc0a0c4a71dea8373d48c659783bf8ab1543a5158918c1bbe91fff5",
+      "etag": "3a649cc1f344e7274f12df64f035e0c4",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/earth-tiles-7.bin": {
+      "key": "assets/textures/earth-tiles-7-f4316c63e40cdbdfe0dd6be29179d24d9c9308dc0bb3b3fc5236c2841c8c0129.bin",
+      "bytes": 9245726,
+      "sha256": "f4316c63e40cdbdfe0dd6be29179d24d9c9308dc0bb3b3fc5236c2841c8c0129",
+      "etag": "e72b3f17db33396a62293c350e9f7e31",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/mars-albedo.webp": {
+      "key": "assets/textures/mars-albedo-bb39bf148273ac61e7cb1291f6d7e1973cf50100f025ad8302ef5b1e5d9f793c.webp",
+      "bytes": 1178768,
+      "sha256": "bb39bf148273ac61e7cb1291f6d7e1973cf50100f025ad8302ef5b1e5d9f793c",
+      "etag": "6a1118278c31d4e09a00cac6d534e996",
+      "contentType": "image/webp",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/mars-terrain.bin": {
+      "key": "assets/textures/mars-terrain-73e1b169581746feafe80b817c4b70281cac02b73b7248eda47318ff486bd7c7.bin",
+      "bytes": 7180544,
+      "sha256": "73e1b169581746feafe80b817c4b70281cac02b73b7248eda47318ff486bd7c7",
+      "etag": "cc7ff40581fe9a3cdb1e544971aaeb1e",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/mars-tiles-0.bin": {
+      "key": "assets/textures/mars-tiles-0-a2de000f4e48eaf6f3b9fc72d79ea696eef4628cc74ce3176b2ec106a27e7d4f.bin",
+      "bytes": 3520604,
+      "sha256": "a2de000f4e48eaf6f3b9fc72d79ea696eef4628cc74ce3176b2ec106a27e7d4f",
+      "etag": "7f547a54d6c370b63c3e1adb506e3374",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/mars-tiles-1.bin": {
+      "key": "assets/textures/mars-tiles-1-e3edc2a7c9e82eb14bfa8c8183484ab46c16b7f53e3a307590096e18259476f3.bin",
+      "bytes": 3746202,
+      "sha256": "e3edc2a7c9e82eb14bfa8c8183484ab46c16b7f53e3a307590096e18259476f3",
+      "etag": "ea1d38bc524fda287b0936c7eafba55d",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/mars-tiles-2.bin": {
+      "key": "assets/textures/mars-tiles-2-8a5d29754643ad68073559c89cdab57ee66cabe43c48b5e14d428e43251038ec.bin",
+      "bytes": 5189302,
+      "sha256": "8a5d29754643ad68073559c89cdab57ee66cabe43c48b5e14d428e43251038ec",
+      "etag": "f94b86849c727f8fb7c229e589235c8f",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/mars-tiles-3.bin": {
+      "key": "assets/textures/mars-tiles-3-5e0b22193311f8c90a68dfd6bbd18d2a26edb193972daa5255c53bb89e8f507e.bin",
+      "bytes": 5180002,
+      "sha256": "5e0b22193311f8c90a68dfd6bbd18d2a26edb193972daa5255c53bb89e8f507e",
+      "etag": "0d4731b05e3d94f82be58e94020bd418",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
     "textures/moon-albedo.webp": {
       "key": "assets/textures/moon-albedo-d8162111f13fcabed4b3a31dac3ca07da269702a2e950ce97136ad57d36abfd4.webp",
       "bytes": 4684300,
       "sha256": "d8162111f13fcabed4b3a31dac3ca07da269702a2e950ce97136ad57d36abfd4",
-      "contentType": "image/webp"
+      "etag": "0985c42a866313bd1b51ee08073e9302",
+      "contentType": "image/webp",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
     },
-    "textures/mars-albedo.webp": {
-      "key": "assets/textures/mars-albedo-033a46e3a6f21f422eb9dcc5b56944f0a2586ba456c871116a0ee34ff30f5041.webp",
-      "bytes": 1369210,
-      "sha256": "033a46e3a6f21f422eb9dcc5b56944f0a2586ba456c871116a0ee34ff30f5041",
-      "contentType": "image/webp"
+    "textures/moon-terrain.bin": {
+      "key": "assets/textures/moon-terrain-dd180db432d1bff322a7d97aca5ae9e33e2ebfcdcc1580b826e94c6e7bbaab9d.bin",
+      "bytes": 8922840,
+      "sha256": "dd180db432d1bff322a7d97aca5ae9e33e2ebfcdcc1580b826e94c6e7bbaab9d",
+      "etag": "8fcc6afdf8d4ee823dd24931cd536850",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/moon-tiles-0.bin": {
+      "key": "assets/textures/moon-tiles-0-a72a8e09ebd8c61ffb7b245382108f23bd5bc79eef45990e5797b434194708ba.bin",
+      "bytes": 11384070,
+      "sha256": "a72a8e09ebd8c61ffb7b245382108f23bd5bc79eef45990e5797b434194708ba",
+      "etag": "890de464f1cbed54e2457cf29ccad7ed",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/moon-tiles-1.bin": {
+      "key": "assets/textures/moon-tiles-1-d3b90a73641db500a3bd369b61d7c5242834167d1828699c4ce62e76e52bf724.bin",
+      "bytes": 12985634,
+      "sha256": "d3b90a73641db500a3bd369b61d7c5242834167d1828699c4ce62e76e52bf724",
+      "etag": "74574ade5f5679b775dbb02ea59a3c26",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/moon-tiles-2.bin": {
+      "key": "assets/textures/moon-tiles-2-021e173935ee1e00c01faf9a393bbb0d8dc506889ac180db32907b680839e720.bin",
+      "bytes": 14190756,
+      "sha256": "021e173935ee1e00c01faf9a393bbb0d8dc506889ac180db32907b680839e720",
+      "etag": "b9c8a0bbb59815d2b59769258553a7bd",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/moon-tiles-3.bin": {
+      "key": "assets/textures/moon-tiles-3-c37e523080ecdf386cbf39e688380375854e2c378b7ce750d46bf46b79143722.bin",
+      "bytes": 14266790,
+      "sha256": "c37e523080ecdf386cbf39e688380375854e2c378b7ce750d46bf46b79143722",
+      "etag": "794c139c000aab0e27b63767e1553a2d",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/nasa-deep-star-map.webp": {
+      "key": "assets/textures/nasa-deep-star-map-97a6634a6ceedfd5ac2b748154a125626d91130213796eeccf3e8ae2bd46f55d.webp",
+      "bytes": 4418364,
+      "sha256": "97a6634a6ceedfd5ac2b748154a125626d91130213796eeccf3e8ae2bd46f55d",
+      "etag": "e97b6d7d747a42bec1c0c52502955c9d",
+      "contentType": "image/webp",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
     }
   },
   "metadata": {
-    "data/surface-basins.json": {
-      "key": "assets/data/surface-basins-9e128d6794ba1ebb942457d5efe417915f454fe84015f275e6f096490461a040.json",
-      "bytes": 16985,
-      "sha256": "9e128d6794ba1ebb942457d5efe417915f454fe84015f275e6f096490461a040",
-      "etag": "f7ab9ea13d8e476e5ec5910f40682942",
-      "contentType": "application/json",
-      "cacheControl": "public, max-age=31536000, immutable",
-      "role": "metadata"
-    },
-    "textures/CREDITS.txt": {
-      "key": "assets/textures/CREDITS-52f23e3314168bcb842aaece42c0b4b2c22ce68c25791bed14689986ef4342b2.txt",
-      "bytes": 6095,
-      "sha256": "52f23e3314168bcb842aaece42c0b4b2c22ce68c25791bed14689986ef4342b2",
-      "etag": "4fb9090a01d35cd0692b6c35bf648488",
-      "contentType": "text/plain; charset=utf-8",
-      "cacheControl": "public, max-age=31536000, immutable",
-      "role": "metadata"
-    },
     "compute-data/world/CREDITS.md": {
       "key": "compute-data/world/CREDITS-a3394fdfc13df9d378a6dd8ab0056456cd3029eb1ef8b151536696e560a600d0.md",
       "bytes": 1576,
@@ -430,8 +562,17 @@
       "contentType": "text/markdown; charset=utf-8",
       "cacheControl": "public, max-age=31536000, immutable",
       "role": "metadata"
+    },
+    "textures/CREDITS.txt": {
+      "key": "assets/textures/CREDITS-38e37d492bc680fc78690718384845727a662f9f5cb5364dd214b1450bb4fc8e.txt",
+      "bytes": 7418,
+      "sha256": "38e37d492bc680fc78690718384845727a662f9f5cb5364dd214b1450bb4fc8e",
+      "etag": "3ddc60ab18bbef0f5bac75ba157f4c1f",
+      "contentType": "text/plain; charset=utf-8",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "metadata"
     }
   },
-  "release": "9b4f36b45e46d8c3b2078e1573b950008c67ef7071fa4df9caaa43287d4c4a0c",
-  "immutableManifestKey": "releases/9b4f36b45e46d8c3b2078e1573b950008c67ef7071fa4df9caaa43287d4c4a0c.json"
+  "release": "990f924d462cacc62ddb48caed8734f42c4d610c667bea563b5ac42b9c423f7f",
+  "immutableManifestKey": "releases/990f924d462cacc62ddb48caed8734f42c4d610c667bea563b5ac42b9c423f7f.json"
 }

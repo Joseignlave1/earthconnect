@@ -9,8 +9,12 @@ export type WorkspaceAssets = {
   dispose(): void
 }
 
-export function workspaceAssets(get: (path: string, signal: AbortSignal) => Blob | Promise<Blob>): WorkspaceAssets {
-  const urls = new Map<string, string>()
+export function workspaceAssets(
+  get: (path: string, signal: AbortSignal) => Blob | Promise<Blob>,
+  resolveDirectUrl?: (path: string, signal: AbortSignal) => Promise<string | undefined>,
+): WorkspaceAssets {
+  const objectUrls = new Map<string, string>()
+  const directUrls = new Map<string, string>()
   async function blob(path: string, signal: AbortSignal) {
     signal.throwIfAborted()
     const result = await get(path, signal)
@@ -20,16 +24,24 @@ export function workspaceAssets(get: (path: string, signal: AbortSignal) => Blob
   return {
     blob,
     async url(path, signal) {
-      const cached = urls.get(path)
+      const cached = directUrls.get(path) ?? objectUrls.get(path)
       if (cached) {
         signal.throwIfAborted()
         return cached
       }
+      if (resolveDirectUrl) {
+        const direct = await resolveDirectUrl(path, signal)
+        signal.throwIfAborted()
+        if (direct) {
+          directUrls.set(path, direct)
+          return direct
+        }
+      }
       const data = await blob(path, signal)
-      let url = urls.get(path)
+      let url = objectUrls.get(path)
       if (!url) {
         url = URL.createObjectURL(data)
-        urls.set(path, url)
+        objectUrls.set(path, url)
       }
       return url
     },
@@ -37,8 +49,9 @@ export function workspaceAssets(get: (path: string, signal: AbortSignal) => Blob
       return new Response(await blob(new URL(url).pathname.slice(1), signal))
     },
     dispose() {
-      for (const url of urls.values()) URL.revokeObjectURL(url)
-      urls.clear()
+      for (const url of objectUrls.values()) URL.revokeObjectURL(url)
+      objectUrls.clear()
+      directUrls.clear()
     },
   }
 }
