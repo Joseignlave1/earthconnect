@@ -12,6 +12,14 @@ export const VIRTUAL_TILE_GUTTER = 2
 export const VIRTUAL_TILE_MIPS = 3
 export const MAX_CONCURRENT_TILE_DECODES = 4
 
+export function tileKey(level: number, tx: number, ty: number) {
+  return (level << 16) | (ty << 8) | tx
+}
+
+export function planetTileKey(kind: 0 | 1, level: number, tx: number, ty: number) {
+  return (kind << 20) | (level << 16) | (ty << 8) | tx
+}
+
 export function parseTilePackHeader(buffer: ArrayBuffer): { packId: number; count: number } | null {
   if (buffer.byteLength < 16) return null
   const head = new DataView(buffer)

@@ -7,12 +7,10 @@ import { solarPosition } from '../src/shader-test/sun.ts'
 import { contourDetail } from '../src/shader-test/contours.ts'
 import { CELL, MISSING, RADIUS, SIZE, cellAddress, tileRow, tileX, worldTiles } from '../src/shader-test/world-grid.ts'
 import { AUTO_POSITIONS, normalizedScore, palettePosition, resolveScoreStyle, ScoreDistribution, scoreAtPalette, scorePalette } from '../src/shader-test/score-style.ts'
-import { computedScoreLayout } from '../src/shader-test/computed-scores.ts'
+import { computedScoreLayout } from '../src/shader-test/computed-score-layout.ts'
 import { createLayout } from '../src/earth-score/layout.ts'
 import { parseManifest } from '../src/earth-score/manifest.ts'
-import { tileKey } from '../src/shader-test/earth-tiles.ts'
-import { paintTilePageTable, parseTilePackHeader, parseTilePackIndex } from '../src/shader-test/virtual-tiles.ts'
-import { planetTileKey } from '../src/workspace/planetTiles.ts'
+import { paintTilePageTable, parseTilePackHeader, parseTilePackIndex, planetTileKey, tileKey } from '../src/shader-test/virtual-tiles.ts'
 
 const camera: Camera = { yaw: 0, pitch: 0, distance: 6, aspect: 1.5 }
 const mesh = createMesh()

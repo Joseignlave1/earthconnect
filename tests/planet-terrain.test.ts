@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { gunzipSync, zstdDecompressSync } from 'node:zlib'
 import { decodeTerrain, decodeTerrainEct2Payload } from '../src/shader-test/terrain.ts'
-import { buildPlanetTerrain, type TerrainBody } from '../src/workspace/planetTerrain.ts'
+import { buildPlanetTerrain, type TerrainBody } from '../src/workspace/planetTerrainMesh.ts'
 import { bodyRadius } from '../src/workspace/solarSystem.ts'
 
 const radians = Math.PI / 180

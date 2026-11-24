@@ -1,11 +1,12 @@
-import type { EarthScore, ScoreChunk } from '../earth-score/index.ts'
+import type { EarthScore } from '../earth-score/index.ts'
 import { checkedGpu } from '../earth-score/gpu.ts'
+import { computedScoreLayout, maxBatchLayers, scoreMipCount, tileCells, type ScoreBatch as Batch } from './computed-score-layout.ts'
 import { uploadBuffer } from './gpu.ts'
+import computedScoresWgsl from './shaders/computed-scores.wgsl?raw'
 import { MISSING, SIZE } from './world-grid.ts'
 
-const tileCells = SIZE ** 2
-export const scoreMipCount = Math.floor(Math.log2(SIZE)) + 1
-const maxBatchLayers = 64
+export { computedScoreLayout, scoreMipCount }
+
 const bins = MISSING
 const histogramShards = 16
 const histogramBytes = bins * Uint32Array.BYTES_PER_ELEMENT
@@ -38,160 +39,6 @@ export function destroyScoreTextures(map: ScoreTextures) {
 export function writeScoreLookup(device: GPUDevice, map: ScoreTextures, lookup: Uint16Array) {
   device.queue.writeTexture({ texture: map.lookup },lookup,{ bytesPerRow: 72 },[36,18])
 }
-
-type Batch = { chunk: ScoreChunk; chunkTile: number; firstSite: number; bank: number; layer: number; layers: number }
-
-export function computedScoreLayout(earth: Pick<EarthScore, 'chunks' | 'layout'>, bankSize: number, bankCount: number) {
-  const { layout, chunks } = earth
-  if (layout.tileSize !== SIZE || layout.rows !== layout.sites.length * tileCells ||
-      !layout.rows || layout.sites.length > bankSize * bankCount) {
-    throw new Error('Earth Score does not match the lab’s native score grid.')
-  }
-  const lookup = new Uint16Array(36 * 18).fill(MISSING)
-  layout.sites.forEach((site,index) => {
-    const h = Number(site.slice(1,3)),v = Number(site.slice(4,6))
-    lookup[v * 36 + h] = index
-  })
-  const batches: Batch[] = []
-  let nextSite = 0
-  for (const chunk of chunks) {
-    const tiles = chunk.rows / tileCells
-    if (chunk.firstAddress !== nextSite * tileCells || !Number.isInteger(tiles) || tiles < 1 ||
-        chunk.scores.size < chunk.rows * 4) throw new Error('Invalid Earth Score chunk layout.')
-    for (let chunkTile = 0; chunkTile < tiles;) {
-      const layer = nextSite % bankSize
-      const layers = Math.min(tiles - chunkTile,bankSize - layer,maxBatchLayers)
-      batches.push({ chunk,chunkTile,firstSite: nextSite,bank: Math.floor(nextSite / bankSize),layer,layers })
-      nextSite += layers
-      chunkTile += layers
-    }
-  }
-  if (nextSite !== layout.sites.length) throw new Error('Incomplete Earth Score chunk layout.')
-  const bytesPerTile = Array.from({ length: scoreMipCount },(_,lod) => (SIZE >> lod) ** 2 * 2)
-    .reduce((total,bytes) => total + bytes,0)
-  return { lookup,batches,bytes: bytesPerTile * layout.sites.length }
-}
-
-const wgsl = /* wgsl */ `
-const missing = ${MISSING}u;
-const size = ${SIZE}u;
-const tileCells = ${tileCells}u;
-const groupWidth = ${groupWidth}u;
-const groupHeight = ${groupHeight}u;
-
-@group(0) @binding(0) var<storage,read> scores: array<u32>;
-@group(0) @binding(1) var<storage,read_write> packed: array<u32>;
-@group(0) @binding(2) var<storage,read_write> histogram: array<atomic<u32>>;
-@group(0) @binding(3) var<storage,read_write> peaks: array<atomic<u32>>;
-@group(0) @binding(4) var<uniform> batch: vec4u; // first manifest site, first chunk tile, pack layer offset
-@group(0) @binding(5) var previous: texture_2d_array<u32>;
-@group(0) @binding(6) var<storage,read_write> summary: array<u32>;
-
-var<workgroup> groupPeak: atomic<u32>;
-var<workgroup> zeros: atomic<u32>;
-var<workgroup> hotCode: u32;
-var<workgroup> hotCount: atomic<u32>;
-
-// Two uint16 pixels share a storage word. Copy rows have 256-byte alignment.
-fn storePair(id: vec3u, layerOffset: u32, dimensions: vec2u, lo: u32, hi: u32) {
-  let wordsPerRow = ((dimensions.x + 127u) / 128u) * 64u;
-  packed[((layerOffset + id.z) * dimensions.y + id.y) * wordsPerRow + id.x] = lo | (hi << 16u);
-}
-
-fn count(code: u32, amount: u32, shard: u32, hot: u32) {
-  if (code == 0u) { atomicAdd(&zeros,amount); }
-  else if (hot != 0u && code == hot) { atomicAdd(&hotCount,amount); }
-  else if (code < missing) { atomicAdd(&histogram[shard * missing + code],amount); }
-}
-
-@compute @workgroup_size(${groupWidth},${groupHeight})
-fn base(@builtin(global_invocation_id) id: vec3u, @builtin(workgroup_id) group: vec3u,
-        @builtin(local_invocation_index) local: u32) {
-  let x = id.x * 2u;
-  let site = batch.x + id.z;
-  let shard = (group.x + group.y * 7u + site * 11u) % ${histogramShards}u;
-  let inBounds = x < size && id.y < size;
-  var lo = missing;
-  var hi = missing;
-  if (inBounds) {
-    let row = (batch.y + id.z) * tileCells + id.y * size + x;
-    lo = min(missing,scores[row]);
-    hi = min(missing,scores[row + 1u]);
-    storePair(id,batch.z,vec2u(size),lo,hi);
-  }
-  if (local == 0u) {
-    hotCode = select(0u,lo,lo > 0u && lo < missing);
-  }
-  workgroupBarrier();
-  let hot = hotCode;
-  if (inBounds) {
-    if (lo == hi) { count(lo,2u,shard,hot); }
-    else {
-      count(lo,1u,shard,hot);
-      count(hi,1u,shard,hot);
-    }
-    if (lo < missing || hi < missing) {
-      let useHi = lo == missing || (hi < missing && hi > lo);
-      let code = select(lo,hi,useHi);
-      // A group contains 256 pixels. Lower pixel addresses break score ties.
-      let pixel = local * 2u + u32(useHi);
-      atomicMax(&groupPeak,((code + 1u) << 8u) | (255u - pixel));
-    }
-  }
-  workgroupBarrier();
-  if (local == 0u) {
-    let zeroCount = atomicLoad(&zeros);
-    if (zeroCount > 0u) { atomicAdd(&histogram[shard * missing],zeroCount); }
-    let cachedCount = atomicLoad(&hotCount);
-    if (cachedCount > 0u) { atomicAdd(&histogram[shard * missing + hot],cachedCount); }
-    let peak = atomicLoad(&groupPeak);
-    if (peak > 0u) {
-      let localPixel = 255u - (peak & 255u);
-      let px = group.x * groupWidth * 2u + localPixel % (groupWidth * 2u);
-      let py = group.y * groupHeight + localPixel / (groupWidth * 2u);
-      let pixel = py * size + px;
-      // The tile's address needs 17 bits. Each half fits a score and address
-      // into one atomic word, with zero reserved for an empty half.
-      atomicMax(&peaks[site * 2u + (pixel >> 16u)],((peak >> 8u) << 16u) | (65535u - (pixel & 65535u)));
-    }
-  }
-}
-
-fn footprint(position: vec2u, layer: u32, dimensions: vec2u, source: vec2u) -> u32 {
-  let first = position * source / dimensions;
-  let end = (position + 1u) * source / dimensions;
-  var best = missing;
-  for (var y = first.y; y < end.y; y++) {
-    for (var x = first.x; x < end.x; x++) {
-      let code = textureLoad(previous,vec2i(i32(x),i32(y)),i32(layer),0).x;
-      if (code < missing) { best = select(max(best,code),code,best == missing); }
-    }
-  }
-  return best;
-}
-
-@compute @workgroup_size(${groupWidth},${groupHeight})
-fn mip(@builtin(global_invocation_id) id: vec3u) {
-  let source = textureDimensions(previous);
-  let dimensions = max(vec2u(1u),source / 2u);
-  let x = id.x * 2u;
-  if (x >= dimensions.x || id.y >= dimensions.y) { return; }
-  let lo = footprint(vec2u(x,id.y),id.z,dimensions,source);
-  var hi = missing;
-  if (x + 1u < dimensions.x) { hi = footprint(vec2u(x + 1u,id.y),id.z,dimensions,source); }
-  storePair(id,0u,dimensions,lo,hi);
-}
-
-@compute @workgroup_size(256)
-fn summarize(@builtin(global_invocation_id) id: vec3u) {
-  if (id.x >= missing) { return; }
-  var total = 0u;
-  for (var shard = 0u; shard < ${histogramShards}u; shard++) {
-    total += atomicLoad(&histogram[shard * missing + id.x]);
-  }
-  summary[id.x] = total;
-}
-`
 
 type Pipelines = { base: GPUComputePipeline; mip: GPUComputePipeline; summarize: GPUComputePipeline }
 const pipelines = new WeakMap<GPUDevice,Promise<Pipelines>>()
@@ -243,11 +90,15 @@ function scorePipelines(device: GPUDevice) {
   const cached = pipelines.get(device)
   if (cached) return cached
   const pending = checkedGpu(device, () => {
-    const module = device.createShaderModule({ label: 'Native score tiles and max LODs',code: wgsl })
-    const make = (entryPoint: string) => device.createComputePipelineAsync({
-      label: `Native scores: ${entryPoint}`,layout: 'auto',compute: { module,entryPoint },
+    const module = device.createShaderModule({ label: 'Native score tiles and max LODs',code: computedScoresWgsl })
+    const make = (entryPoint: string, constants: Record<string, number>) => device.createComputePipelineAsync({
+      label: `Native scores: ${entryPoint}`,layout: 'auto',compute: { module,entryPoint,constants },
     })
-    return [make('base'),make('mip'),make('summarize')] as const
+    return [
+      make('base', { MISSING, SIZE, TILE_CELLS: tileCells, GROUP_WIDTH: groupWidth, GROUP_HEIGHT: groupHeight, HISTOGRAM_SHARDS: histogramShards }),
+      make('mip', { MISSING, GROUP_WIDTH: groupWidth, GROUP_HEIGHT: groupHeight }),
+      make('summarize', { MISSING, HISTOGRAM_SHARDS: histogramShards }),
+    ] as const
   },'Preparing the GPU score pipelines').then(async ([base,mip,summarize]) => ({
     base: await base,mip: await mip,summarize: await summarize,
   }))

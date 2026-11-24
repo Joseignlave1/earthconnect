@@ -39,19 +39,3 @@ export function magmaColor(value: number) {
   const index = Math.max(0,Math.min(1,value)) * (MAGMA.length - 1), lo = Math.min(MAGMA.length - 2,Math.floor(index))
   return MAGMA[lo].map((channel,i) => channel + (MAGMA[lo + 1][i] - channel) * (index - lo))
 }
-
-export const colorShader = `
-fn toLinear(c: vec3f) -> vec3f {
-  return mix(c / 12.92,pow((c + .055) / 1.055,vec3f(2.4)),step(vec3f(.04045),c));
-}
-fn toDisplay(c: vec3f) -> vec3f {
-  return mix(c * 12.92,1.055 * pow(max(c,vec3f(0.)),vec3f(1. / 2.4)) - .055,step(vec3f(.0031308),c));
-}`
-
-export const magmaShader = `
-fn magma(value: f32) -> vec3f {
-  let stops = array<vec3f,${MAGMA.length}>(${MAGMA.map(c => `vec3f(${c.join(',')})`).join(',')});
-  let index = clamp(value,0.,1.) * ${MAGMA.length - 1}.;
-  let lo = min(u32(floor(index)),${MAGMA.length - 2}u);
-  return mix(stops[lo],stops[lo + 1u],index - f32(lo));
-}`

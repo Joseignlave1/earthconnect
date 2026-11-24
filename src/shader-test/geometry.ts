@@ -3,8 +3,8 @@ export type Rotation = [number, number, number, number]
 export type Selection = { longitude: number; latitude: number; position: Vec3; elevation?: number }
 export type Camera = { yaw: number; pitch: number; rotation?: Rotation; center?: Vec3; distance: number; aspect: number; near?: number }
 export const FOV = Math.PI / 4
-export const COLUMNS = 384
-export const ROWS = 192
+export const COLUMNS = 512
+export const ROWS = 256
 export const EARTH_AXIS = 6378137
 export const EARTH_FLATTENING = 1 / 298.257223563
 
@@ -50,19 +50,6 @@ export function equalEarthInverse(x: number, y: number): { lon: number; lat: num
   const lat = Math.asin(Math.max(-1, Math.min(1, Math.sin(theta) / EE_M)))
   return { lon, lat }
 }
-
-export const equalEarthShader = `
-fn equalEarth(lon: f32,lat: f32) -> vec2f {
-  let theta = asin(clamp(.8660254038 * sin(lat),-1.,1.));
-  let t2 = theta * theta;
-  let t6 = t2 * t2 * t2;
-  let d = 1.340264 - .243318 * t2 + t6 * (.006251 + .034164 * t2);
-  return vec2f(
-    1.1547005384 * lon * cos(theta) / d,
-    theta * (1.340264 - .081106 * t2 + t6 * (.000893 + .003796 * t2)),
-  );
-}
-`
 
 // Equal Earth flat map opening at ±180°, morphing smoothly to the WGS84 ellipsoid.
 export function surfacePoint(longitude: number, latitude: number, morph: number, elevation = 0, exaggeration = 1): Vec3 {

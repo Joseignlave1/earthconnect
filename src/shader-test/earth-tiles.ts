@@ -2,9 +2,11 @@ import { cameraBasis, equalEarthInverse, FOV, type Camera, type Vec3 } from './g
 import { generateMipmaps } from './gpu.ts'
 import {
   createTileSampler, findLruSlot, intersectUnitSphere, loadPackIndexEntries, MAX_CONCURRENT_TILE_DECODES,
-  paintTilePageTable, readTileWebpBlob, toPackHandle, VIRTUAL_TILE_MIPS, VIRTUAL_TILE_SIZE,
+  paintTilePageTable, readTileWebpBlob, tileKey, toPackHandle, VIRTUAL_TILE_MIPS, VIRTUAL_TILE_SIZE,
   type PackHandle, type TileEntry,
 } from './virtual-tiles.ts'
+
+export { tileKey }
 
 const EARTH_TILE_PACKS = 8
 const EARTH_TILE_SLOTS = 96
@@ -18,10 +20,6 @@ type TileSlot = { key: number; level: number; tx: number; ty: number; lastUsed: 
 type TileJob = { key: number; level: number; tx: number; ty: number; priority: number }
 
 export type EarthTilePackLoader = (packId: number, signal: AbortSignal) => Promise<Blob | string | null>
-
-export function tileKey(level: number, tx: number, ty: number) {
-  return (level << 16) | (ty << 8) | tx
-}
 
 function keyLevel(key: number) { return key >>> 16 }
 function keyTy(key: number) { return (key >>> 8) & 0xff }
@@ -64,7 +62,7 @@ export class EarthTileCache {
     this.poolTexture = device.createTexture({
       label: 'Earth tile pool placeholder',
       size: [1, 1, 1],
-      format: 'rgba8unorm',
+      format: 'rgba8unorm-srgb',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     })
     device.queue.writeTexture({ texture: this.poolTexture }, new Uint8Array([18, 30, 42, 255]), {}, [1, 1, 1])
@@ -140,7 +138,7 @@ export class EarthTileCache {
       label: 'Earth 500m virtual tile cache',
       size: [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE, EARTH_TILE_SLOTS],
       mipLevelCount: VIRTUAL_TILE_MIPS,
-      format: 'rgba8unorm',
+      format: 'rgba8unorm-srgb',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
     })
     this.notifyTexturesChanged()

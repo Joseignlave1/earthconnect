@@ -2,9 +2,11 @@ import { FOV } from '../shader-test/geometry.ts'
 import { generateMipmaps } from '../shader-test/gpu.ts'
 import {
   createTileSampler, findLruSlot, intersectUnitSphere, loadPackIndexEntries, MAX_CONCURRENT_TILE_DECODES,
-  paintTilePageTable, readTileWebpBlob, toPackHandle, VIRTUAL_TILE_INNER, VIRTUAL_TILE_MIPS, VIRTUAL_TILE_SIZE,
+  paintTilePageTable, planetTileKey, readTileWebpBlob, toPackHandle, VIRTUAL_TILE_INNER, VIRTUAL_TILE_MIPS, VIRTUAL_TILE_SIZE,
   type PackHandle, type TileEntry, type TileVec3,
 } from '../shader-test/virtual-tiles.ts'
+
+export { planetTileKey }
 
 export type PlanetTileBody = 'moon' | 'mars'
 
@@ -32,10 +34,6 @@ export type PlanetTilePackLoader = (body: PlanetTileBody, packId: number, signal
 
 export function planetTilePath(body: PlanetTileBody, packId: number) {
   return `textures/${body}-tiles-${packId}.bin`
-}
-
-export function planetTileKey(kind: 0 | 1, level: number, tx: number, ty: number) {
-  return (kind << 20) | (level << 16) | (ty << 8) | tx
 }
 
 function pairKey(level: number, tx: number, ty: number) {

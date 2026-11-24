@@ -1,3 +1,10 @@
+import fullscreenWgsl from './shaders/fullscreen.wgsl?raw'
+import mipBlitWgsl from './shaders/mip-blit.wgsl?raw'
+
+export function joinWgsl(...parts: string[]) {
+  return parts.join('\n')
+}
+
 // WebGPU owns resource lifetime explicitly; uploads never read numeric data
 // through canvas or image color conversion.
 export async function shaderModule(device: GPUDevice, label: string, code: string) {
@@ -84,23 +91,7 @@ export async function copyExternalImageChunked(
   }
 }
 
-export const fullscreenVertex = `
-struct ScreenVertex {
-  @builtin(position) position: vec4f,
-  @location(0) uv: vec2f,
-}
-@vertex fn screenVertex(@builtin(vertex_index) index: u32) -> ScreenVertex {
-  let p = vec2f(f32((index << 1u) & 2u),f32(index & 2u));
-  // Texture coordinates run downwards, while clip-space Y points upwards.
-  return ScreenVertex(vec4f(p * 2. - 1.,0.,1.),vec2f(p.x,1. - p.y));
-}`
-
-const mipBlitShader = `${fullscreenVertex}
-@group(0) @binding(0) var source: texture_2d<f32>;
-@group(0) @binding(1) var linearSampler: sampler;
-@fragment fn mipFragment(input: ScreenVertex) -> @location(0) vec4f {
-  return textureSampleLevel(source, linearSampler, input.uv, 0.);
-}`
+const mipBlitShader = joinWgsl(fullscreenWgsl, mipBlitWgsl)
 
 type DeviceMipCache = {
   module: GPUShaderModule
