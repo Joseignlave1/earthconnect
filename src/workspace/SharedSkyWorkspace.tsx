@@ -25,6 +25,7 @@ import { createEarthWorkspaceResources, type EarthWorkspaceResources } from './e
 import { useEarthWorkspace } from './useEarthWorkspace'
 import {
   assembleShaderProject,
+  defaultShaderProject,
   defaultShaderSource,
   findShaderLocation,
   readShaderProject,
@@ -620,7 +621,12 @@ function FilePreview({
   )
 }
 
-type WorkspaceProps = { assets: WorkspaceAssets; resources?: EarthWorkspaceResources; onReady: () => void }
+type WorkspaceProps = {
+  assets: WorkspaceAssets
+  resources?: EarthWorkspaceResources
+  initialProject?: ShaderProject
+  onReady: () => void
+}
 
 function StandaloneSkyWorkspace({ assets, onReady }: WorkspaceProps) {
   const sceneReady = useCallback(() => {
@@ -633,9 +639,9 @@ function StandaloneSkyWorkspace({ assets, onReady }: WorkspaceProps) {
   )
 }
 
-export default function SharedSkyWorkspace({ assets, resources, onReady }: WorkspaceProps) {
+export default function SharedSkyWorkspace({ assets, resources, initialProject, onReady }: WorkspaceProps) {
   if (!WgslEditor) return <StandaloneSkyWorkspace assets={assets} onReady={onReady} />
-  return <ShaderWorkspace assets={assets} resources={resources} onReady={onReady} />
+  return <ShaderWorkspace assets={assets} resources={resources} initialProject={initialProject} onReady={onReady} />
 }
 
 function initialPreviewFileId(files: readonly { id: string }[], activeFileId: string): string | undefined {
@@ -668,11 +674,13 @@ function initialPreviewFileId(files: readonly { id: string }[], activeFileId: st
   return valid.has(activeFileId) ? activeFileId : undefined
 }
 
-function ShaderWorkspace({ assets, resources: sharedResources, onReady }: WorkspaceProps) {
+function ShaderWorkspace({ assets, resources: sharedResources, initialProject, onReady }: WorkspaceProps) {
   const [resources] = useState(() => sharedResources ?? createEarthWorkspaceResources())
   const [workbenchFailed, setWorkbenchFailed] = useState(false)
-  const [projectFiles, setProjectFiles] = useState(readShaderProject)
+  const [projectFiles, setProjectFiles] = useState<ShaderProject>(() => initialProject ?? defaultShaderProject())
   const currentProject = useRef(projectFiles)
+  const projectLoaded = useRef(initialProject !== undefined)
+  const persistedProject = useRef(projectFiles)
   const [vim, setVim] = useState(readVim)
   const [insertion, setInsertion] = useState<{ id: number; fileId: string; text: string }>()
   const sequence = useRef(0)
@@ -793,7 +801,23 @@ function ShaderWorkspace({ assets, resources: sharedResources, onReady }: Worksp
     return () => controller.abort()
   }, [shaderFiles, activeFile, openPreviews, analyzerReady, resources])
   useEffect(() => {
-    saveShaderProject(projectFiles)
+    if (projectLoaded.current) return
+    let cancelled = false
+    void readShaderProject().then(loaded => {
+      if (cancelled || projectLoaded.current) return
+      projectLoaded.current = true
+      persistedProject.current = loaded
+      currentProject.current = loaded
+      setProjectFiles(loaded)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  useEffect(() => {
+    if (!projectLoaded.current || projectFiles === persistedProject.current) return
+    persistedProject.current = projectFiles
+    void saveShaderProject(projectFiles)
   }, [projectFiles])
   useEffect(() => {
     try {
@@ -804,6 +828,7 @@ function ShaderWorkspace({ assets, resources: sharedResources, onReady }: Worksp
   }, [vim])
 
   function updateProject(next: ShaderProject) {
+    projectLoaded.current = true
     currentProject.current = next
     setProjectFiles(next)
   }

@@ -4,6 +4,7 @@ import '../index.css'
 import type { createSurfaceDevicePool } from '../shader-test/surface-device.ts'
 import { WorkspaceStartup } from './WorkspaceStartup.tsx'
 import type { WorkspaceAssets } from './workspaceAssets.ts'
+import { readShaderProject } from './shaderProject.ts'
 import { startWorkspacePrewarm, type WorkspacePrewarm } from './workspacePrewarm.ts'
 import type { loadWorkspaceRelease } from './workspaceRelease.ts'
 
@@ -27,13 +28,20 @@ function createOpener(
       releaseUnclaimedDevice?.()
     }
     signal.addEventListener('abort', prewarm.dispose, { once: true })
-    const { default: SharedSkyWorkspace } = await workspaceModule
+    const [{ default: SharedSkyWorkspace }, initialProject] = await Promise.all([workspaceModule, readShaderProject()])
     signal.throwIfAborted()
     const handleReady = () => {
       prewarm.handoff()
       onReady()
     }
-    return <SharedSkyWorkspace assets={assets} resources={prewarm.resources} onReady={handleReady} />
+    return (
+      <SharedSkyWorkspace
+        assets={assets}
+        resources={prewarm.resources}
+        initialProject={initialProject}
+        onReady={handleReady}
+      />
+    )
   }
 }
 
