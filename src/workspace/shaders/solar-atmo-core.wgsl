@@ -55,7 +55,13 @@ fn computeEarthAtmo(input: ScreenVertex) -> AtmoSample {
     - evalAtmoB(mappedNdc - vec2f(0., mappedStep.y), centerS, pAxis, stretch);
   let db = max(length(vec2f(dbX, dbY)), max(t, 0.) * view.light.w * .5);
   let maxScale = select(1.058, 1.032, isMars);
-  if (t <= view.back.w || bEllip - .5 * db >= radius * maxScale || bEllip + .5 * db <= radius) {
+  // Displaced 3D terrain can dip below the reference radius (e.g. Mars's northern lowlands
+  // and Hellas Basin sit up to ~25 km below MOLA datum with 3x relief). Extend the inner
+  // plateau past the deepest depression when not using the smooth analytic small-planet sphere
+  // so hardware/4-sample depth testing clips the atmosphere seamlessly against the real mesh
+  // silhouette instead of leaving a dark gap between depressed terrain and `radius`.
+  let minScale = select(select(.998, .988, isMars), 1., isSmall);
+  if (t <= view.back.w || bEllip - .5 * db >= radius * maxScale || bEllip + .5 * db <= radius * minScale) {
     return AtmoSample(vec3f(0.), 0., false);
   }
   let shellWidth = select(.046, .024, isMars);
@@ -64,21 +70,31 @@ fn computeEarthAtmo(input: ScreenVertex) -> AtmoSample {
   let w = max(db * invShell, 1e-4);
   let a0 = altSigned - .5 * w;
   let a1 = altSigned + .5 * w;
+  let altMin = (minScale - 1.) / shellWidth;
   let altMax = 1.25;
-  let lo = max(0., a0);
-  let hi = min(altMax, a1);
-  if (hi <= lo) { return AtmoSample(vec3f(0.), 0., false); }
-  // Closed-form integral of (exp(-k*x) - exp(-k*altMax)) / (1 - exp(-k*altMax)) over [lo, hi].
-  // Small planets have exact analytical ellipsoid/sphere horizons with zero displaced relief, so
-  // testing depth at the front bounding plane lets all 4 MSAA samples pass on the rim (while still
+  let flatLo = max(altMin, a0);
+  let flatHi = min(0., a1);
+  let flatSpan = max(0., flatHi - flatLo);
+  let expLo = max(0., a0);
+  let expHi = min(altMax, a1);
+  let expSpan = max(0., expHi - expLo);
+  if (flatSpan + expSpan <= 0.) { return AtmoSample(vec3f(0.), 0., false); }
+  // Closed-form integral of (exp(-k*x) - exp(-k*altMax)) / (1 - exp(-k*altMax)) over [expLo, expHi],
+  // joined continuously with a unit plateau over [flatLo, flatHi] below the reference datum.
+  // Small planets have exact analytical ellipsoid/sphere horizons with zero displaced relief (altMin = 0),
+  // so testing depth at the front bounding plane lets all 4 MSAA samples pass on the rim (while still
   // occluding behind closer bodies like the Moon) and dividing by full pixel width w yields the
   // exact continuous integral at every sub-pixel offset without 4-sample visibility mismatch.
   let k = select(4.2, 4.6, isMars);
   let eEnd = exp(-k * altMax);
-  let span = hi - lo;
-  let expIntegral = select((exp(-k * lo) - exp(-k * hi)) / k, exp(-k * .5 * (lo + hi)) * span, k * span < 1e-4);
-  let denom = select(max(a1 - lo, 1e-4), w, isSmall);
-  let shell = max(0., (expIntegral - eEnd * span) / (denom * (1. - eEnd)));
+  let expIntegral = select(
+    (exp(-k * expLo) - exp(-k * expHi)) / k,
+    exp(-k * .5 * (expLo + expHi)) * expSpan,
+    k * expSpan < 1e-4,
+  );
+  let expContrib = select(0., max(0., (expIntegral - eEnd * expSpan) / (1. - eEnd)), expSpan > 0.);
+  let denom = select(max(a1 - max(altMin, a0), 1e-4), w, isSmall);
+  let shell = (flatSpan + expContrib) / denom;
   let limbNormal = offset / max(length(offset), 1.e-4);
   let sunDir = normalize(view.light.xyz - center);
   let sunDot = dot(limbNormal, sunDir);
@@ -95,7 +111,10 @@ fn computeEarthAtmo(input: ScreenVertex) -> AtmoSample {
     vec3f(.10, .06, .04) * .06 * (1. - day),
     isMars,
   ) * shell * atmo.params.x;
-  let atmoT = select(t, max(view.back.w * 1.01, t - radius * 1.01), isSmall);
+  // For 3D displaced meshes, place the atmosphere depth plane slightly past the planet center plane
+  // so steep front-facing limb relief never fails depth test against the atmosphere while still
+  // occluding properly behind closer bodies and staying strictly in front of the infinite sky.
+  let atmoT = select(t + radius * .05, max(view.back.w * 1.01, t - radius * 1.01), isSmall);
   let depth = -ray.z * atmoT;
   if (depth <= view.back.w) { return AtmoSample(vec3f(0.), 0., false); }
   return AtmoSample(radiance, view.back.w / depth, true);
