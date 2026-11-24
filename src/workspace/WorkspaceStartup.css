@@ -1,0 +1,126 @@
+.brand {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 7px;
+  color: var(--ink, #f7f9ff);
+  font:
+    500 13px / 1 "DM Sans",
+    system-ui,
+    sans-serif;
+  letter-spacing: 0.2em;
+  text-decoration: none;
+}
+.brand > span:not(.brand-symbol) {
+  font-weight: 600;
+}
+.brand-symbol {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-right: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 50%;
+}
+.brand-symbol::after {
+  content: "";
+  position: absolute;
+  width: 37px;
+  height: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  transform: rotate(-24deg);
+}
+.brand-symbol i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--nasa-red, #fc3d21);
+  box-shadow: 0 0 10px rgba(252, 61, 33, 0.55);
+}
+
+.workspace-content {
+  isolation: isolate;
+}
+
+.workspace-startup {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: 24px;
+  background: #000;
+  color: #f7f9ff;
+  font:
+    14px / 1.5 system-ui,
+    sans-serif;
+  text-align: center;
+}
+
+.workspace-startup[data-revealed] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 220ms ease-out,
+    visibility 0s 220ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-startup[data-revealed] {
+    transition: none;
+  }
+}
+
+.workspace-startup-content {
+  width: min(100%, 300px);
+}
+
+.workspace-startup progress {
+  display: block;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  margin: 30px 0 12px;
+  border: 0;
+  border-radius: 2px;
+  overflow: hidden;
+  background: #292929;
+  color: #f7f9ff;
+}
+
+.workspace-startup progress::-webkit-progress-bar {
+  background: #292929;
+}
+.workspace-startup progress::-webkit-progress-value {
+  background: #f7f9ff;
+}
+.workspace-startup progress::-moz-progress-bar {
+  background: #f7f9ff;
+}
+.workspace-startup p {
+  margin: 0;
+  color: #bbb;
+  font-variant-numeric: tabular-nums;
+}
+.workspace-startup p[role="alert"] {
+  margin-top: 22px;
+  color: #f7f9ff;
+}
+.workspace-startup .workspace-startup-error {
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.workspace-startup button {
+  margin-top: 18px;
+  padding: 6px 16px;
+  border: 1px solid #666;
+  border-radius: 4px;
+  background: #171717;
+  color: #f7f9ff;
+  cursor: pointer;
+}

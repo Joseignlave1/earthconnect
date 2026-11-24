@@ -1,0 +1,136 @@
+Magma color palette
+Nathaniel J. Smith and Stefan van der Walt, CC0 / public domain.
+https://github.com/BIDS/colormap
+https://creativecommons.org/publicdomain/zero/1.0/
+The surface shader and legend interpolate 32 samples from the original palette.
+
+earth-blue-marble.jpg
+
+NASA Blue Marble: Next Generation, July 2004, with topography.
+Credit: NASA Earth Observatory. Blue Marble: Next Generation was produced
+by Reto Stockli, NASA Earth Observatory (NASA Goddard Space Flight Center).
+
+Source and original 21600 x 10800 JPEG:
+https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography/
+https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography/july/world.topo.200407.3x21600x10800.jpg
+
+Bundled 8192 x 4096 progressive JPEG downsampled with Lanczos filtering.
+
+earth-tiles-0.bin .. earth-tiles-7.bin
+
+NASA Blue Marble: Next Generation, July 2004, 500 m topography mosaic
+(8 panels world.topo.200407.3x21600x21600.{A1..D2}.jpg, 86400 x 43200).
+Credit: NASA Earth Observatory / Reto Stockli (NASA GSFC).
+Sliced into 8 octant ECVT1 packs across 3 dyadic levels (40x20, 80x40, 160x80
+tiles; 508x508 logical pixels + 2 px seamless neighbor gutter inside 512x512
+WebP tiles, ~493 m/px at level 2) via scripts/prepare-earth-tiles.py. Open-ocean
+tiles are omitted so oceans use the 8K base layer + GEBCO bathymetry.
+
+Used only as a geographic visual reference underneath synthetic Perlin scores.
+
+earth-elevation.png
+earth-terrain.bin
+
+GEBCO Compilation Group (2026), GEBCO_2026 Grid.
+https://www.gebco.net/data-products-gridded-bathymetry-data/gebco2026-grid
+COG distribution by the Australian Antarctic Division:
+https://source.coop/ausantarctic/gebco
+https://data.source.coop/ausantarctic/gebco/GEBCO_2026.tif
+
+Visual overview: global geographic grid, 4096 x 2048 (~9.8 km at the equator).
+Prepared with rasterio average resampling from available source overviews.
+Stored elevation = R * 256 + G - 32768 metres, north-to-south rows.
+Blue encodes signed distance to the connected ocean boundary in source pixels:
+distance = (B - 128) / 4, positive inland, saturated at +/-31.75 pixels.
+Ocean membership is the largest connected negative-elevation component, joined
+across the dateline. Enclosed negative basins do not become ocean. This is an
+approximate coastline derived from the overview, not an exact shoreline survey.
+RGB values are data, not a visual color ramp. Elevation PNG round-trip checked.
+The runtime loads a lossless Zstd-compressed numeric copy (ECT2 header,
+little-endian uint32 width/height/flags, 2D-predicted byte-shuffled uint16
+elevation + uint8 coast distance). It does not read elevation through canvas:
+browser fingerprinting protection can add noise to canvas readback and corrupt
+packed numeric heights. The preparation script writes a reference PNG to exports/earth-elevation.png.
+The GPU uses a two-channel float texture (32-bit filtering when supported,
+16-bit fallback) and averaged display LODs;
+inspection reads the original prepared metre values.
+Display mip levels average their polar rows to a single value per pole, and
+globe pole vertices share the corresponding native-row average height.
+Observed overview elevation range: -10353..6320 m.
+This overview supports visualization, not precise local height measurements.
+Negative elevations remain available for inspection; geometric oceans are flat
+at sea level. The blue outline uses geographic distance to the ocean boundary,
+independently of the elevation derivatives used for inland contour lines.
+Land geometry uses WGS84 plus exaggerated positive relief; contour labels and
+inspected elevations always use unexaggerated overview elevations.
+Reproduction: scripts/prepare-terrain.py (temporary rasterio/numpy/Pillow/SciPy env).
+
+moon-terrain.bin
+
+NASA Lunar Reconnaissance Orbiter Lunar Orbiter Laser Altimeter (LOLA),
+global cylindrical Gridded Data Record LDEM_64, 64 samples per degree.
+Credit: NASA / GSFC and the LOLA Science Team, distributed by NASA PDS.
+Elevations reference the 1737.4 km sphere (0.5 m per little-endian signed sample).
+https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/cylindrical/img/ldem_64.img
+
+moon-albedo.webp
+
+NASA Scientific Visualization Studio CGI Moon Kit (2019), LRO Wide Angle Camera
+global color mosaic (lroc_color_poles_8k.tif, 8192 x 4096, public domain).
+Credit: NASA's Scientific Visualization Studio / Ernie Wright / LROC Team.
+https://svs.gsfc.nasa.gov/4720
+https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_poles_8k.tif
+
+moon-tiles-0.bin .. moon-tiles-3.bin
+
+Paired 24K (24384 x 12192, ~448 m/px) LROC WAC color albedo (lroc_color_poles.tif,
+NASA SVS CGI Moon Kit, 27360 x 13680) + tangent-space relief normals derived from
+LOLA LDEM_64 (23040 x 11520, ~474 m/px). Packed into 4 quadrant ECVT1 packs
+(24x12 L0, 48x24 L1, 508x508 logical + 2 px seamless gutter inside 512x512 WebP)
+via scripts/prepare-planet-tiles.py.
+
+mars-terrain.bin
+
+NASA Mars Global Surveyor Mars Orbiter Laser Altimeter (MOLA) Mission
+Experiment Gridded Data Record, global 32 samples per degree, MEGT90N000FB.
+Credit: NASA and the MOLA Science Team, distributed by NASA PDS.
+Signed big-endian samples are metres relative to the MOLA areoid.
+https://pds-geosciences.wustl.edu/mgs/urn-nasa-pds-mgs_mola_topography_derived/meg032/megt90n000fb.img
+
+mars-albedo.webp
+
+USGS Astrogeology Science Center / NASA Mars Viking Global Color Mosaic (925 m/px,
+Simple Cylindrical Mars, public domain), Lanczos-resampled to 8192 x 4096 WebP.
+Credit: USGS Astrogeology Science Center / NASA Viking Mission.
+https://planetarymaps.usgs.gov/mosaic/Mars_Viking_ClrMosaic_global_925m.tif
+
+mars-tiles-0.bin .. mars-tiles-3.bin
+
+Paired 24K (24384 x 12192, ~875 m/px) USGS Mars Viking color albedo
+(Mars_Viking_ClrMosaic_global_925m.tif, 23040 x 11520) + tangent-space relief
+normals derived from MGS MOLA MEG064 (megt{90,00}n{000,180}gb.img, 23040 x 11520,
+~925 m/px). Packed into 4 quadrant ECVT1 packs (24x12 L0, 48x24 L1, 508x508 logical
++ 2 px seamless gutter inside 512x512 WebP) via scripts/prepare-planet-tiles.py.
+
+Both planetary display DEMs are area-averaged to a 4096 x 2048 global
+planetocentric equirectangular grid centered at 0° longitude, isotropically
+filtered along polar longitudes to prevent orbital cross-track spokes, and stored
+in ECT2 format (16-byte header + Zstd-compressed byte-shuffled 2D-predicted
+uint16 signed metres). High-resolution close-up relief comes from the paired
+24K tangent-space normal tile packs. Run scripts/prepare-planet-terrain.py to reproduce them.
+
+nasa-deep-star-map.webp
+
+Deep Star Maps 2020, NASA/Goddard Space Flight Center Scientific Visualization
+Studio, Ernie Wright. Gaia DR2: ESA/Gaia/DPAC. Star positions, brightness and
+colors also use the Hipparcos-2 and Tycho-2 catalogs.
+https://svs.gsfc.nasa.gov/4851/
+https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004851/starmap_2020_8k.exr
+
+Source is the celestial ICRF/J2000 plate carrée map (8192 × 4096 16-bit linear
+EXR). It is centered at 0 h right ascension, with right ascension increasing
+toward the left and declination increasing toward the top. Linear values are
+scaled by 0.85, converted to sRGB with subtle TPDF dithering on non-black sky
+pixels to prevent 8-bit Milky Way banding, and encoded at full 8192 × 4096 as
+quality-84 WebP via scripts/prepare-sky-assets.py. No constellation graphics
+are included.
