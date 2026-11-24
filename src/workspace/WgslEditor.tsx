@@ -5,11 +5,20 @@ import { OverlayWidgetPositionPreference } from '@codingame/monaco-vscode-api/vs
 import { MenuId, MenuRegistry } from '@codingame/monaco-vscode-api/vscode/vs/platform/actions/common/actions'
 import { CommandsRegistry } from '@codingame/monaco-vscode-api/vscode/vs/platform/commands/common/commands'
 import { ContextKeyExpr } from '@codingame/monaco-vscode-api/vscode/vs/platform/contextkey/common/contextkey'
-import { KeybindingWeight, KeybindingsRegistry } from '@codingame/monaco-vscode-api/vscode/vs/platform/keybinding/common/keybindingsRegistry'
+import {
+  KeybindingWeight,
+  KeybindingsRegistry,
+} from '@codingame/monaco-vscode-api/vscode/vs/platform/keybinding/common/keybindingsRegistry'
 import { registerShaderProjectActions } from './registerShaderProjectActions'
 import { mountShaderWorkbench, type ShaderWorkbench } from './shaderWorkbench'
 import type { CompletionItem, Hover, Position, Range } from 'vscode-languageserver-types'
-import { assembleShaderProject, findShaderLocation, selectShaderModule, type ShaderFile, type ShaderFileKind } from './shaderProject'
+import {
+  assembleShaderProject,
+  findShaderLocation,
+  selectShaderModule,
+  type ShaderFile,
+  type ShaderFileKind,
+} from './shaderProject'
 import { wgslKeywords as keywords, wgslLanguageId as language, wgslTypes as types } from './wgslTheme'
 import { startWgslLanguageServer } from './wgslLanguageServer'
 import { registerSharedWgslAnalyzer } from './planetaryShaderAnalysis'
@@ -74,7 +83,6 @@ const builtins: Readonly<Record<string, string>> = {
   NO_SCORE: 'Return this value to exclude the current cell from the map.',
 }
 
-
 function vimEditor(editor: monaco.editor.ICodeEditor) {
   const context = (editor as CodeEditorWidget).contextKeyService
   const createContextKey = context.createKey.bind(context)
@@ -93,8 +101,12 @@ function virtualSource(prelude: string, code: string) {
 }
 
 function editorRange(range: Range, firstLine = 1) {
-  return new monaco.Range(range.start.line + 2 - firstLine, range.start.character + 1,
-    range.end.line + 2 - firstLine, range.end.character + 1)
+  return new monaco.Range(
+    range.start.line + 2 - firstLine,
+    range.start.character + 1,
+    range.end.line + 2 - firstLine,
+    range.end.character + 1,
+  )
 }
 
 function hoverContents(hover: Hover): monaco.IMarkdownString[] {
@@ -107,7 +119,12 @@ function hoverContents(hover: Hover): monaco.IMarkdownString[] {
   })
 }
 
-function editorSuggestion(item: CompletionItem, defaultRange: monaco.IRange, firstLine: number, lineCount: number): monaco.languages.CompletionItem {
+function editorSuggestion(
+  item: CompletionItem,
+  defaultRange: monaco.IRange,
+  firstLine: number,
+  lineCount: number,
+): monaco.languages.CompletionItem {
   const edit = item.textEdit
   const localRange = (range: Range) => {
     const local = editorRange(range, firstLine)
@@ -115,13 +132,18 @@ function editorSuggestion(item: CompletionItem, defaultRange: monaco.IRange, fir
   }
   const insert = edit && 'insert' in edit ? localRange(edit.insert) : undefined
   const replace = edit && 'replace' in edit ? localRange(edit.replace) : undefined
-  const range = edit && ('range' in edit
-    ? localRange(edit.range)
-    : insert && replace && { insert, replace })
+  const range = edit && ('range' in edit ? localRange(edit.range) : insert && replace && { insert, replace })
   const kinds = monaco.languages.CompletionItemKind
   const kindsByProtocol: Partial<Record<number, monaco.languages.CompletionItemKind>> = {
-    2: kinds.Method, 3: kinds.Function, 5: kinds.Field, 6: kinds.Variable, 7: kinds.Class,
-    14: kinds.Keyword, 21: kinds.Constant, 22: kinds.Struct, 25: kinds.TypeParameter,
+    2: kinds.Method,
+    3: kinds.Function,
+    5: kinds.Field,
+    6: kinds.Variable,
+    7: kinds.Class,
+    14: kinds.Keyword,
+    21: kinds.Constant,
+    22: kinds.Struct,
+    25: kinds.TypeParameter,
   }
   return {
     label: item.label,
@@ -129,7 +151,10 @@ function editorSuggestion(item: CompletionItem, defaultRange: monaco.IRange, fir
     insertText: edit?.newText ?? item.insertText ?? item.label,
     range: range ?? defaultRange,
     detail: item.detail,
-    documentation: typeof item.documentation === 'string' ? item.documentation : item.documentation && { value: item.documentation.value },
+    documentation:
+      typeof item.documentation === 'string'
+        ? item.documentation
+        : item.documentation && { value: item.documentation.value },
     filterText: item.filterText,
     sortText: item.sortText,
   }
@@ -137,24 +162,39 @@ function editorSuggestion(item: CompletionItem, defaultRange: monaco.IRange, fir
 
 function cellFields(prelude: string) {
   const cell = prelude.match(/struct\s+EarthCell\s*\{([^}]*)\}/)?.[1] ?? ''
-  return Array.from(cell.matchAll(/(?:\/\/([^\n]+)\n\s*)?\b([a-zA-Z_]\w*)\s*:\s*([a-zA-Z_]\w*)/g),
-    ([, doc, name, type]) => ({ name, type, doc: doc?.trim() }))
+  return Array.from(
+    cell.matchAll(/(?:\/\/([^\n]+)\n\s*)?\b([a-zA-Z_]\w*)\s*:\s*([a-zA-Z_]\w*)/g),
+    ([, doc, name, type]) => ({ name, type, doc: doc?.trim() }),
+  )
 }
 
-function fallbackSuggestions(model: monaco.editor.ITextModel, position: monaco.Position, range: monaco.IRange, prelude: string) {
+function fallbackSuggestions(
+  model: monaco.editor.ITextModel,
+  position: monaco.Position,
+  range: monaco.IRange,
+  prelude: string,
+) {
   const kind = monaco.languages.CompletionItemKind
   const before = model.getLineContent(position.lineNumber).slice(0, position.column - 1)
   if (/\.\s*\w*$/.test(before)) {
     return cellFields(prelude).map(({ name, type, doc }) => ({
-      label: name, insertText: name, kind: kind.Field, range, detail: type, documentation: doc,
+      label: name,
+      insertText: name,
+      kind: kind.Field,
+      range,
+      detail: type,
+      documentation: doc,
     }))
   }
   return [
     ...keywords.map(name => ({ label: name, insertText: name, kind: kind.Keyword, range })),
     ...types.map(name => ({ label: name, insertText: name, kind: kind.Class, range })),
     ...Object.entries(builtins).map(([name, doc]) => ({
-      label: name, insertText: name, kind: name === 'NO_SCORE' ? kind.Constant : kind.Function,
-      range, documentation: doc,
+      label: name,
+      insertText: name,
+      kind: name === 'NO_SCORE' ? kind.Constant : kind.Function,
+      range,
+      documentation: doc,
     })),
   ]
 }
@@ -184,14 +224,20 @@ const severity = {
 }
 
 function setGpuMarkers(model: monaco.editor.ITextModel, diagnostics: readonly WgslDiagnostic[] = []) {
-  monaco.editor.setModelMarkers(model, gpuOwner, diagnostics.map(item => ({
-    ...model.validateRange(item.line > 0
-      ? new monaco.Range(item.line, item.column, item.line, item.column + Math.max(1, item.length ?? 1))
-      : new monaco.Range(1, 1, 1, model.getLineMaxColumn(1))),
-    message: item.message,
-    severity: severity[item.severity],
-    source: 'WebGPU',
-  })))
+  monaco.editor.setModelMarkers(
+    model,
+    gpuOwner,
+    diagnostics.map(item => ({
+      ...model.validateRange(
+        item.line > 0
+          ? new monaco.Range(item.line, item.column, item.line, item.column + Math.max(1, item.length ?? 1))
+          : new monaco.Range(1, 1, 1, model.getLineMaxColumn(1)),
+      ),
+      message: item.message,
+      severity: severity[item.severity],
+      source: 'WebGPU',
+    })),
+  )
 }
 
 type FileModel = {
@@ -202,7 +248,17 @@ type FileModel = {
 }
 
 export default function WgslEditor(props: Props) {
-  const { files, activeFileId, diagnostics, insertion, onInserted, prelude = '', label = 'WGSL score function', vim, analyzerEnabled = true } = props
+  const {
+    files,
+    activeFileId,
+    diagnostics,
+    insertion,
+    onInserted,
+    prelude = '',
+    label = 'WGSL score function',
+    vim,
+    analyzerEnabled = true,
+  } = props
   const current = { ...props, prelude, label, analyzerEnabled }
   const panel = useRef<HTMLDivElement>(null)
   const container = useRef<HTMLDivElement>(null)
@@ -214,7 +270,9 @@ export default function WgslEditor(props: Props) {
     maybeStartAnalyzer: () => void
   }>(null)
   const latest = useRef(current)
-  useLayoutEffect(() => { latest.current = current })
+  useLayoutEffect(() => {
+    latest.current = current
+  })
 
   useEffect(() => {
     const host = container.current
@@ -225,9 +283,12 @@ export default function WgslEditor(props: Props) {
     const models = new Map<string, FileModel>()
     const modelIds = new Map<monaco.editor.ITextModel, string>()
     const previewHosts = new Map<string, HTMLElement>()
-    const editorBindings = new Map<monaco.editor.ICodeEditor, {
-      dispose: () => void
-    }>()
+    const editorBindings = new Map<
+      monaco.editor.ICodeEditor,
+      {
+        dispose: () => void
+      }
+    >()
     const editorLanguage = ContextKeyExpr.equals('editorLangId', language)
     const runCommand = 'earthQuery.run'
     const resources: monaco.IDisposable[] = []
@@ -251,9 +312,12 @@ export default function WgslEditor(props: Props) {
     let sentProgram = program
 
     function assemble(fileId: string) {
-      return assembleShaderProject(selectShaderModule(latest.current.files, fileId).map(file => ({
-        ...file, source: models.get(file.id)?.model.getValue() ?? file.source,
-      })))
+      return assembleShaderProject(
+        selectShaderModule(latest.current.files, fileId).map(file => ({
+          ...file,
+          source: models.get(file.id)?.model.getValue() ?? file.source,
+        })),
+      )
     }
 
     function runFile(fileId: string) {
@@ -272,11 +336,19 @@ export default function WgslEditor(props: Props) {
     }
 
     function runFromPreview(event: KeyboardEvent) {
-      if (event.defaultPrevented || !(event.ctrlKey || event.metaKey) || event.key !== 'Enter'
-        || !(event.target instanceof Node)) return
+      if (
+        event.defaultPrevented ||
+        !(event.ctrlKey || event.metaKey) ||
+        event.key !== 'Enter' ||
+        !(event.target instanceof Node)
+      )
+        return
       const target = event.target
-      const fileId = [...previewHosts].find(([, preview]) => preview.contains(target)
-        || (preview.parentElement === target && preview.parentElement.classList.contains('shader-preview-pane')))?.[0]
+      const fileId = [...previewHosts].find(
+        ([, preview]) =>
+          preview.contains(target) ||
+          (preview.parentElement === target && preview.parentElement.classList.contains('shader-preview-pane')),
+      )?.[0]
       if (!fileId) return
       event.preventDefault()
       event.stopPropagation()
@@ -295,12 +367,14 @@ export default function WgslEditor(props: Props) {
           order: 1,
         }),
       )
-      resources.push(KeybindingsRegistry.registerKeybindingRule({
-        id: runCommand,
-        primary: monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-        weight: KeybindingWeight.EditorContrib,
-        when: ContextKeyExpr.and(editorLanguage, ContextKeyExpr.has('editorTextFocus')),
-      }))
+      resources.push(
+        KeybindingsRegistry.registerKeybindingRule({
+          id: runCommand,
+          primary: monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+          weight: KeybindingWeight.EditorContrib,
+          when: ContextKeyExpr.and(editorLanguage, ContextKeyExpr.has('editorTextFocus')),
+        }),
+      )
     }
 
     function applyInsertion(focusShader = true) {
@@ -314,19 +388,27 @@ export default function WgslEditor(props: Props) {
         const request = { id: insertion.id, fileId }
         focusingForInsertion = request
         if (file.closed) latest.current.onReopenFile(fileId)
-        void workbench.focusShader(fileId).then(() => {
-          if (!controller.signal.aborted && focusingForInsertion === request) applyInsertion(false)
-        }).catch(error => {
-          if (!controller.signal.aborted) console.error('Could not focus the shader for point insertion', error)
-        }).finally(() => {
-          if (focusingForInsertion === request) focusingForInsertion = undefined
-        })
+        void workbench
+          .focusShader(fileId)
+          .then(() => {
+            if (!controller.signal.aborted && focusingForInsertion === request) applyInsertion(false)
+          })
+          .catch(error => {
+            if (!controller.signal.aborted) console.error('Could not focus the shader for point insertion', error)
+          })
+          .finally(() => {
+            if (focusingForInsertion === request) focusingForInsertion = undefined
+          })
         return
       }
       const selection = activeEditor?.getSelection()
       if (!activeEditor || !selection) return
       activeEditor.pushUndoStop()
-      if (activeEditor.executeEdits('earth-insert-point', [{ range: selection, text: insertion.text, forceMoveMarkers: true }])) {
+      if (
+        activeEditor.executeEdits('earth-insert-point', [
+          { range: selection, text: insertion.text, forceMoveMarkers: true },
+        ])
+      ) {
         activeEditor.pushUndoStop()
         insertedId.current = insertion.id
         activeEditor.focus()
@@ -335,7 +417,10 @@ export default function WgslEditor(props: Props) {
     }
 
     function updateEditors() {
-      projectActions?.update(latest.current.vim, latest.current.files.some(file => file.closed))
+      projectActions?.update(
+        latest.current.vim,
+        latest.current.files.some(file => file.closed),
+      )
       const editors = new Set(workbench?.editors() ?? [])
       if (activeEditor) editors.add(activeEditor)
       for (const [editor, binding] of editorBindings) {
@@ -349,8 +434,12 @@ export default function WgslEditor(props: Props) {
         if (!binding) {
           const keydown = editor.onKeyDown(event => {
             // Handle the shortcut in the editor before Vim or workbench keybindings consume it.
-            if (event.browserEvent.defaultPrevented || !(event.ctrlKey || event.metaKey)
-              || event.keyCode !== monaco.KeyCode.Enter) return
+            if (
+              event.browserEvent.defaultPrevented ||
+              !(event.ctrlKey || event.metaKey) ||
+              event.keyCode !== monaco.KeyCode.Enter
+            )
+              return
             event.preventDefault()
             event.stopPropagation()
             runInEditor(editor)
@@ -387,17 +476,19 @@ export default function WgslEditor(props: Props) {
           }
           editor.addOverlayWidget(statusWidget)
           editorPanel.dataset.vimMode = 'loading'
-          void import('monaco-vim').then(({ initVimMode }) => {
-            if (canceled) return
-            adapter = initVimMode(vimEditor(editor), status)
-            editorPanel.dataset.vimMode = 'active'
-            editor.layoutOverlayWidget(statusWidget)
-          }).catch(() => {
-            if (canceled) return
-            editorPanel.dataset.vimMode = 'unavailable'
-            status.textContent = 'Vim unavailable'
-            editor.layoutOverlayWidget(statusWidget)
-          })
+          void import('monaco-vim')
+            .then(({ initVimMode }) => {
+              if (canceled) return
+              adapter = initVimMode(vimEditor(editor), status)
+              editorPanel.dataset.vimMode = 'active'
+              editor.layoutOverlayWidget(statusWidget)
+            })
+            .catch(() => {
+              if (canceled) return
+              editorPanel.dataset.vimMode = 'unavailable'
+              status.textContent = 'Vim unavailable'
+              editor.layoutOverlayWidget(statusWidget)
+            })
           stopVim = () => {
             if (canceled) return
             canceled = true
@@ -420,9 +511,15 @@ export default function WgslEditor(props: Props) {
 
     function sync() {
       const next = assemble(latest.current.activeFileId)
-      if (next.source !== program.source || next.segments.length !== program.segments.length ||
-          next.segments.some((segment, index) => segment.fileId !== program.segments[index].fileId
-            || segment.lineCount !== program.segments[index].lineCount)) {
+      if (
+        next.source !== program.source ||
+        next.segments.length !== program.segments.length ||
+        next.segments.some(
+          (segment, index) =>
+            segment.fileId !== program.segments[index].fileId ||
+            segment.lineCount !== program.segments[index].lineCount,
+        )
+      ) {
         program = next
       }
       virtualProgram = virtualSource(latest.current.prelude, program.source)
@@ -437,7 +534,10 @@ export default function WgslEditor(props: Props) {
       const entries = latest.current.diagnostics ?? []
       const defaultFile = latest.current.activeFileId
       for (const [id, { model }] of models) {
-        setGpuMarkers(model, entries.filter(item => (item.fileId ?? defaultFile) === id))
+        setGpuMarkers(
+          model,
+          entries.filter(item => (item.fileId ?? defaultFile) === id),
+        )
       }
     }
 
@@ -509,15 +609,22 @@ export default function WgslEditor(props: Props) {
         do {
           needsReconcile = false
           const { files, activeFileId } = latest.current
-          if (syncedProject?.activeFileId === activeFileId && files.length === syncedProject.files.length
-            && files.every((file, index) => {
+          if (
+            syncedProject?.activeFileId === activeFileId &&
+            files.length === syncedProject.files.length &&
+            files.every((file, index) => {
               const synced = syncedProject?.files[index]
               return file.id === synced?.id && file.name === synced.name && file.closed === synced.closed
-            })) {
+            })
+          ) {
             updateEditors()
             continue
           }
-          await bench.sync(files, files.filter(file => !file.closed).map(file => file.id), activeFileId)
+          await bench.sync(
+            files,
+            files.filter(file => !file.closed).map(file => file.id),
+            activeFileId,
+          )
           if (controller.signal.aborted) return
           syncedProject = { files, activeFileId }
           reconcileModels()
@@ -546,47 +653,56 @@ export default function WgslEditor(props: Props) {
     }
 
     function configureLanguage() {
-      resources.push(monaco.languages.registerCompletionItemProvider(language, {
-        triggerCharacters: ['.'],
-        async provideCompletionItems(model, position, _context, token) {
-          const snapshot = program
-          const fileId = modelIds.get(model)
-          if (!fileId) return null
-          const segment = snapshot.segments.find(part => part.fileId === fileId)
-          const word = model.getWordUntilPosition(position)
-          const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn)
-          if (server && segment) {
-            const text = virtualProgram
-            const result = await server.complete(lspPosition(position, segment.startLine)).catch(() => null)
-            if (token.isCancellationRequested || snapshot !== program || text !== virtualProgram) return null
-            const entries = Array.isArray(result) ? result : result?.items
-            if (entries?.length) return {
-              suggestions: entries.map(item => editorSuggestion(item, range, segment.startLine, segment.lineCount)),
-              incomplete: !Array.isArray(result) && result?.isIncomplete,
+      resources.push(
+        monaco.languages.registerCompletionItemProvider(language, {
+          triggerCharacters: ['.'],
+          async provideCompletionItems(model, position, _context, token) {
+            const snapshot = program
+            const fileId = modelIds.get(model)
+            if (!fileId) return null
+            const segment = snapshot.segments.find(part => part.fileId === fileId)
+            const word = model.getWordUntilPosition(position)
+            const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn)
+            if (server && segment) {
+              const text = virtualProgram
+              const result = await server.complete(lspPosition(position, segment.startLine)).catch(() => null)
+              if (token.isCancellationRequested || snapshot !== program || text !== virtualProgram) return null
+              const entries = Array.isArray(result) ? result : result?.items
+              if (entries?.length)
+                return {
+                  suggestions: entries.map(item => editorSuggestion(item, range, segment.startLine, segment.lineCount)),
+                  incomplete: !Array.isArray(result) && result?.isIncomplete,
+                }
             }
-          }
-          return { suggestions: fallbackSuggestions(model, position, range, latest.current.prelude) }
-        },
-      }))
-      resources.push(monaco.languages.registerHoverProvider(language, {
-        async provideHover(model, position, token) {
-          const snapshot = program
-          const fileId = modelIds.get(model)
-          if (!fileId) return null
-          const segment = snapshot.segments.find(part => part.fileId === fileId)
-          if (server && segment) {
-            const text = virtualProgram
-            const result = await server.hover(lspPosition(position, segment.startLine)).catch(() => null)
-            if (token.isCancellationRequested || snapshot !== program || text !== virtualProgram) return null
-            if (result) {
-              const range = result.range && model.validateRange(editorRange(result.range, segment.startLine))
-              return { contents: hoverContents(result), range }
+            return { suggestions: fallbackSuggestions(model, position, range, latest.current.prelude) }
+          },
+        }),
+      )
+      resources.push(
+        monaco.languages.registerHoverProvider(language, {
+          async provideHover(model, position, token) {
+            const snapshot = program
+            const fileId = modelIds.get(model)
+            if (!fileId) return null
+            const segment = snapshot.segments.find(part => part.fileId === fileId)
+            if (server && segment) {
+              const text = virtualProgram
+              const result = await server.hover(lspPosition(position, segment.startLine)).catch(() => null)
+              if (token.isCancellationRequested || snapshot !== program || text !== virtualProgram) return null
+              if (result) {
+                const range = result.range && model.validateRange(editorRange(result.range, segment.startLine))
+                return { contents: hoverContents(result), range }
+              }
             }
-          }
-          return localHover(model, position, latest.current.prelude,
-            segment ? virtualProgram : virtualSource(latest.current.prelude, assemble(fileId).source))
-        },
-      }))
+            return localHover(
+              model,
+              position,
+              latest.current.prelude,
+              segment ? virtualProgram : virtualSource(latest.current.prelude, assemble(fileId).source),
+            )
+          },
+        }),
+      )
     }
 
     function startAnalyzer(editorPanel: HTMLDivElement) {
@@ -596,38 +712,52 @@ export default function WgslEditor(props: Props) {
           fallback()
           analyzerController.abort()
         }, 15_000)
-        void startWgslLanguageServer(() => {
-          sentProgram = program
-          sentSource = virtualProgram
-          return virtualProgram
-        }, ({ diagnostics: entries }) => {
-          if (analyzerController.signal.aborted) return
-          const markers = new Map<string, monaco.editor.IMarkerData[]>()
-          for (const item of entries) {
-            const location = findShaderLocation(sentProgram.segments, item.range.start.line + 1)
-            const entry = location && models.get(location.fileId)
-            if (!entry) continue
-            const firstLine = item.range.start.line + 2 - location.line
-            const list = markers.get(location.fileId) ?? []
-            list.push({
-              ...entry.model.validateRange(editorRange(item.range, firstLine)),
-              message: typeof item.message === 'string' ? item.message : item.message.value,
-              severity: item.severity === 2 ? monaco.MarkerSeverity.Warning
-                : item.severity === 3 ? monaco.MarkerSeverity.Info
-                : item.severity === 4 ? monaco.MarkerSeverity.Hint : monaco.MarkerSeverity.Error,
-              source: item.source ?? 'wgsl-analyzer',
-            })
-            markers.set(location.fileId, list)
-          }
-          for (const [id, { model }] of models) monaco.editor.setModelMarkers(model, analyzerOwner, markers.get(id) ?? [])
-        }, fallback, analyzerController.signal).then(ready => {
-          if (analyzerController.signal.aborted) return
-          server = ready
-          unregisterAnalyzer = registerSharedWgslAnalyzer(ready.syntaxTreeFor)
-          editorPanel.dataset.languageService = 'wgsl-analyzer'
-          sync()
-          latest.current.onAnalyzerReady?.()
-        }).catch(fallback).finally(() => window.clearTimeout(startupTimer))
+        void startWgslLanguageServer(
+          () => {
+            sentProgram = program
+            sentSource = virtualProgram
+            return virtualProgram
+          },
+          ({ diagnostics: entries }) => {
+            if (analyzerController.signal.aborted) return
+            const markers = new Map<string, monaco.editor.IMarkerData[]>()
+            for (const item of entries) {
+              const location = findShaderLocation(sentProgram.segments, item.range.start.line + 1)
+              const entry = location && models.get(location.fileId)
+              if (!entry) continue
+              const firstLine = item.range.start.line + 2 - location.line
+              const list = markers.get(location.fileId) ?? []
+              list.push({
+                ...entry.model.validateRange(editorRange(item.range, firstLine)),
+                message: typeof item.message === 'string' ? item.message : item.message.value,
+                severity:
+                  item.severity === 2
+                    ? monaco.MarkerSeverity.Warning
+                    : item.severity === 3
+                      ? monaco.MarkerSeverity.Info
+                      : item.severity === 4
+                        ? monaco.MarkerSeverity.Hint
+                        : monaco.MarkerSeverity.Error,
+                source: item.source ?? 'wgsl-analyzer',
+              })
+              markers.set(location.fileId, list)
+            }
+            for (const [id, { model }] of models)
+              monaco.editor.setModelMarkers(model, analyzerOwner, markers.get(id) ?? [])
+          },
+          fallback,
+          analyzerController.signal,
+        )
+          .then(ready => {
+            if (analyzerController.signal.aborted) return
+            server = ready
+            unregisterAnalyzer = registerSharedWgslAnalyzer(ready.syntaxTreeFor)
+            editorPanel.dataset.languageService = 'wgsl-analyzer'
+            sync()
+            latest.current.onAnalyzerReady?.()
+          })
+          .catch(fallback)
+          .finally(() => window.clearTimeout(startupTimer))
       } else {
         editorPanel.dataset.languageService = 'local'
       }
@@ -641,67 +771,88 @@ export default function WgslEditor(props: Props) {
       startAnalyzer(editorPanel!)
     }
 
-    instance.current = { reconcile: () => { void reconcile() }, updateMarkers, updateEditors, maybeStartAnalyzer }
-    void mountShaderWorkbench(host, {
-      onSelect: id => { if (!controller.signal.aborted) latest.current.onActiveFileChange(id) },
-      onClose: id => !controller.signal.aborted && latest.current.onCloseFile(id),
-      onReopen: id => { if (!controller.signal.aborted) latest.current.onReopenFile(id) },
-      onEditor: editor => {
-        if (controller.signal.aborted) return
-        activeEditor = editor
-        if (workbench) updateEditors()
+    instance.current = {
+      reconcile: () => {
+        void reconcile()
       },
-      onPreviewHost: (id, preview) => {
-        if (controller.signal.aborted) return
-        if (preview) previewHosts.set(id, preview)
-        else previewHosts.delete(id)
-        latest.current.onPreviewHost(id, preview)
-      },
-      onPreviewOpenChange: ids => { if (!controller.signal.aborted) latest.current.onPreviewOpenChange(ids) },
-      onVisiblePreviews: ids => { if (!controller.signal.aborted) latest.current.onVisiblePreviews(ids) },
-      takePrewarmedHost: id => controller.signal.aborted ? undefined : latest.current.takePrewarmedHost?.(id),
-    }, controller.signal).then(async bench => {
-      if (controller.signal.aborted) {
-        bench.dispose()
-        return
-      }
-      workbench = bench
-      configureLanguage()
-      registerCommands()
-      const actions = await registerShaderProjectActions({
-        getFiles: () => latest.current.files,
-        getActiveFileId: () => latest.current.activeFileId,
-        onNewFile: kind => latest.current.onNewFile(kind),
-        onRenameFile: (id, name) => latest.current.onRenameFile(id, name),
-        onReopenFile: id => latest.current.onReopenFile(id),
-        onToggleVim: () => latest.current.onToggleVim(),
-        onShowPreview: id => bench.showPreview(id),
-        onRevealSource: async id => {
-          if (latest.current.files.find(file => file.id === id)?.closed) latest.current.onReopenFile(id)
-          await bench.focusShader(id)
+      updateMarkers,
+      updateEditors,
+      maybeStartAnalyzer,
+    }
+    void mountShaderWorkbench(
+      host,
+      {
+        onSelect: id => {
+          if (!controller.signal.aborted) latest.current.onActiveFileChange(id)
         },
+        onClose: id => !controller.signal.aborted && latest.current.onCloseFile(id),
+        onReopen: id => {
+          if (!controller.signal.aborted) latest.current.onReopenFile(id)
+        },
+        onEditor: editor => {
+          if (controller.signal.aborted) return
+          activeEditor = editor
+          if (workbench) updateEditors()
+        },
+        onPreviewHost: (id, preview) => {
+          if (controller.signal.aborted) return
+          if (preview) previewHosts.set(id, preview)
+          else previewHosts.delete(id)
+          latest.current.onPreviewHost(id, preview)
+        },
+        onPreviewOpenChange: ids => {
+          if (!controller.signal.aborted) latest.current.onPreviewOpenChange(ids)
+        },
+        onVisiblePreviews: ids => {
+          if (!controller.signal.aborted) latest.current.onVisiblePreviews(ids)
+        },
+        takePrewarmedHost: id => (controller.signal.aborted ? undefined : latest.current.takePrewarmedHost?.(id)),
+      },
+      controller.signal,
+    )
+      .then(async bench => {
+        if (controller.signal.aborted) {
+          bench.dispose()
+          return
+        }
+        workbench = bench
+        configureLanguage()
+        registerCommands()
+        const actions = await registerShaderProjectActions({
+          getFiles: () => latest.current.files,
+          getActiveFileId: () => latest.current.activeFileId,
+          onNewFile: kind => latest.current.onNewFile(kind),
+          onRenameFile: (id, name) => latest.current.onRenameFile(id, name),
+          onReopenFile: id => latest.current.onReopenFile(id),
+          onToggleVim: () => latest.current.onToggleVim(),
+          onShowPreview: id => bench.showPreview(id),
+          onRevealSource: async id => {
+            if (latest.current.files.find(file => file.id === id)?.closed) latest.current.onReopenFile(id)
+            await bench.focusShader(id)
+          },
+        })
+        if (controller.signal.aborted) {
+          actions.dispose()
+          return
+        }
+        projectActions = actions
+        resources.push(actions)
+        canReconcile = true
+        await reconcile(true)
+        if (!controller.signal.aborted) {
+          bench.renderVisibleEditors()
+          workbenchReady = true
+          latest.current.onLayoutReady()
+          maybeStartAnalyzer()
+        }
       })
-      if (controller.signal.aborted) {
-        actions.dispose()
-        return
-      }
-      projectActions = actions
-      resources.push(actions)
-      canReconcile = true
-      await reconcile(true)
-      if (!controller.signal.aborted) {
-        bench.renderVisibleEditors()
-        workbenchReady = true
-        latest.current.onLayoutReady()
-        maybeStartAnalyzer()
-      }
-    }).catch(error => {
-      if (controller.signal.aborted) return
-      editorPanel.dataset.languageService = 'unavailable'
-      host.textContent = 'The shader editor could not start.'
-      console.error('Could not start the shader editor', error)
-      latest.current.onStartError?.()
-    })
+      .catch(error => {
+        if (controller.signal.aborted) return
+        editorPanel.dataset.languageService = 'unavailable'
+        host.textContent = 'The shader editor could not start.'
+        console.error('Could not start the shader editor', error)
+        latest.current.onStartError?.()
+      })
 
     return () => {
       controller.abort()
@@ -723,12 +874,22 @@ export default function WgslEditor(props: Props) {
     }
   }, [])
 
-  useLayoutEffect(() => { instance.current?.reconcile() }, [files, activeFileId, prelude])
-  useEffect(() => { instance.current?.updateMarkers() }, [diagnostics])
-  useEffect(() => { instance.current?.updateEditors() }, [vim, label, insertion, onInserted])
-  useEffect(() => { if (analyzerEnabled) instance.current?.maybeStartAnalyzer() }, [analyzerEnabled])
+  useLayoutEffect(() => {
+    instance.current?.reconcile()
+  }, [files, activeFileId, prelude])
+  useEffect(() => {
+    instance.current?.updateMarkers()
+  }, [diagnostics])
+  useEffect(() => {
+    instance.current?.updateEditors()
+  }, [vim, label, insertion, onInserted])
+  useEffect(() => {
+    if (analyzerEnabled) instance.current?.maybeStartAnalyzer()
+  }, [analyzerEnabled])
 
-  return <div ref={panel} className="wgsl-editor">
-    <div ref={container} className="wgsl-monaco" />
-  </div>
+  return (
+    <div ref={panel} className="wgsl-editor">
+      <div ref={container} className="wgsl-monaco" />
+    </div>
+  )
 }

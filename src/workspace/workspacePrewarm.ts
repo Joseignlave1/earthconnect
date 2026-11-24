@@ -24,7 +24,10 @@ export function startWorkspacePrewarm(
   const deviceLease = existingDeviceLease ?? resources.acquireDevice()
   if (!existingDeviceLease) {
     startStartupSpan('gpu-device')
-    void deviceLease.ready.then(() => endStartupSpan('gpu-device'), () => undefined)
+    void deviceLease.ready.then(
+      () => endStartupSpan('gpu-device'),
+      () => undefined,
+    )
   }
 
   let worldLease: ReturnType<typeof resources.acquireWorld> | undefined
@@ -46,27 +49,46 @@ export function startWorkspacePrewarm(
   // Prewarm Earth terrain immediately; defer Moon & Mars terrain until Earth's
   // Zstd score chunks finish so startup CPU cores and GPU queues stay uncontended.
   startStartupSpan('earth-terrain')
-  void resources.acquireTerrain('textures/earth-terrain.bin', 'rg32float', s => assets.url('textures/earth-terrain.bin', s), signal)
-    .then(() => endStartupSpan('earth-terrain'), () => undefined)
+  void resources
+    .acquireTerrain('textures/earth-terrain.bin', 'rg32float', s => assets.url('textures/earth-terrain.bin', s), signal)
+    .then(
+      () => endStartupSpan('earth-terrain'),
+      () => undefined,
+    )
 
-  void deviceLease.ready.then(({ device }) => {
-    if (handedOff || signal.aborted) return
-    warmComputedScorePipelines(device)
-    startStartupSpan('earth-score', '36 Zstd chunks + GPU upload')
-    worldLease = resources.acquireWorld(device, {
-      manifestUrl: scoreManifestUrl,
-      readAsset: assets.readAsset,
-    })
-    void worldLease.loading.then(async () => {
-      endStartupSpan('earth-score')
-      if (signal.aborted) return
-      startStartupSpan('solar-terrain')
-      await resources.acquireTerrain('textures/moon-terrain.bin', 'rg8unorm', s => assets.url('textures/moon-terrain.bin', s), signal)
-      if (signal.aborted) return
-      await resources.acquireTerrain('textures/mars-terrain.bin', 'rg8unorm', s => assets.url('textures/mars-terrain.bin', s), signal)
-      endStartupSpan('solar-terrain')
-    }).catch(() => undefined)
-  }, () => undefined)
+  void deviceLease.ready.then(
+    ({ device }) => {
+      if (handedOff || signal.aborted) return
+      warmComputedScorePipelines(device)
+      startStartupSpan('earth-score', '36 Zstd chunks + GPU upload')
+      worldLease = resources.acquireWorld(device, {
+        manifestUrl: scoreManifestUrl,
+        readAsset: assets.readAsset,
+      })
+      void worldLease.loading
+        .then(async () => {
+          endStartupSpan('earth-score')
+          if (signal.aborted) return
+          startStartupSpan('solar-terrain')
+          await resources.acquireTerrain(
+            'textures/moon-terrain.bin',
+            'rg8unorm',
+            s => assets.url('textures/moon-terrain.bin', s),
+            signal,
+          )
+          if (signal.aborted) return
+          await resources.acquireTerrain(
+            'textures/mars-terrain.bin',
+            'rg8unorm',
+            s => assets.url('textures/mars-terrain.bin', s),
+            signal,
+          )
+          endStartupSpan('solar-terrain')
+        })
+        .catch(() => undefined)
+    },
+    () => undefined,
+  )
 
   return { assets, resources, handoff, dispose }
 }

@@ -1,8 +1,6 @@
 export type TileEntry = { packId: number; offset: number; length: number }
 
-export type PackHandle =
-  | { kind: 'blob'; blob: Blob }
-  | { kind: 'url'; url: string }
+export type PackHandle = { kind: 'blob'; blob: Blob } | { kind: 'url'; url: string }
 
 export type TileVec3 = readonly [number, number, number]
 
@@ -49,7 +47,12 @@ export function toPackHandle(resource: Blob | string): PackHandle {
   return typeof resource === 'string' ? { kind: 'url', url: resource } : { kind: 'blob', blob: resource }
 }
 
-export async function readPackRange(handle: PackHandle, start: number, length: number, signal: AbortSignal): Promise<ArrayBuffer> {
+export async function readPackRange(
+  handle: PackHandle,
+  start: number,
+  length: number,
+  signal: AbortSignal,
+): Promise<ArrayBuffer> {
   if (handle.kind === 'blob') {
     const buf = await handle.blob.slice(start, start + length).arrayBuffer()
     signal.throwIfAborted()
@@ -69,7 +72,12 @@ export async function readPackRange(handle: PackHandle, start: number, length: n
   return buf
 }
 
-export async function readTileWebpBlob(handle: PackHandle, offset: number, length: number, signal: AbortSignal): Promise<Blob> {
+export async function readTileWebpBlob(
+  handle: PackHandle,
+  offset: number,
+  length: number,
+  signal: AbortSignal,
+): Promise<Blob> {
   if (handle.kind === 'blob') {
     signal.throwIfAborted()
     return handle.blob.slice(offset, offset + length, 'image/webp')
@@ -162,7 +170,9 @@ export function intersectUnitSphere(
   const ry = right[1] * sx + up[1] * sy - back[1]
   const rz = right[2] * sx + up[2] * sy - back[2]
   const invLen = 1 / Math.hypot(rx, ry, rz)
-  const dx = rx * invLen, dy = ry * invLen, dz = rz * invLen
+  const dx = rx * invLen,
+    dy = ry * invLen,
+    dz = rz * invLen
 
   const b = eye[0] * dx + eye[1] * dy + eye[2] * dz
   const c = eye[0] * eye[0] + eye[1] * eye[1] + eye[2] * eye[2] - 1

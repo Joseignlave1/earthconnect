@@ -23,14 +23,22 @@ export async function checkedGpu<T>(device: GPUDevice, operation: () => T, label
 
 export function checkDeviceLimits(device: GPUDevice, manifest: ScoreManifest) {
   const limits = device.limits
-  const storageBytes = Math.max(lookupBytes(manifest),
-    ...manifest.chunks.map(({ rows, packedBytes }) => Math.max(rows * 4, packedBytes)))
-  if (storageBytes > limits.maxStorageBufferBindingSize ||
-      storageBytes > limits.maxBufferSize ||
-      limits.maxStorageBuffersPerShaderStage < 4 || limits.maxUniformBuffersPerShaderStage < 1 ||
-      limits.maxComputeInvocationsPerWorkgroup < WORKGROUP_SIZE || limits.maxComputeWorkgroupSizeX < WORKGROUP_SIZE ||
-      manifest.chunks.some(({ rows }) => Math.ceil(rows / WORKGROUP_SIZE) > limits.maxComputeWorkgroupsPerDimension)) {
-    throw new Error(`WebGPU limits do not support Earth Score (requires ${storageBytes} bytes per storage binding and ${WORKGROUP_SIZE} invocations per workgroup)`)
+  const storageBytes = Math.max(
+    lookupBytes(manifest),
+    ...manifest.chunks.map(({ rows, packedBytes }) => Math.max(rows * 4, packedBytes)),
+  )
+  if (
+    storageBytes > limits.maxStorageBufferBindingSize ||
+    storageBytes > limits.maxBufferSize ||
+    limits.maxStorageBuffersPerShaderStage < 4 ||
+    limits.maxUniformBuffersPerShaderStage < 1 ||
+    limits.maxComputeInvocationsPerWorkgroup < WORKGROUP_SIZE ||
+    limits.maxComputeWorkgroupSizeX < WORKGROUP_SIZE ||
+    manifest.chunks.some(({ rows }) => Math.ceil(rows / WORKGROUP_SIZE) > limits.maxComputeWorkgroupsPerDimension)
+  ) {
+    throw new Error(
+      `WebGPU limits do not support Earth Score (requires ${storageBytes} bytes per storage binding and ${WORKGROUP_SIZE} invocations per workgroup)`,
+    )
   }
 }
 

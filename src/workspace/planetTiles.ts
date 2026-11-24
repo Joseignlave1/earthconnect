@@ -1,9 +1,21 @@
 import { FOV } from '../shader-test/geometry.ts'
 import { generateMipmaps } from '../shader-test/gpu.ts'
 import {
-  createTileSampler, findLruSlot, intersectUnitSphere, loadPackIndexEntries, MAX_CONCURRENT_TILE_DECODES,
-  paintTilePageTable, planetTileKey, readTileWebpBlob, toPackHandle, VIRTUAL_TILE_INNER, VIRTUAL_TILE_MIPS, VIRTUAL_TILE_SIZE,
-  type PackHandle, type TileEntry, type TileVec3,
+  createTileSampler,
+  findLruSlot,
+  intersectUnitSphere,
+  loadPackIndexEntries,
+  MAX_CONCURRENT_TILE_DECODES,
+  paintTilePageTable,
+  planetTileKey,
+  readTileWebpBlob,
+  toPackHandle,
+  VIRTUAL_TILE_INNER,
+  VIRTUAL_TILE_MIPS,
+  VIRTUAL_TILE_SIZE,
+  type PackHandle,
+  type TileEntry,
+  type TileVec3,
 } from '../shader-test/virtual-tiles.ts'
 
 export { planetTileKey }
@@ -30,7 +42,11 @@ type PairSlot = {
 
 type TileJob = { body: PlanetTileBody; key: number; level: number; tx: number; ty: number; priority: number }
 
-export type PlanetTilePackLoader = (body: PlanetTileBody, packId: number, signal: AbortSignal) => Promise<Blob | string | null>
+export type PlanetTilePackLoader = (
+  body: PlanetTileBody,
+  packId: number,
+  signal: AbortSignal,
+) => Promise<Blob | string | null>
 
 export function planetTilePath(body: PlanetTileBody, packId: number) {
   return `textures/${body}-tiles-${packId}.bin`
@@ -40,9 +56,15 @@ function pairKey(level: number, tx: number, ty: number) {
   return (level << 16) | (ty << 8) | tx
 }
 
-function keyLevel(key: number) { return (key >>> 16) & 0xf }
-function keyTy(key: number) { return (key >>> 8) & 0xff }
-function keyTx(key: number) { return key & 0xff }
+function keyLevel(key: number) {
+  return (key >>> 16) & 0xf
+}
+function keyTy(key: number) {
+  return (key >>> 8) & 0xff
+}
+function keyTx(key: number) {
+  return key & 0xff
+}
 
 type BodyState = {
   packs: (PackHandle | null)[]
@@ -112,11 +134,21 @@ export class PlanetTileCache {
     this.bodies = { moon: makeBody('moon'), mars: makeBody('mars') }
   }
 
-  pageTexture(body: PlanetTileBody) { return this.bodies[body].pageTexture }
-  ready(body: PlanetTileBody) { return this.poolAllocated && this.bodies[body].indexed }
-  hasIndex(body: PlanetTileBody) { return this.bodies[body].indexed }
-  residentCount(body: PlanetTileBody) { return this.bodies[body].resident.size }
-  indexedCount(body: PlanetTileBody) { return this.bodies[body].index.size >> 1 }
+  pageTexture(body: PlanetTileBody) {
+    return this.bodies[body].pageTexture
+  }
+  ready(body: PlanetTileBody) {
+    return this.poolAllocated && this.bodies[body].indexed
+  }
+  hasIndex(body: PlanetTileBody) {
+    return this.bodies[body].indexed
+  }
+  residentCount(body: PlanetTileBody) {
+    return this.bodies[body].resident.size
+  }
+  indexedCount(body: PlanetTileBody) {
+    return this.bodies[body].index.size >> 1
+  }
 
   subscribe(onTileReady: () => void, onTexturesChanged: () => void) {
     this.tileListeners.add(onTileReady)
@@ -146,7 +178,12 @@ export class PlanetTileCache {
     }
   }
 
-  private async loadPackIndex(body: PlanetTileBody, packId: number, loadPack: PlanetTilePackLoader, signal: AbortSignal) {
+  private async loadPackIndex(
+    body: PlanetTileBody,
+    packId: number,
+    loadPack: PlanetTilePackLoader,
+    signal: AbortSignal,
+  ) {
     try {
       const resource = await loadPack(body, packId, signal)
       if (!resource || signal.aborted || this.destroyed) return
@@ -195,9 +232,12 @@ export class PlanetTileCache {
       oldTextures.push(oldPage)
     }
     this.notifyTexturesChanged()
-    void device.queue.onSubmittedWorkDone().then(() => {
-      for (const tex of oldTextures) tex.destroy()
-    }).catch(() => undefined)
+    void device.queue
+      .onSubmittedWorkDone()
+      .then(() => {
+        for (const tex of oldTextures) tex.destroy()
+      })
+      .catch(() => undefined)
   }
 
   /**
@@ -223,7 +263,7 @@ export class PlanetTileCache {
     const l0TexelM = (2 * Math.PI * radiusMetres) / (PLANET_TILE_BASE_COLS * VIRTUAL_TILE_INNER)
     const l1TexelM = l0TexelM * 0.5
     const entryThreshold = l0TexelM * 1.45 // activate just before surpassing 8K (~1,300m Moon, ~2,540m Mars)
-    const l1Threshold = l1TexelM * 1.55    // refine to L1 (~695m Moon, ~1,355m Mars)
+    const l1Threshold = l1TexelM * 1.55 // refine to L1 (~695m Moon, ~1,355m Mars)
 
     const loupeMpp = loupe ? physicalMetresPerPixel / Math.max(1, loupe.zoom) : Infinity
     if (Math.min(physicalMetresPerPixel, loupeMpp) > entryThreshold) return
@@ -236,7 +276,7 @@ export class PlanetTileCache {
 
     const requestPoint = (lon: number, lat: number, mpp: number, distSq: number, halo: number) => {
       if (mpp > entryThreshold) return
-      const u = ((lon / (2 * Math.PI) + 0.5) % 1 + 1) % 1
+      const u = (((lon / (2 * Math.PI) + 0.5) % 1) + 1) % 1
       const v = Math.max(0, Math.min(0.999999, 0.5 - lat / Math.PI))
       const targetLevel = mpp < l1Threshold ? 1 : 0
 
@@ -252,7 +292,8 @@ export class PlanetTileCache {
           for (let dx = -radius; dx <= radius; dx++) {
             const tx = (cx + dx + cols) % cols
             const pk = pairKey(level, tx, ty)
-            if (!state.index.has(planetTileKey(0, level, tx, ty)) || !state.index.has(planetTileKey(1, level, tx, ty))) continue
+            if (!state.index.has(planetTileKey(0, level, tx, ty)) || !state.index.has(planetTileKey(1, level, tx, ty)))
+              continue
             const slotIndex = state.resident.get(pk)
             if (slotIndex !== undefined) {
               const slot = this.slots[slotIndex]
@@ -365,7 +406,14 @@ export class PlanetTileCache {
         mipLevelCount: VIRTUAL_TILE_MIPS,
         label: 'Planetary tile mipmaps',
       })
-      this.slots[slotIndex] = { body: job.body, key: job.key, level: job.level, tx: job.tx, ty: job.ty, lastUsed: this.frameCounter }
+      this.slots[slotIndex] = {
+        body: job.body,
+        key: job.key,
+        level: job.level,
+        tx: job.tx,
+        ty: job.ty,
+        lastUsed: this.frameCounter,
+      }
       state.resident.set(job.key, slotIndex)
       state.pageDirty = true
       this.flushPageTables()

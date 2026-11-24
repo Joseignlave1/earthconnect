@@ -1,18 +1,35 @@
 import {
-  getService, GroupDirection, GroupOrientation, GroupsOrder, ICodeEditorService, IEditorGroupsService,
-  IEditorService, IExtensionService, initialize, type EditorGroupLayout, type IEditorGroup,
+  getService,
+  GroupDirection,
+  GroupOrientation,
+  GroupsOrder,
+  ICodeEditorService,
+  IEditorGroupsService,
+  IEditorService,
+  IExtensionService,
+  initialize,
+  type EditorGroupLayout,
+  type IEditorGroup,
 } from '@codingame/monaco-vscode-api'
 import { isCodeEditor } from '@codingame/monaco-vscode-api/vscode/vs/editor/browser/editorBrowser'
-import { isIMenuItem, MenuId, MenuRegistry } from '@codingame/monaco-vscode-api/vscode/vs/platform/actions/common/actions'
+import {
+  isIMenuItem,
+  MenuId,
+  MenuRegistry,
+} from '@codingame/monaco-vscode-api/vscode/vs/platform/actions/common/actions'
 import { ContextKeyExpr } from '@codingame/monaco-vscode-api/vscode/vs/platform/contextkey/common/contextkey'
 import { ConfigureEditorAction } from '@codingame/monaco-vscode-api/vscode/vs/workbench/browser/actions/layoutActions'
 import {
-  COPY_EDITOR_INTO_NEW_WINDOW_COMMAND_ID, MOVE_EDITOR_INTO_NEW_WINDOW_COMMAND_ID, REOPEN_WITH_COMMAND_ID,
+  COPY_EDITOR_INTO_NEW_WINDOW_COMMAND_ID,
+  MOVE_EDITOR_INTO_NEW_WINDOW_COMMAND_ID,
+  REOPEN_WITH_COMMAND_ID,
 } from '@codingame/monaco-vscode-api/vscode/vs/workbench/browser/parts/editor/editorCommands'
 import { EditorCloseContext } from '@codingame/monaco-vscode-api/vscode/vs/workbench/common/editor'
 import getConfigurationServiceOverride from '@codingame/monaco-vscode-configuration-service-override'
 import getFilesServiceOverride, {
-  RegisteredFileSystemProvider, RegisteredMemoryFile, registerFileSystemOverlay,
+  RegisteredFileSystemProvider,
+  RegisteredMemoryFile,
+  registerFileSystemOverlay,
 } from '@codingame/monaco-vscode-files-service-override'
 import getLanguagesServiceOverride from '@codingame/monaco-vscode-languages-service-override'
 import getModelServiceOverride from '@codingame/monaco-vscode-model-service-override'
@@ -22,7 +39,12 @@ import getThemeServiceOverride from '@codingame/monaco-vscode-theme-service-over
 import getViewsServiceOverride, { renderEditorPart } from '@codingame/monaco-vscode-views-service-override'
 import { editor, Uri } from 'monaco-editor'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker.js?worker'
-import { movePreviewHost, registerShaderPreviewPane, ShaderPreviewInput, ShaderPreviewPane } from './shaderPreviewEditor'
+import {
+  movePreviewHost,
+  registerShaderPreviewPane,
+  ShaderPreviewInput,
+  ShaderPreviewPane,
+} from './shaderPreviewEditor'
 import type { ShaderFile } from './shaderProject'
 import { registerWgslTheme, wgslLanguageId, wgslThemeName } from './wgslTheme'
 import './shaderWorkbench.css'
@@ -67,8 +89,10 @@ let layoutRestored = false
 function configureEditorMenus() {
   // The embedded workbench has one text editor type and no Settings or auxiliary window UI.
   const unsupported = new Set([
-    ConfigureEditorAction.ID, REOPEN_WITH_COMMAND_ID,
-    MOVE_EDITOR_INTO_NEW_WINDOW_COMMAND_ID, COPY_EDITOR_INTO_NEW_WINDOW_COMMAND_ID,
+    ConfigureEditorAction.ID,
+    REOPEN_WITH_COMMAND_ID,
+    MOVE_EDITOR_INTO_NEW_WINDOW_COMMAND_ID,
+    COPY_EDITOR_INTO_NEW_WINDOW_COMMAND_ID,
   ])
   for (const menu of [MenuId.EditorTitle, MenuId.EditorTitleContext]) {
     for (const item of MenuRegistry.getMenuItems(menu)) {
@@ -84,40 +108,44 @@ function initializeWorkbench() {
   registerShaderPreviewPane()
   const themeReady = registerWgslTheme()
   window.MonacoEnvironment = {
-    getWorker: (_moduleId, label) => label === 'TextMateWorker' ? new TextMateWorker() : new EditorWorker(),
+    getWorker: (_moduleId, label) => (label === 'TextMateWorker' ? new TextMateWorker() : new EditorWorker()),
   }
-  initialization = initialize({
-    ...getFilesServiceOverride(),
-    ...getModelServiceOverride(),
-    ...getConfigurationServiceOverride(),
-    ...getLanguagesServiceOverride(),
-    ...getThemeServiceOverride(),
-    ...getTextMateServiceOverride(),
-    ...getViewsServiceOverride(undefined, undefined, false),
-  }, document.body, {
-    configurationDefaults: {
-      'workbench.colorTheme': wgslThemeName,
-      'workbench.startupEditor': 'none',
-      'workbench.editor.enablePreview': false,
-      'workbench.editor.closeEmptyGroups': true,
-      'workbench.editor.restoreViewState': true,
-      'workbench.editor.tabSizing': 'shrink',
-      'workbench.editor.alwaysShowEditorActions': true,
-      'workbench.editor.dragToOpenWindow': false,
-      'workbench.editor.showIcons': false,
-      'workbench.tips.enabled': false,
-      'breadcrumbs.enabled': false,
-      'files.autoSave': 'onFocusChange',
-      'editor.minimap.enabled': false,
-      'editor.fontSize': 13,
-      'editor.wordWrap': 'on',
-      'editor.scrollBeyondLastLine': false,
-      'editor.lineNumbersMinChars': 3,
-      'editor.renderValidationDecorations': 'on',
-      'editor.tabSize': 2,
-      'editor.insertSpaces': true,
+  initialization = initialize(
+    {
+      ...getFilesServiceOverride(),
+      ...getModelServiceOverride(),
+      ...getConfigurationServiceOverride(),
+      ...getLanguagesServiceOverride(),
+      ...getThemeServiceOverride(),
+      ...getTextMateServiceOverride(),
+      ...getViewsServiceOverride(undefined, undefined, false),
     },
-  }).then(async () => {
+    document.body,
+    {
+      configurationDefaults: {
+        'workbench.colorTheme': wgslThemeName,
+        'workbench.startupEditor': 'none',
+        'workbench.editor.enablePreview': false,
+        'workbench.editor.closeEmptyGroups': true,
+        'workbench.editor.restoreViewState': true,
+        'workbench.editor.tabSizing': 'shrink',
+        'workbench.editor.alwaysShowEditorActions': true,
+        'workbench.editor.dragToOpenWindow': false,
+        'workbench.editor.showIcons': false,
+        'workbench.tips.enabled': false,
+        'breadcrumbs.enabled': false,
+        'files.autoSave': 'onFocusChange',
+        'editor.minimap.enabled': false,
+        'editor.fontSize': 13,
+        'editor.wordWrap': 'on',
+        'editor.scrollBeyondLastLine': false,
+        'editor.lineNumbersMinChars': 3,
+        'editor.renderValidationDecorations': 'on',
+        'editor.tabSize': 2,
+        'editor.insertSpaces': true,
+      },
+    },
+  ).then(async () => {
     await themeReady
     const extensionService = await getService(IExtensionService)
     await extensionService.whenInstalledExtensionsRegistered()
@@ -126,21 +154,34 @@ function initializeWorkbench() {
 }
 
 function isLayoutTab(tab: unknown): tab is LayoutTab {
-  return typeof tab === 'string' || (typeof tab === 'object' && tab !== null
-    && 'previewFileId' in tab && typeof tab.previewFileId === 'string')
+  return (
+    typeof tab === 'string' ||
+    (typeof tab === 'object' && tab !== null && 'previewFileId' in tab && typeof tab.previewFileId === 'string')
+  )
 }
 
 function loadLayout(activeFileId: string): { snapshot: EditorLayout; addPreview: boolean } | undefined {
   try {
-    const saved = JSON.parse(localStorage.getItem(layoutKey) ?? 'null') as (Omit<EditorLayout, 'groups'> & {
-      groups: { tabs?: (LayoutTab | null)[]; active?: LayoutTab | null; files?: string[] }[]
-    }) | null
-    if (saved && Array.isArray(saved.groups) && saved.groups.length > 0 && Array.isArray(saved.layout?.groups)
-      && Number.isInteger(saved.activeGroup)
-      && (saved.layout.orientation === GroupOrientation.HORIZONTAL || saved.layout.orientation === GroupOrientation.VERTICAL)) {
-      if (saved.groups.every(group => Array.isArray(group?.tabs)
-        && group.tabs.every(tab => tab === null || isLayoutTab(tab)))) {
-        const migrate = (tab: LayoutTab | null | undefined) => tab === null ? { previewFileId: activeFileId } : tab
+    const saved = JSON.parse(localStorage.getItem(layoutKey) ?? 'null') as
+      | (Omit<EditorLayout, 'groups'> & {
+          groups: { tabs?: (LayoutTab | null)[]; active?: LayoutTab | null; files?: string[] }[]
+        })
+      | null
+    if (
+      saved &&
+      Array.isArray(saved.groups) &&
+      saved.groups.length > 0 &&
+      Array.isArray(saved.layout?.groups) &&
+      Number.isInteger(saved.activeGroup) &&
+      (saved.layout.orientation === GroupOrientation.HORIZONTAL ||
+        saved.layout.orientation === GroupOrientation.VERTICAL)
+    ) {
+      if (
+        saved.groups.every(
+          group => Array.isArray(group?.tabs) && group.tabs.every(tab => tab === null || isLayoutTab(tab)),
+        )
+      ) {
+        const migrate = (tab: LayoutTab | null | undefined) => (tab === null ? { previewFileId: activeFileId } : tab)
         return {
           snapshot: {
             ...saved,
@@ -152,15 +193,21 @@ function loadLayout(activeFileId: string): { snapshot: EditorLayout; addPreview:
           addPreview: false,
         }
       }
-      if (saved.groups.every(group => Array.isArray(group?.files)
-        && group.files.every(file => typeof file === 'string'))) {
+      if (
+        saved.groups.every(group => Array.isArray(group?.files) && group.files.every(file => typeof file === 'string'))
+      ) {
         return {
-          snapshot: { ...saved, groups: saved.groups.map(group => ({ tabs: group.files!, active: group.active ?? undefined })) },
+          snapshot: {
+            ...saved,
+            groups: saved.groups.map(group => ({ tabs: group.files!, active: group.active ?? undefined })),
+          },
           addPreview: true,
         }
       }
     }
-  } catch { /* Storage may be unavailable. */ }
+  } catch {
+    /* Storage may be unavailable. */
+  }
 }
 
 export function getFileId(resource: Uri | undefined) {
@@ -192,7 +239,9 @@ export async function mountShaderWorkbench(host: HTMLElement, callbacks: Workben
   await initializeWorkbench()
   signal?.throwIfAborted()
   const [groups, editorService, codeEditorService] = await Promise.all([
-    getService(IEditorGroupsService), getService(IEditorService), getService(ICodeEditorService),
+    getService(IEditorGroupsService),
+    getService(IEditorService),
+    getService(ICodeEditorService),
   ])
   await groups.whenRestored
   signal?.throwIfAborted()
@@ -297,7 +346,11 @@ export async function mountShaderWorkbench(host: HTMLElement, callbacks: Workben
       })),
       activeGroup: ordered.indexOf(part.activeGroup),
     }
-    try { localStorage.setItem(layoutKey, JSON.stringify(snapshot)) } catch { /* Storage may be unavailable. */ }
+    try {
+      localStorage.setItem(layoutKey, JSON.stringify(snapshot))
+    } catch {
+      /* Storage may be unavailable. */
+    }
   }
 
   function scheduleUpdate() {
@@ -331,17 +384,23 @@ export async function mountShaderWorkbench(host: HTMLElement, callbacks: Workben
   function open(fileId: string, group: IEditorGroup, inactive = false) {
     const entry = filesById.get(fileId)
     if (!entry) return
-    return editorService.openEditor({
-      resource: entry.resource,
-      options: { pinned: true, inactive, preserveFocus: true, index: inactive ? group.count : undefined },
-    }, group)
+    return editorService.openEditor(
+      {
+        resource: entry.resource,
+        options: { pinned: true, inactive, preserveFocus: true, index: inactive ? group.count : undefined },
+      },
+      group,
+    )
   }
 
   function openPreview(fileId: string, group: IEditorGroup, inactive = false) {
     const entry = filesById.get(fileId)
     if (!entry) return
     return group.openEditor(findPreview(group, fileId) ?? new ShaderPreviewInput(fileId, entry.name), {
-      pinned: true, inactive, preserveFocus: true, index: inactive ? group.count : undefined,
+      pinned: true,
+      inactive,
+      preserveFocus: true,
+      index: inactive ? group.count : undefined,
     })
   }
 
@@ -354,10 +413,13 @@ export async function mountShaderWorkbench(host: HTMLElement, callbacks: Workben
     if (!entry) return
     const active = groups.activeGroup
     const previous = sourceGroupIds.get(fileId)
-    const group = (active.findEditors(entry.resource).length > 0 ? active : undefined)
-      ?? groups.mainPart.getGroups(GroupsOrder.GRID_APPEARANCE).find(candidate => candidate.findEditors(entry.resource).length > 0)
-      ?? (previous === undefined ? undefined : groups.mainPart.getGroup(previous))
-      ?? fallback
+    const group =
+      (active.findEditors(entry.resource).length > 0 ? active : undefined) ??
+      groups.mainPart
+        .getGroups(GroupsOrder.GRID_APPEARANCE)
+        .find(candidate => candidate.findEditors(entry.resource).length > 0) ??
+      (previous === undefined ? undefined : groups.mainPart.getGroup(previous)) ??
+      fallback
     await open(fileId, group)
     groups.activateGroup(group)
   }
@@ -431,13 +493,20 @@ export async function mountShaderWorkbench(host: HTMLElement, callbacks: Workben
             const replacement = await addFile(file)
             for (const group of groups.groups) {
               const inputs = group.findEditors(entry.resource)
-              if (inputs.length > 0) await editorService.replaceEditors(inputs.map(input => ({
-                editor: input, replacement: { resource: replacement.resource }, forceReplaceDirty: true,
-              })), group)
+              if (inputs.length > 0)
+                await editorService.replaceEditors(
+                  inputs.map(input => ({
+                    editor: input,
+                    replacement: { resource: replacement.resource },
+                    forceReplaceDirty: true,
+                  })),
+                  group,
+                )
             }
           } else {
             const toClose = groups.groups.flatMap(group =>
-              group.findEditors(entry.resource).map(input => ({ groupId: group.id, editor: input })))
+              group.findEditors(entry.resource).map(input => ({ groupId: group.id, editor: input })),
+            )
             if (toClose.length > 0) await editorService.closeEditors(toClose)
           }
           if (!obsolete) continue
@@ -487,7 +556,9 @@ export async function mountShaderWorkbench(host: HTMLElement, callbacks: Workben
         const activeGroup = groups.activeGroup
         const previewActive = activeGroup.activeEditor instanceof ShaderPreviewInput
         const target = previewActive
-          ? groups.mainPart.getGroups(GroupsOrder.GRID_APPEARANCE).find(group => group.editors.some(input => getFileId(input.resource))) ?? activeGroup
+          ? (groups.mainPart
+              .getGroups(GroupsOrder.GRID_APPEARANCE)
+              .find(group => group.editors.some(input => getFileId(input.resource))) ?? activeGroup)
           : activeGroup
         let openedActiveFile = false
         for (const id of openFileIds) {
@@ -550,7 +621,9 @@ export async function mountShaderWorkbench(host: HTMLElement, callbacks: Workben
   currentMount = dispose
 
   return {
-    sync, editors, dispose,
+    sync,
+    editors,
+    dispose,
     renderVisibleEditors() {
       for (const editor of editors()) {
         const container = editor.getContainerDomNode()
@@ -571,15 +644,17 @@ export async function mountShaderWorkbench(host: HTMLElement, callbacks: Workben
       if (disposed || !entry) return
       const main = groups.mainPart
       const ordered = main.getGroups(GroupsOrder.GRID_APPEARANCE)
-      const source = (main.activeGroup.findEditors(entry.resource).length > 0 ? main.activeGroup : undefined)
-        ?? ordered.find(group => group.findEditors(entry.resource).length > 0)
-        ?? main.activeGroup
+      const source =
+        (main.activeGroup.findEditors(entry.resource).length > 0 ? main.activeGroup : undefined) ??
+        ordered.find(group => group.findEditors(entry.resource).length > 0) ??
+        main.activeGroup
       const direction = host.clientWidth >= 760 ? GroupDirection.RIGHT : GroupDirection.UP
       const adjacent = main.findGroup({ direction }, source)
       const previous = previewGroupIds.get(fileId)
-      const group = ordered.find(candidate => findPreview(candidate, fileId))
-        ?? (previous === undefined ? undefined : main.getGroup(previous))
-        ?? (source.isEmpty ? source : adjacent ?? addPreviewGroup(source))
+      const group =
+        ordered.find(candidate => findPreview(candidate, fileId)) ??
+        (previous === undefined ? undefined : main.getGroup(previous)) ??
+        (source.isEmpty ? source : (adjacent ?? addPreviewGroup(source)))
       await openPreview(fileId, group)
       group.focus()
     },

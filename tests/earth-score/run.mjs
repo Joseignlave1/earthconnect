@@ -51,13 +51,21 @@ try {
     executablePath: process.env.EARTH_SCORE_CHROMIUM,
     channel: 'chromium',
     headless: true,
-    args: JSON.parse(process.env.EARTH_SCORE_CHROMIUM_ARGS ?? JSON.stringify([
-      '--enable-unsafe-webgpu',
-      ...(process.platform === 'linux' ? [
-        '--ignore-gpu-blocklist', '--use-gl=angle', '--use-angle=vulkan',
-        '--enable-features=Vulkan', '--disable-vulkan-surface',
-      ] : []),
-    ])),
+    args: JSON.parse(
+      process.env.EARTH_SCORE_CHROMIUM_ARGS ??
+        JSON.stringify([
+          '--enable-unsafe-webgpu',
+          ...(process.platform === 'linux'
+            ? [
+                '--ignore-gpu-blocklist',
+                '--use-gl=angle',
+                '--use-angle=vulkan',
+                '--enable-features=Vulkan',
+                '--disable-vulkan-surface',
+              ]
+            : []),
+        ]),
+    ),
   })
   const page = await browser.newPage()
   page.on('console', message => console.log(message.text()))

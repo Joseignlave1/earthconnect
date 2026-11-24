@@ -71,7 +71,10 @@ def load_albedo_24k(path: Path, neutralize_blue: bool) -> np.ndarray:
     src_arr = np.asarray(im, dtype=np.uint8)
     if float(src_arr[:, 0].mean()) < 10.0 and float(src_arr[:, 1].mean()) > 20.0:
         src_arr = src_arr.copy()
-        src_arr[:, 0] = ((src_arr[:, -1].astype(np.uint16) + src_arr[:, 1].astype(np.uint16) + 1) >> 1).astype(np.uint8)
+        src_arr[:, 0] = (
+            (src_arr[:, -1].astype(np.uint16) + src_arr[:, 1].astype(np.uint16) + 1)
+            >> 1
+        ).astype(np.uint8)
         im.close()
         im = Image.fromarray(src_arr, mode="RGB")
     if im.size != (FULL_W, FULL_H):
@@ -176,7 +179,9 @@ def smooth_polar_longitudes_inplace(grid: np.ndarray) -> None:
     print(f"  polar smoothing done in {time.time() - t0:.1f}s", flush=True)
 
 
-def dem_to_tangent_normals(dem: np.ndarray, radius_m: float, relief: float) -> np.ndarray:
+def dem_to_tangent_normals(
+    dem: np.ndarray, radius_m: float, relief: float
+) -> np.ndarray:
     """Compute (H, W, 3) uint8 tangent-space normals matching planetTerrain.ts hillNormal."""
     t0 = time.time()
     h, w = dem.shape
@@ -206,8 +211,12 @@ def dem_to_tangent_normals(dem: np.ndarray, radius_m: float, relief: float) -> n
         ty *= inv_len
         tz = inv_len
 
-        out[y0:y1, :, 0] = np.clip(np.rint((tx * 0.5 + 0.5) * 255.0), 0, 255).astype(np.uint8)
-        out[y0:y1, :, 1] = np.clip(np.rint((ty * 0.5 + 0.5) * 255.0), 0, 255).astype(np.uint8)
+        out[y0:y1, :, 0] = np.clip(np.rint((tx * 0.5 + 0.5) * 255.0), 0, 255).astype(
+            np.uint8
+        )
+        out[y0:y1, :, 1] = np.clip(np.rint((ty * 0.5 + 0.5) * 255.0), 0, 255).astype(
+            np.uint8
+        )
         out[y0:y1, :, 2] = np.clip(np.rint(tz * 255.0), 0, 255).astype(np.uint8)
 
     print(f"  tangent normals ({w}x{h}) ready in {time.time() - t0:.1f}s", flush=True)
@@ -229,14 +238,16 @@ def extract_tile_with_gutter(img: np.ndarray, tx: int, ty: int) -> np.ndarray:
     h, w, _ = img.shape
     x0 = tx * INNER - GUTTER
     y0 = ty * INNER - GUTTER
-    xs = (np.arange(x0, x0 + TILE_SIZE) % w)
+    xs = np.arange(x0, x0 + TILE_SIZE) % w
     ys = np.clip(np.arange(y0, y0 + TILE_SIZE), 0, h - 1)
     return img[np.ix_(ys, xs)]
 
 
 def encode_webp_bytes(tile_rgb: np.ndarray, quality: int) -> bytes:
     buf = io.BytesIO()
-    Image.fromarray(tile_rgb, mode="RGB").save(buf, format="WEBP", quality=quality, method=5)
+    Image.fromarray(tile_rgb, mode="RGB").save(
+        buf, format="WEBP", quality=quality, method=5
+    )
     return buf.getvalue()
 
 
@@ -286,7 +297,10 @@ def build_body_packs(
                 pack_id = py * 2 + px
                 jobs.append((kind, level, tx, ty, img, q, pack_id))
 
-    print(f"Encoding {len(jobs)} WebP tiles for {body} across {workers} threads ...", flush=True)
+    print(
+        f"Encoding {len(jobs)} WebP tiles for {body} across {workers} threads ...",
+        flush=True,
+    )
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
         for pack_id, key, data in ex.map(encode_job, jobs):
             pack_buckets[pack_id].append((key, data))
@@ -312,7 +326,10 @@ def build_body_packs(
                 f.write(part)
         size = out_path.stat().st_size
         total_bytes += size
-        print(f"  wrote {out_path.name}: {count} entries, {size / (1024 * 1024):.2f} MiB", flush=True)
+        print(
+            f"  wrote {out_path.name}: {count} entries, {size / (1024 * 1024):.2f} MiB",
+            flush=True,
+        )
 
     print(
         f"Finished {body}: {sum(len(b) for b in pack_buckets)} entries, "
@@ -323,9 +340,16 @@ def build_body_packs(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--sources", type=Path, required=True, help="Directory with downloaded Moon/Mars sources")
+    parser.add_argument(
+        "--sources",
+        type=Path,
+        required=True,
+        help="Directory with downloaded Moon/Mars sources",
+    )
     parser.add_argument("--output", type=Path, default=Path("public/textures"))
-    parser.add_argument("--bodies", nargs="+", choices=["moon", "mars"], default=["moon", "mars"])
+    parser.add_argument(
+        "--bodies", nargs="+", choices=["moon", "mars"], default=["moon", "mars"]
+    )
     parser.add_argument("--albedo-quality", type=int, default=84)
     parser.add_argument("--normal-quality", type=int, default=86)
     parser.add_argument("--workers", type=int, default=min(16, os.cpu_count() or 8))
@@ -335,13 +359,31 @@ def main() -> None:
     if "moon" in args.bodies:
         albedo = load_albedo_24k(args.sources / "lroc_color_poles.tif", False)
         dem = load_moon_dem_24k(args.sources / "ldem_64.img")
-        build_body_packs("moon", albedo, dem, args.output, args.albedo_quality, args.normal_quality, args.workers)
+        build_body_packs(
+            "moon",
+            albedo,
+            dem,
+            args.output,
+            args.albedo_quality,
+            args.normal_quality,
+            args.workers,
+        )
         del albedo, dem
 
     if "mars" in args.bodies:
-        albedo = load_albedo_24k(args.sources / "Mars_Viking_ClrMosaic_global_925m.tif", True)
+        albedo = load_albedo_24k(
+            args.sources / "Mars_Viking_ClrMosaic_global_925m.tif", True
+        )
         dem = load_mars_dem_24k(args.sources)
-        build_body_packs("mars", albedo, dem, args.output, args.albedo_quality, args.normal_quality, args.workers)
+        build_body_packs(
+            "mars",
+            albedo,
+            dem,
+            args.output,
+            args.albedo_quality,
+            args.normal_quality,
+            args.workers,
+        )
         del albedo, dem
 
 

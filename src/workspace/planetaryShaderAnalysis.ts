@@ -42,7 +42,7 @@ export function mentionsPlanetaryName(source: string) {
     if (Object.hasOwn(functions, identifier)) first = offset - identifier.length
     identifier = ''
   }
-  for (let index = 0; index < source.length;) {
+  for (let index = 0; index < source.length; ) {
     const pair = source.slice(index, index + 2)
     if (pair === '/*') {
       finish(index)
@@ -113,11 +113,15 @@ export function readPlanetaryCalls(source: string, syntaxTree: string): readonly
   for (let index = 0; index < bytes.length; index++) {
     if (bytes[index] === 10) offsets.push(index + 1)
   }
-  const lineStarts = source.split('\n').reduce<number[]>((starts, line) => {
-    starts.push(starts[starts.length - 1] + line.length + 1)
-    return starts
-  }, [0])
-  const sourceOffset = ([offset, line]: Point) => lineStarts[line] + decoder.decode(bytes.subarray(offsets[line], offset)).length
+  const lineStarts = source.split('\n').reduce<number[]>(
+    (starts, line) => {
+      starts.push(starts[starts.length - 1] + line.length + 1)
+      return starts
+    },
+    [0],
+  )
+  const sourceOffset = ([offset, line]: Point) =>
+    lineStarts[line] + decoder.decode(bytes.subarray(offsets[line], offset)).length
   const text = (node: Ast) => decoder.decode(bytes.subarray(node.start[0], node.end[0]))
   function range(node: Ast): Range {
     const [start, line] = node.start
@@ -129,10 +133,12 @@ export function readPlanetaryCalls(source: string, syntaxTree: string): readonly
     }
   }
   const name = (node: Ast) => branch(branch(node, 'Name'), 'Identifier')
-  const pathParts = (node: Ast | undefined) => children(branch(node, 'Path')).filter(child => child.kind === 'Identifier')
+  const pathParts = (node: Ast | undefined) =>
+    children(branch(node, 'Path')).filter(child => child.kind === 'Identifier')
   function simplePath(node: Ast | undefined) {
     const parts = pathParts(node)
-    if (parts.length === 1 && !branch(branch(node, 'Path'), 'TemplateList') && !branch(node, 'TemplateList')) return text(parts[0])
+    if (parts.length === 1 && !branch(branch(node, 'Path'), 'TemplateList') && !branch(node, 'TemplateList'))
+      return text(parts[0])
   }
 
   const globals = new Map<string, Ast>()
@@ -151,14 +157,21 @@ export function readPlanetaryCalls(source: string, syntaxTree: string): readonly
 
   function shadows(identifier: string, position: number, ancestors: readonly Ast[]) {
     for (const scope of ancestors) {
-      const definitions = scope.kind === 'FunctionDeclaration' ? children(branch(scope, 'FunctionParameters'))
-        : scope.kind === 'ForStatement' ? children(branch(scope, 'ForInitializer'))
-        : scope.kind === 'CompoundStatement' ? children(scope).filter(child => runtimeBindings.has(child.kind))
-        : []
-      if (definitions.some(definition => {
-        const declaration = name(definition)
-        return declaration && definition.end[0] <= position && text(declaration) === identifier
-      })) return true
+      const definitions =
+        scope.kind === 'FunctionDeclaration'
+          ? children(branch(scope, 'FunctionParameters'))
+          : scope.kind === 'ForStatement'
+            ? children(branch(scope, 'ForInitializer'))
+            : scope.kind === 'CompoundStatement'
+              ? children(scope).filter(child => runtimeBindings.has(child.kind))
+              : []
+      if (
+        definitions.some(definition => {
+          const declaration = name(definition)
+          return declaration && definition.end[0] <= position && text(declaration) === identifier
+        })
+      )
+        return true
     }
     return false
   }
@@ -173,13 +186,21 @@ export function readPlanetaryCalls(source: string, syntaxTree: string): readonly
       }
       case 'PrefixExpression': {
         if (!branch(node, 'Minus')) return
-        const number = numeric(children(node).find(child => child.type === 'Node'), ancestors, seen)
+        const number = numeric(
+          children(node).find(child => child.type === 'Node'),
+          ancestors,
+          seen,
+        )
         if (number) return { ...number, value: -number.value }
         return
       }
       case 'ParenthesisExpression': {
         if (!branch(node, 'ParenthesisRight')) return
-        return numeric(children(node).find(child => child.type === 'Node'), ancestors, seen)
+        return numeric(
+          children(node).find(child => child.type === 'Node'),
+          ancestors,
+          seen,
+        )
       }
       case 'IdentExpression': {
         const identifier = simplePath(node)
@@ -197,7 +218,8 @@ export function readPlanetaryCalls(source: string, syntaxTree: string): readonly
         }
         return
       }
-      default: return
+      default:
+        return
     }
   }
 
@@ -231,7 +253,10 @@ export function readPlanetaryCalls(source: string, syntaxTree: string): readonly
             const axis = index === 0 ? 'Latitude' : 'Longitude'
             const limit = index === 0 ? 90 : 180
             if (!number || number.type === 'other' || !Number.isFinite(number.value)) {
-              fail(argument, `${axis} must be a finite numeric literal or a module-scope numeric const that converts to f32.`)
+              fail(
+                argument,
+                `${axis} must be a finite numeric literal or a module-scope numeric const that converts to f32.`,
+              )
               return
             }
             if (Math.abs(number.value) > limit) {
@@ -313,7 +338,9 @@ async function inspect(source: string, signal: AbortSignal) {
     if (!session) {
       const controller = new AbortController()
       shutdown = controller
-      const onExit = () => { if (shutdown === controller) stopSession() }
+      const onExit = () => {
+        if (shutdown === controller) stopSession()
+      }
       session = startWgslLanguageServer(() => source, null, onExit, controller.signal)
       openedSource = source
     }
@@ -340,16 +367,22 @@ export async function analyzePlanetaryShader(source: string, signal: AbortSignal
   const offset = mentionsPlanetaryName(source)
   if (offset < 0) return []
   const name = Object.keys(functions).find(name => source.startsWith(name, offset))
-  const unavailable = () => new PlanetaryAnalysisError([{
-    line: source.slice(0, offset).split('\n').length,
-    column: offset - source.lastIndexOf('\n', offset - 1),
-    length: name?.length ?? 1,
-    severity: 'error',
-    message: 'Planetary calls require the local WGSL analyzer. Reload on a cross-origin-isolated page to use them.',
-  }])
+  const unavailable = () =>
+    new PlanetaryAnalysisError([
+      {
+        line: source.slice(0, offset).split('\n').length,
+        column: offset - source.lastIndexOf('\n', offset - 1),
+        length: name?.length ?? 1,
+        severity: 'error',
+        message: 'Planetary calls require the local WGSL analyzer. Reload on a cross-origin-isolated page to use them.',
+      },
+    ])
   if (!globalThis.crossOriginIsolated) throw unavailable()
   const job = queue.then(() => inspect(source, signal))
-  queue = job.then(() => undefined, () => undefined)
+  queue = job.then(
+    () => undefined,
+    () => undefined,
+  )
   try {
     return await job
   } catch (error) {

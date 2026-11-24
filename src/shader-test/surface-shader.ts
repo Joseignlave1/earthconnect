@@ -18,19 +18,22 @@ function scoreBankBindings(banks: number) {
     `@group(0) @binding(${8 + banks}) var earthTileSampler: sampler;`,
   ].join('\n')
 
-  const singleBranches = Array.from({ length: banks }, (_, i) =>
-    `${i ? '  else ' : '  '}if (bank == ${i}u) { return textureLoad(scores${i}, pixel, layer, lod).r; }`,
+  const singleBranches = Array.from(
+    { length: banks },
+    (_, i) => `${i ? '  else ' : '  '}if (bank == ${i}u) { return textureLoad(scores${i}, pixel, layer, lod).r; }`,
   ).join('\n')
 
-  const quadBranches = Array.from({ length: banks }, (_, i) =>
-    `${i ? '  else ' : '  '}if (bank == ${i}u) {\n`
-    + `    return vec4u(\n`
-    + `      textureLoad(scores${i}, local, layer, lod).r,\n`
-    + `      textureLoad(scores${i}, local + vec2i(1, 0), layer, lod).r,\n`
-    + `      textureLoad(scores${i}, local + vec2i(0, 1), layer, lod).r,\n`
-    + `      textureLoad(scores${i}, local + vec2i(1, 1), layer, lod).r,\n`
-    + `    );\n`
-    + `  }`,
+  const quadBranches = Array.from(
+    { length: banks },
+    (_, i) =>
+      `${i ? '  else ' : '  '}if (bank == ${i}u) {\n` +
+      `    return vec4u(\n` +
+      `      textureLoad(scores${i}, local, layer, lod).r,\n` +
+      `      textureLoad(scores${i}, local + vec2i(1, 0), layer, lod).r,\n` +
+      `      textureLoad(scores${i}, local + vec2i(0, 1), layer, lod).r,\n` +
+      `      textureLoad(scores${i}, local + vec2i(1, 1), layer, lod).r,\n` +
+      `    );\n` +
+      `  }`,
   ).join('\n')
 
   return `${declarations}

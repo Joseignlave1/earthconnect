@@ -5,9 +5,15 @@ export type Terrain = {
   stride?: 2 | 4
   polarSmoothed?: boolean
 }
-type TerrainZstdDecompressor = (frame: ArrayBuffer, outputBytes: number, signal?: AbortSignal) => Promise<Uint8Array<ArrayBuffer>>
+type TerrainZstdDecompressor = (
+  frame: ArrayBuffer,
+  outputBytes: number,
+  signal?: AbortSignal,
+) => Promise<Uint8Array<ArrayBuffer>>
 export type TerrainPackFormat = 'rg32float' | 'rg8unorm'
-export type PackedTerrainLevel<T extends Float32Array<ArrayBuffer> | Uint8Array<ArrayBuffer> = Float32Array<ArrayBuffer> | Uint8Array<ArrayBuffer>> = {
+export type PackedTerrainLevel<
+  T extends Float32Array<ArrayBuffer> | Uint8Array<ArrayBuffer> = Float32Array<ArrayBuffer> | Uint8Array<ArrayBuffer>,
+> = {
   data: T
   width: number
   height: number
@@ -17,7 +23,9 @@ export type TerrainWorkerResponse =
   | { kind: 'ok'; terrain: Terrain; poles: [number, number]; levels: PackedTerrainLevel[] }
   | { kind: 'error'; message: string }
 
-export function packRg32FloatLevels(levels: ReturnType<typeof elevationPyramid>): PackedTerrainLevel<Float32Array<ArrayBuffer>>[] {
+export function packRg32FloatLevels(
+  levels: ReturnType<typeof elevationPyramid>,
+): PackedTerrainLevel<Float32Array<ArrayBuffer>>[] {
   return levels.map(({ values, coast, width, height }) => {
     const data = new Float32Array(values.length * 2)
     for (let i = 0; i < values.length; i++) {
@@ -28,7 +36,9 @@ export function packRg32FloatLevels(levels: ReturnType<typeof elevationPyramid>)
   })
 }
 
-export function packRg8Levels(levels: ReturnType<typeof elevationPyramid>): PackedTerrainLevel<Uint8Array<ArrayBuffer>>[] {
+export function packRg8Levels(
+  levels: ReturnType<typeof elevationPyramid>,
+): PackedTerrainLevel<Uint8Array<ArrayBuffer>>[] {
   return levels.map(({ values, width, height }) => {
     const data = new Uint8Array(width * height * 2)
     for (let i = 0; i < values.length; i++) {
@@ -46,18 +56,27 @@ export function packRg8PyramidDirect(terrain: Terrain): PackedTerrainLevel<Uint8
   if ((terrain.stride ?? 4) !== 2 || !terrain.polarSmoothed) {
     return packRg8Levels(elevationPyramid(terrain, true))
   }
-  let width = terrain.width, height = terrain.height
-  const level0 = new Uint8Array(terrain.pixels.buffer as ArrayBuffer, terrain.pixels.byteOffset, terrain.pixels.byteLength)
+  let width = terrain.width,
+    height = terrain.height
+  const level0 = new Uint8Array(
+    terrain.pixels.buffer as ArrayBuffer,
+    terrain.pixels.byteOffset,
+    terrain.pixels.byteLength,
+  )
   const levels: PackedTerrainLevel<Uint8Array<ArrayBuffer>>[] = [{ data: level0, width, height }]
   let prev = level0
   while (width > 1 || height > 1) {
-    const w = Math.max(1, width >> 1), h = Math.max(1, height >> 1)
+    const w = Math.max(1, width >> 1),
+      h = Math.max(1, height >> 1)
     const next = new Uint8Array(w * h * 2)
     for (let y = 0; y < h; y++) {
-      const sy0 = Math.floor(y * height / h), sy1 = Math.floor((y + 1) * height / h)
+      const sy0 = Math.floor((y * height) / h),
+        sy1 = Math.floor(((y + 1) * height) / h)
       for (let x = 0; x < w; x++) {
-        const sx0 = Math.floor(x * width / w), sx1 = Math.floor((x + 1) * width / w)
-        let sum = 0, count = 0
+        const sx0 = Math.floor((x * width) / w),
+          sx1 = Math.floor(((x + 1) * width) / w)
+        let sum = 0,
+          count = 0
         for (let sy = sy0; sy < sy1; sy++) {
           const rowOff = sy * width
           for (let sx = sx0; sx < sx1; sx++) {
@@ -80,7 +99,8 @@ export function packRg8PyramidDirect(terrain: Terrain): PackedTerrainLevel<Uint8
         sum += next[i] * 256 + next[i + 1]
       }
       const code = Math.max(0, Math.min(65535, Math.round(sum / w)))
-      const hi = code >> 8, lo = code & 255
+      const hi = code >> 8,
+        lo = code & 255
       for (let x = 0; x < w; x++) {
         const i = (row * w + x) * 2
         next[i] = hi
@@ -88,7 +108,9 @@ export function packRg8PyramidDirect(terrain: Terrain): PackedTerrainLevel<Uint8
       }
     }
     levels.push({ data: next, width: w, height: h })
-    prev = next; width = w; height = h
+    prev = next
+    width = w
+    height = h
   }
   return levels
 }
@@ -98,11 +120,12 @@ export function packRg8PyramidDirect(terrain: Terrain): PackedTerrainLevel<Uint8
 export function decodeTerrain(buffer: ArrayBuffer): Terrain {
   const view = new DataView(buffer)
   if (buffer.byteLength < 12 || view.getUint32(0) !== 0x45435431) throw new Error('Invalid terrain data header.')
-  const width = view.getUint32(4,true), height = view.getUint32(8,true)
+  const width = view.getUint32(4, true),
+    height = view.getUint32(8, true)
   if (!width || !height || width > 16384 || height > 16384 || buffer.byteLength !== 12 + width * height * 4) {
     throw new Error('Invalid terrain data dimensions or length.')
   }
-  return { pixels: new Uint8ClampedArray(buffer,12), width, height, stride: 4 }
+  return { pixels: new Uint8ClampedArray(buffer, 12), width, height, stride: 4 }
 }
 
 // ECT2: big-endian magic 0x45435432, LE uint32 width/height/flags, then Zstd-compressed
@@ -129,7 +152,7 @@ export function decodeTerrainEct2Payload(width: number, height: number, flags: n
         const i = rowOff + x
         const zz = (payload[i] << 8) | payload[count + i]
         const signed = (zz >>> 1) ^ -(zz & 1)
-        const pred = y === 0 ? (x === 0 ? 32768 : left) : (x === 0 ? prevRow[0] : (left + prevRow[x]) >> 1)
+        const pred = y === 0 ? (x === 0 ? 32768 : left) : x === 0 ? prevRow[0] : (left + prevRow[x]) >> 1
         const code = (pred + signed) & 0xffff
         left = code
         prevRow[x] = code
@@ -139,7 +162,7 @@ export function decodeTerrainEct2Payload(width: number, height: number, flags: n
         if (prevCoast) {
           const czz = payload[coastOffset + i]
           const cs = (czz >>> 1) ^ -(czz & 1)
-          const cpred = y === 0 ? (x === 0 ? 128 : leftCoast) : (x === 0 ? prevCoast[0] : (leftCoast + prevCoast[x]) >> 1)
+          const cpred = y === 0 ? (x === 0 ? 128 : leftCoast) : x === 0 ? prevCoast[0] : (leftCoast + prevCoast[x]) >> 1
           const ccode = (cpred + cs) & 0xff
           leftCoast = ccode
           prevCoast[x] = ccode
@@ -161,18 +184,28 @@ export function decodeTerrainEct2Payload(width: number, height: number, flags: n
   return { pixels, width, height, stride, polarSmoothed: Boolean(flags & 2) }
 }
 
-export async function decodeTerrainEct2(buffer: ArrayBuffer, decompress: TerrainZstdDecompressor, signal?: AbortSignal): Promise<Terrain> {
+export async function decodeTerrainEct2(
+  buffer: ArrayBuffer,
+  decompress: TerrainZstdDecompressor,
+  signal?: AbortSignal,
+): Promise<Terrain> {
   const view = new DataView(buffer)
   if (buffer.byteLength < 16 || view.getUint32(0) !== 0x45435432) throw new Error('Invalid ECT2 terrain header.')
-  const width = view.getUint32(4, true), height = view.getUint32(8, true), flags = view.getUint32(12, true)
+  const width = view.getUint32(4, true),
+    height = view.getUint32(8, true),
+    flags = view.getUint32(12, true)
   if (!width || !height || width > 16384 || height > 16384) throw new Error('Invalid ECT2 terrain dimensions.')
-  const payloadStride = (flags & 4) ? 3 : 2
+  const payloadStride = flags & 4 ? 3 : 2
   const payload = await decompress(buffer.slice(16), width * height * payloadStride, signal)
   return decodeTerrainEct2Payload(width, height, flags, payload)
 }
 
-export async function loadTerrain(url: string, signal: AbortSignal, decompress?: TerrainZstdDecompressor): Promise<Terrain> {
-  const response = await fetch(url,{ signal })
+export async function loadTerrain(
+  url: string,
+  signal: AbortSignal,
+  decompress?: TerrainZstdDecompressor,
+): Promise<Terrain> {
+  const response = await fetch(url, { signal })
   if (!response.ok || !response.body) throw new Error('Could not load terrain elevation. Reload to retry.')
   const raw = await response.arrayBuffer()
   signal.throwIfAborted()
@@ -194,22 +227,22 @@ export function poleElevations(terrain: Terrain): [number, number] {
     }
     return sum / terrain.width
   }
-  return [average(terrain.height - 1),average(0)]
+  return [average(terrain.height - 1), average(0)]
 }
 
 function smoothPolarLongitudes(data: Float32Array, width: number, height: number) {
   if (width < 4 || height < 4) return
   const prefix = new Float64Array(width * 3 + 1)
   const scratch = new Float32Array(width)
-  const maxHalf = (width - 1) * .5
+  const maxHalf = (width - 1) * 0.5
   for (let y = 1; y < height - 1; y++) {
-    const latitude = (.5 - (y + .5) / height) * Math.PI
+    const latitude = (0.5 - (y + 0.5) / height) * Math.PI
     const ratio = 1 / Math.max(1e-4, Math.cos(latitude))
     if (ratio < 1.25) continue
     // Three periodic fractional box passes match a Gaussian of sigma ~= half,
     // equalizing east-west resolution to the north-south texel pitch so polar
     // orbital cross-track noise does not form radial spokes.
-    const half = Math.min(maxHalf, .5 * Math.sqrt(ratio * ratio - 1))
+    const half = Math.min(maxHalf, 0.5 * Math.sqrt(ratio * ratio - 1))
     const radius = Math.floor(half)
     const frac = half - radius
     const weight = 2 * half + 1
@@ -239,7 +272,8 @@ function smoothPolarLongitudes(data: Float32Array, width: number, height: number
 // Numeric averages, not averages of the packed PNG color channels. Uploading
 // these levels also avoids requiring float render-target extensions for mipmaps.
 export function elevationPyramid(terrain: Terrain, isotropicPoles = false) {
-  let width = terrain.width, height = terrain.height
+  let width = terrain.width,
+    height = terrain.height
   const stride = terrain.stride ?? 4
   const hasCoast = stride === 4
   let values = new Float32Array(width * height)
@@ -253,58 +287,69 @@ export function elevationPyramid(terrain: Terrain, isotropicPoles = false) {
     if (!data.length) return
     // Every longitude converges to one point. A longitude-dependent last row
     // otherwise remains visible as radial wedges, even with correct coordinates.
-    for (const row of new Set([0,rows - 1])) {
+    for (const row of new Set([0, rows - 1])) {
       let sum = 0
       for (let x = 0; x < columns; x++) sum += data[row * columns + x]
-      data.fill(sum / columns,row * columns,(row + 1) * columns)
+      data.fill(sum / columns, row * columns, (row + 1) * columns)
     }
   }
   const smoothRuntime = isotropicPoles && !terrain.polarSmoothed
-  if (smoothRuntime) smoothPolarLongitudes(values,width,height)
-  closePoles(values,width,height); closePoles(coast,width,height)
+  if (smoothRuntime) smoothPolarLongitudes(values, width, height)
+  closePoles(values, width, height)
+  closePoles(coast, width, height)
   const levels = [{ values, coast, width, height }]
   while (width > 1 || height > 1) {
-    const w = Math.max(1,width >> 1), h = Math.max(1,height >> 1)
+    const w = Math.max(1, width >> 1),
+      h = Math.max(1, height >> 1)
     const next = new Float32Array(w * h)
     const nextCoast = hasCoast ? new Float32Array(w * h) : new Float32Array(0)
     if (width === w * 2 && height === h * 2) {
       for (let y = 0; y < h; y++) {
-        const r0 = (y * 2) * width
+        const r0 = y * 2 * width
         const r1 = r0 + width
         const dstRow = y * w
         if (hasCoast) {
           for (let x = 0; x < w; x++) {
             const x0 = x * 2
-            const i0 = r0 + x0, i1 = r1 + x0
-            next[dstRow + x] = (values[i0] + values[i0 + 1] + values[i1] + values[i1 + 1]) * .25
-            nextCoast[dstRow + x] = (coast[i0] + coast[i0 + 1] + coast[i1] + coast[i1 + 1]) * .25
+            const i0 = r0 + x0,
+              i1 = r1 + x0
+            next[dstRow + x] = (values[i0] + values[i0 + 1] + values[i1] + values[i1 + 1]) * 0.25
+            nextCoast[dstRow + x] = (coast[i0] + coast[i0 + 1] + coast[i1] + coast[i1 + 1]) * 0.25
           }
         } else {
           for (let x = 0; x < w; x++) {
             const x0 = x * 2
-            const i0 = r0 + x0, i1 = r1 + x0
-            next[dstRow + x] = (values[i0] + values[i0 + 1] + values[i1] + values[i1 + 1]) * .25
+            const i0 = r0 + x0,
+              i1 = r1 + x0
+            next[dstRow + x] = (values[i0] + values[i0 + 1] + values[i1] + values[i1 + 1]) * 0.25
           }
         }
       }
     } else {
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-        let sum = 0, coastSum = 0, count = 0
-        for (let sy = Math.floor(y * height / h); sy < Math.floor((y + 1) * height / h); sy++) {
-          for (let sx = Math.floor(x * width / w); sx < Math.floor((x + 1) * width / w); sx++) {
-            sum += values[sy * width + sx]
-            if (hasCoast) coastSum += coast[sy * width + sx]
-            count++
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          let sum = 0,
+            coastSum = 0,
+            count = 0
+          for (let sy = Math.floor((y * height) / h); sy < Math.floor(((y + 1) * height) / h); sy++) {
+            for (let sx = Math.floor((x * width) / w); sx < Math.floor(((x + 1) * width) / w); sx++) {
+              sum += values[sy * width + sx]
+              if (hasCoast) coastSum += coast[sy * width + sx]
+              count++
+            }
           }
+          next[y * w + x] = sum / count
+          if (hasCoast) nextCoast[y * w + x] = coastSum / count
         }
-        next[y * w + x] = sum / count
-        if (hasCoast) nextCoast[y * w + x] = coastSum / count
-      }
     }
-    if (smoothRuntime) smoothPolarLongitudes(next,w,h)
-    closePoles(next,w,h); closePoles(nextCoast,w,h)
+    if (smoothRuntime) smoothPolarLongitudes(next, w, h)
+    closePoles(next, w, h)
+    closePoles(nextCoast, w, h)
     levels.push({ values: next, coast: nextCoast, width: w, height: h })
-    values = next; coast = nextCoast; width = w; height = h
+    values = next
+    coast = nextCoast
+    width = w
+    height = h
   }
   return levels
 }
@@ -313,11 +358,14 @@ export function elevationPyramid(terrain: Terrain, isotropicPoles = false) {
 export function elevationAt(terrain: Terrain, longitude: number, latitude: number) {
   const { pixels, width, height } = terrain
   const stride = terrain.stride ?? 4
-  const x = (longitude / (2 * Math.PI) + .5) * width - .5
-  const y = Math.max(0, Math.min(height - 1, (.5 - latitude / Math.PI) * height - .5))
-  const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0
+  const x = (longitude / (2 * Math.PI) + 0.5) * width - 0.5
+  const y = Math.max(0, Math.min(height - 1, (0.5 - latitude / Math.PI) * height - 0.5))
+  const x0 = Math.floor(x),
+    y0 = Math.floor(y),
+    fx = x - x0,
+    fy = y - y0
   const read = (column: number, row: number) => {
-    const i = (Math.min(height - 1, row) * width + ((column % width) + width) % width) * stride
+    const i = (Math.min(height - 1, row) * width + (((column % width) + width) % width)) * stride
     return pixels[i] * 256 + pixels[i + 1] - 32768
   }
   const top = read(x0, y0) * (1 - fx) + read(x0 + 1, y0) * fx

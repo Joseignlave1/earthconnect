@@ -6,10 +6,21 @@ import { comparisonExamples } from '../src/workspace/comparisonExamples.ts'
 const wgsl = registerHooks({
   load(url, context, nextLoad) {
     if (!url.endsWith('.wgsl?raw')) return nextLoad(url, context)
-    return { format: 'module', source: `export default ${JSON.stringify(readFileSync(new URL(url), 'utf8'))}`, shortCircuit: true }
+    return {
+      format: 'module',
+      source: `export default ${JSON.stringify(readFileSync(new URL(url), 'utf8'))}`,
+      shortCircuit: true,
+    }
   },
 })
-const { assembleShaderProject, findShaderLocation, readShaderProject, resolveShaderFiles, saveShaderProject, selectShaderModule } = await import('../src/workspace/shaderProject.ts')
+const {
+  assembleShaderProject,
+  findShaderLocation,
+  readShaderProject,
+  resolveShaderFiles,
+  saveShaderProject,
+  selectShaderModule,
+} = await import('../src/workspace/shaderProject.ts')
 const { helloWorldExample } = await import('../src/workspace/helloWorldExample.ts')
 wgsl.deregister()
 
@@ -17,7 +28,12 @@ function mockStorage(t: TestContext, saved: string | null) {
   const storage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
-    value: { getItem: () => saved, setItem: (_key: string, value: string) => { saved = value } },
+    value: {
+      getItem: () => saved,
+      setItem: (_key: string, value: string) => {
+        saved = value
+      },
+    },
   })
   t.after(() => {
     if (storage) Object.defineProperty(globalThis, 'localStorage', storage)
@@ -74,8 +90,19 @@ test('default examples run separately from each other and the shared score files
 test('saved user shaders compile independently while helpers still belong to the score module', t => {
   mockStorage(t, null)
   const initial = readShaderProject()
-  const terrain = { id: 'terrain', name: 'terrain.wgsl', kind: 'shader', source: 'fn score(cell: EarthCell) -> f32 { return 0.2; }' } as const
-  const vegetation = { id: 'vegetation', name: 'vegetation.wgsl', kind: 'shader', source: 'fn score(cell: EarthCell) -> f32 { return 0.9; }', closed: true } as const
+  const terrain = {
+    id: 'terrain',
+    name: 'terrain.wgsl',
+    kind: 'shader',
+    source: 'fn score(cell: EarthCell) -> f32 { return 0.2; }',
+  } as const
+  const vegetation = {
+    id: 'vegetation',
+    name: 'vegetation.wgsl',
+    kind: 'shader',
+    source: 'fn score(cell: EarthCell) -> f32 { return 0.9; }',
+    closed: true,
+  } as const
   const legacyHelper = { id: 'legacy', name: 'legacy.wgsl', source: 'fn legacy() {}' }
   const helper = { id: 'shared', name: 'shared.wgsl', kind: 'helper', source: 'fn shared() {}' } as const
   const project = { ...initial, files: [...initial.files, terrain, vegetation, legacyHelper, helper] }
@@ -89,7 +116,10 @@ test('saved user shaders compile independently while helpers still belong to the
     assert.deepEqual(findShaderLocation(module.segments, 1), { fileId: shader.id, line: 1 })
   }
   for (const id of ['score', legacyHelper.id, helper.id]) {
-    assert.deepEqual(selectShaderModule(files, id).map(file => file.id), ['score', legacyHelper.id, helper.id])
+    assert.deepEqual(
+      selectShaderModule(files, id).map(file => file.id),
+      ['score', legacyHelper.id, helper.id],
+    )
   }
 })
 
@@ -107,13 +137,16 @@ test('adding the default tabs preserves existing files, tab selection and saved 
   assert.deepEqual(merged.files.slice(0, 2), oldProject.files)
   assert.equal(merged.activeFileId, oldProject.activeFileId)
   assert.equal(new Set(merged.files.map(file => file.name.toLowerCase())).size, merged.files.length)
-  assert.deepEqual(merged.files.slice(2).map(file => file.id), [...comparisonExamples.map(file => file.id), helloWorldExample.id])
+  assert.deepEqual(
+    merged.files.slice(2).map(file => file.id),
+    [...comparisonExamples.map(file => file.id), helloWorldExample.id],
+  )
   assert.equal(merged.files.find(file => file.id === helloWorldExample.id)?.closed, true)
   const edited = {
     activeFileId: second.id,
-    files: merged.files.map(file => file.id === first.id
-      ? { ...file, name: 'edited-example.wgsl', source: '// custom example', closed: true }
-      : file),
+    files: merged.files.map(file =>
+      file.id === first.id ? { ...file, name: 'edited-example.wgsl', source: '// custom example', closed: true } : file,
+    ),
   }
   saveShaderProject(edited)
   const restored = readShaderProject()

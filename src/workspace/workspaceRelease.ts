@@ -18,11 +18,7 @@ const planetTilePaths = [
   ...Array.from({ length: 4 }, (_, index) => `textures/mars-tiles-${index}.bin`),
 ]
 const allTilePaths = [...earthTilePaths, ...planetTilePaths]
-const optionalRenderPaths = new Set([
-  'textures/moon-albedo.webp',
-  'textures/mars-albedo.webp',
-  ...allTilePaths,
-])
+const optionalRenderPaths = new Set(['textures/moon-albedo.webp', 'textures/mars-albedo.webp', ...allTilePaths])
 // Legacy CDN releases still list the removed basins snapshot in their manifest totals.
 const ignoredPaths = new Set(['data/surface-basins.bin'])
 const hashPattern = /^[a-f0-9]{64}$/
@@ -33,11 +29,19 @@ export type DownloadProgress = { downloaded: number; total: number; fallback: bo
 function parseRelease(value: unknown, etag: string | null): Release {
   if (!value || typeof value !== 'object') throw new Error('Invalid Earth data release.')
   const { format, runtimeFileCount, runtimeBytes, scoreManifest, assets } = value as {
-    format?: unknown; runtimeFileCount?: unknown; runtimeBytes?: unknown
-    scoreManifest?: Partial<Asset>; assets?: Record<string, unknown>
+    format?: unknown
+    runtimeFileCount?: unknown
+    runtimeBytes?: unknown
+    scoreManifest?: Partial<Asset>
+    assets?: Record<string, unknown>
   }
-  if (format !== 'earth-connect-assets-v1' || !assets || typeof assets !== 'object' ||
-      !renderPaths.every(path => Object.hasOwn(assets, path)) || !Object.hasOwn(assets, scorePath)) {
+  if (
+    format !== 'earth-connect-assets-v1' ||
+    !assets ||
+    typeof assets !== 'object' ||
+    !renderPaths.every(path => Object.hasOwn(assets, path)) ||
+    !Object.hasOwn(assets, scorePath)
+  ) {
     throw new Error('The Earth data release is missing required files.')
   }
   const files: Record<string, Asset> = Object.create(null)
@@ -47,12 +51,24 @@ function parseRelease(value: unknown, etag: string | null): Release {
   for (const [path, value] of Object.entries(assets)) {
     const item = value as Partial<Asset> | undefined
     const ignored = ignoredPaths.has(path)
-    if (!ignored && !renderPaths.includes(path) && !optionalRenderPaths.has(path) && path !== scorePath && !/^compute-data\/world\/chunk-\d+\.zst$/.test(path)) {
+    if (
+      !ignored &&
+      !renderPaths.includes(path) &&
+      !optionalRenderPaths.has(path) &&
+      path !== scorePath &&
+      !/^compute-data\/world\/chunk-\d+\.zst$/.test(path)
+    ) {
       throw new Error(`Unexpected Earth data file ${path}.`)
     }
-    if (!item || typeof item.sha256 !== 'string' || !hashPattern.test(item.sha256) ||
-        typeof item.bytes !== 'number' || !Number.isSafeInteger(item.bytes) || item.bytes <= 0 ||
-        typeof item.contentType !== 'string') {
+    if (
+      !item ||
+      typeof item.sha256 !== 'string' ||
+      !hashPattern.test(item.sha256) ||
+      typeof item.bytes !== 'number' ||
+      !Number.isSafeInteger(item.bytes) ||
+      item.bytes <= 0 ||
+      typeof item.contentType !== 'string'
+    ) {
       throw new Error(`Invalid Earth data metadata for ${path}.`)
     }
     const dot = path.lastIndexOf('.')
@@ -67,8 +83,11 @@ function parseRelease(value: unknown, etag: string | null): Release {
       bytes += item.bytes
     }
   }
-  if (scoreManifest?.key !== files[scorePath].key ||
-      scoreManifest.sha256 !== files[scorePath].sha256 || scoreManifest.bytes !== files[scorePath].bytes) {
+  if (
+    scoreManifest?.key !== files[scorePath].key ||
+    scoreManifest.sha256 !== files[scorePath].sha256 ||
+    scoreManifest.bytes !== files[scorePath].bytes
+  ) {
     throw new Error('The Earth scoring manifest does not match the release.')
   }
   if (manifestFiles !== runtimeFileCount || manifestBytes !== runtimeBytes || !Number.isSafeInteger(manifestBytes)) {
@@ -141,7 +160,9 @@ function pruneCache(db: IDBDatabase, release: Release) {
 async function downloadBytes(asset: Asset, signal: AbortSignal, count: (bytes: number) => void) {
   const lifetime = AbortSignal.any([signal, AbortSignal.timeout(300_000)])
   const response = await fetch(new URL(asset.key, manifestUrl), {
-    signal: lifetime, cache: 'no-store', credentials: 'omit',
+    signal: lifetime,
+    cache: 'no-store',
+    credentials: 'omit',
   })
   if (!response.ok || !response.body) throw new Error(`${asset.key} returned HTTP ${response.status}.`)
   const bytes = new Uint8Array(asset.bytes)
@@ -177,15 +198,19 @@ async function verifyAsset(asset: Asset, bytes: Uint8Array<ArrayBuffer>, signal:
 async function validateScoreManifest(blob: Blob, worldFiles: ReadonlyMap<string, Asset>) {
   const score = await new Response(blob).json()
   const remaining = new Map(worldFiles)
-  if (!Array.isArray(score?.chunks) || score.chunks.length !== remaining.size ||
-      score.chunks.length === 0 || !score.chunks.every((chunk: { file?: unknown; compressedBytes?: unknown } | null) => {
-        if (typeof chunk?.file !== 'string') return false
-        const path = world + chunk.file
-        const asset = remaining.get(path)
-        if (!asset || asset.bytes !== chunk.compressedBytes) return false
-        remaining.delete(path)
-        return true
-      })) {
+  if (
+    !Array.isArray(score?.chunks) ||
+    score.chunks.length !== remaining.size ||
+    score.chunks.length === 0 ||
+    !score.chunks.every((chunk: { file?: unknown; compressedBytes?: unknown } | null) => {
+      if (typeof chunk?.file !== 'string') return false
+      const path = world + chunk.file
+      const asset = remaining.get(path)
+      if (!asset || asset.bytes !== chunk.compressedBytes) return false
+      remaining.delete(path)
+      return true
+    })
+  ) {
     throw new Error('The Earth scoring release is missing world chunks.')
   }
 }
@@ -195,7 +220,9 @@ function releaseSource(release: Release, lifetime: AbortSignal) {
   const worldFiles = new Map<string, Asset>()
   for (const [path, asset] of Object.entries(release.files)) {
     let resolve!: (blob: Blob) => void
-    const pending = new Promise<Blob>(ready => { resolve = ready })
+    const pending = new Promise<Blob>(ready => {
+      resolve = ready
+    })
     const slot = { pending, resolve }
     slots.set(path, slot)
     if (path.startsWith(world) && path !== scorePath) {
@@ -210,30 +237,39 @@ function releaseSource(release: Release, lifetime: AbortSignal) {
     if (!pending) {
       const url = `${import.meta.env.BASE_URL}${path}`
       pending = fetch(url, { method: 'HEAD', cache: 'no-store' })
-        .then(res => res.ok ? url : undefined)
+        .then(res => (res.ok ? url : undefined))
         .catch(() => undefined)
       localDevUrlCache.set(path, pending)
     }
     return raceAbort(pending, signal)
   }
-  const assets = workspaceAssets(async (path, signal) => {
-    lifetime.throwIfAborted()
-    const combined = AbortSignal.any([signal, lifetime])
-    if (localDevUrlCache && path.startsWith('textures/')) {
-      const direct = await resolveLocalDevTextureUrl(path, combined)
-      if (direct) {
-        const res = await fetch(direct, { signal: combined, cache: 'no-store' })
-        if (res.ok) return await res.blob()
+  const assets = workspaceAssets(
+    async (path, signal) => {
+      lifetime.throwIfAborted()
+      const combined = AbortSignal.any([signal, lifetime])
+      if (localDevUrlCache && path.startsWith('textures/')) {
+        const direct = await resolveLocalDevTextureUrl(path, combined)
+        if (direct) {
+          const res = await fetch(direct, { signal: combined, cache: 'no-store' })
+          if (res.ok) return await res.blob()
+        }
       }
-    }
-    const slot = slots.get(path)
-    if (!slot) throw new Error(`Workspace data is missing ${path}.`)
-    return slot.blob ?? raceAbort(slot.pending!, combined)
-  }, localDevUrlCache ? (path, signal) => resolveLocalDevTextureUrl(path, AbortSignal.any([signal, lifetime])) : undefined)
-  lifetime.addEventListener('abort', () => {
-    assets.dispose()
-    slots.clear()
-  }, { once: true })
+      const slot = slots.get(path)
+      if (!slot) throw new Error(`Workspace data is missing ${path}.`)
+      return slot.blob ?? raceAbort(slot.pending!, combined)
+    },
+    localDevUrlCache
+      ? (path, signal) => resolveLocalDevTextureUrl(path, AbortSignal.any([signal, lifetime]))
+      : undefined,
+  )
+  lifetime.addEventListener(
+    'abort',
+    () => {
+      assets.dispose()
+      slots.clear()
+    },
+    { once: true },
+  )
   return {
     assets,
     async publish(path: string, blob: Blob) {
@@ -296,7 +332,9 @@ function orderedPaths(files: Record<string, Asset>) {
     'textures/mars-terrain.bin',
   ].filter(path => Object.hasOwn(files, path))
   const tiles = allTilePaths.filter(path => Object.hasOwn(files, path))
-  const chunks = Object.keys(files).filter(path => !priority.includes(path) && !tiles.includes(path) && !ignoredPaths.has(path))
+  const chunks = Object.keys(files).filter(
+    path => !priority.includes(path) && !tiles.includes(path) && !ignoredPaths.has(path),
+  )
   return [...priority, ...chunks, ...tiles]
 }
 
@@ -327,11 +365,11 @@ async function revalidateInBackground(saved: Release) {
             const [, asset] = missing[cursor++]
             const bytes = await downloadBytes(asset, signal, () => {})
             const blob = await verifyAsset(asset, bytes, signal)
-            if (!await accessCache(cache, 'files', asset.sha256, blob)) persisted = false
+            if (!(await accessCache(cache, 'files', asset.sha256, blob))) persisted = false
           }
         })
         await Promise.all(workers)
-        if (persisted && await accessCache(cache, 'releases', manifestUrl, next) && exclusive) {
+        if (persisted && (await accessCache(cache, 'releases', manifestUrl, next)) && exclusive) {
           await pruneCache(cache, next)
         }
       } finally {
@@ -348,7 +386,12 @@ async function revalidateInBackground(saved: Release) {
   }
 }
 
-async function prepareRelease(signal: AbortSignal, progress: (state: DownloadProgress) => void, exclusive: boolean, { refresh, onAssets }: ReleaseOptions) {
+async function prepareRelease(
+  signal: AbortSignal,
+  progress: (state: DownloadProgress) => void,
+  exclusive: boolean,
+  { refresh, onAssets }: ReleaseOptions,
+) {
   startStartupSpan('release')
   const cache = await openCache()
   try {
@@ -413,18 +456,20 @@ async function prepareRelease(signal: AbortSignal, progress: (state: DownloadPro
         // consumers that already received a verified copy.
         while (writes.size >= writeBacklog) await Promise.race(writes)
         transfer.throwIfAborted()
-        const write = accessCache(cache, 'files', asset.sha256, blob).then(async savedBlob => {
-          if (!savedBlob) {
-            persisted = false
-            return
-          }
-          // Replace the RAM-backed Blob with the disk-backed IndexedDB Blob so
-          // Chromium's browser process can release downloaded bytes immediately.
-          const diskBlob = await accessCache<Blob>(cache, 'files', asset.sha256)
-          if (diskBlob instanceof Blob && diskBlob.size === asset.bytes) {
-            source.replaceBlob(path, diskBlob)
-          }
-        }).finally(() => writes.delete(write))
+        const write = accessCache(cache, 'files', asset.sha256, blob)
+          .then(async savedBlob => {
+            if (!savedBlob) {
+              persisted = false
+              return
+            }
+            // Replace the RAM-backed Blob with the disk-backed IndexedDB Blob so
+            // Chromium's browser process can release downloaded bytes immediately.
+            const diskBlob = await accessCache<Blob>(cache, 'files', asset.sha256)
+            if (diskBlob instanceof Blob && diskBlob.size === asset.bytes) {
+              source.replaceBlob(path, diskBlob)
+            }
+          })
+          .finally(() => writes.delete(write))
         writes.add(write)
       }
       try {
@@ -441,7 +486,8 @@ async function prepareRelease(signal: AbortSignal, progress: (state: DownloadPro
         }
         await Promise.all(publications)
         transfer.throwIfAborted()
-        if (cachedOnly && missing.length) throw new Error('The saved Earth data is incomplete. Connect to the internet and retry.')
+        if (cachedOnly && missing.length)
+          throw new Error('The saved Earth data is incomplete. Connect to the internet and retry.')
         const total = missing.reduce((sum, [, asset]) => sum + asset.bytes, 0)
         let downloaded = 0
         progress({ downloaded, total, fallback: cachedOnly })
@@ -458,10 +504,13 @@ async function prepareRelease(signal: AbortSignal, progress: (state: DownloadPro
             // small verification backlog is full, pause until it drains.
             while (verifications.size >= verificationBacklog) await Promise.race(verifications)
             transfer.throwIfAborted()
-            const verification = verifyAsset(asset, bytes, transfer).then(async blob => {
-              await source.publish(path, blob)
-              await persist(path, asset, blob)
-            }).catch(error => controller.abort(error)).finally(() => verifications.delete(verification))
+            const verification = verifyAsset(asset, bytes, transfer)
+              .then(async blob => {
+                await source.publish(path, blob)
+                await persist(path, asset, blob)
+              })
+              .catch(error => controller.abort(error))
+              .finally(() => verifications.delete(verification))
             verifications.add(verification)
           }
         }
@@ -477,7 +526,7 @@ async function prepareRelease(signal: AbortSignal, progress: (state: DownloadPro
         await Promise.all(writes)
         transfer.throwIfAborted()
         if (persisted && current !== saved) {
-          persisted = !!await accessCache(cache, 'releases', manifestUrl, current)
+          persisted = !!(await accessCache(cache, 'releases', manifestUrl, current))
           // A staged or failed update must leave the previous release intact.
           if (persisted && cache && exclusive) await pruneCache(cache, current)
         }
@@ -509,7 +558,11 @@ async function prepareRelease(signal: AbortSignal, progress: (state: DownloadPro
   }
 }
 
-export async function loadWorkspaceRelease(signal: AbortSignal, progress: (state: DownloadProgress) => void, options: ReleaseOptions = {}) {
+export async function loadWorkspaceRelease(
+  signal: AbortSignal,
+  progress: (state: DownloadProgress) => void,
+  options: ReleaseOptions = {},
+) {
   signal.throwIfAborted()
   let entered = false
   try {

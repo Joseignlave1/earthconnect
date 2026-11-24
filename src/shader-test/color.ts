@@ -36,6 +36,7 @@ export const MAGMA = [
 ] as const
 
 export function magmaColor(value: number) {
-  const index = Math.max(0,Math.min(1,value)) * (MAGMA.length - 1), lo = Math.min(MAGMA.length - 2,Math.floor(index))
-  return MAGMA[lo].map((channel,i) => channel + (MAGMA[lo + 1][i] - channel) * (index - lo))
+  const index = Math.max(0, Math.min(1, value)) * (MAGMA.length - 1),
+    lo = Math.min(MAGMA.length - 2, Math.floor(index))
+  return MAGMA[lo].map((channel, i) => channel + (MAGMA[lo + 1][i] - channel) * (index - lo))
 }

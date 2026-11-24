@@ -20,17 +20,19 @@ test('Earth Score decodes chunks when isolation prevents its workers from starti
     root,
     logLevel: 'silent',
     server: { host: '127.0.0.1', port: 0 },
-    plugins: [{
-      name: 'decoder-test-page',
-      configureServer(server) {
-        server.middlewares.use('/decoder-test', (_request, response) => {
-          response.setHeader('Content-Type', 'text/html')
-          response.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
-          response.setHeader('Cross-Origin-Embedder-Policy', 'credentialless')
-          response.end('<!doctype html><title>Earth Score decoder verification</title>')
-        })
+    plugins: [
+      {
+        name: 'decoder-test-page',
+        configureServer(server) {
+          server.middlewares.use('/decoder-test', (_request, response) => {
+            response.setHeader('Content-Type', 'text/html')
+            response.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+            response.setHeader('Cross-Origin-Embedder-Policy', 'credentialless')
+            response.end('<!doctype html><title>Earth Score decoder verification</title>')
+          })
+        },
       },
-    }],
+    ],
   })
   let browser
   try {
@@ -56,29 +58,35 @@ test('Earth Score decodes chunks when isolation prevents its workers from starti
       try {
         const page = await context.newPage()
         await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/decoder-test`)
-        const result = await page.evaluate(async ({ chunk, fields }) => {
-          const { createDecoderPool } = await import('/src/earth-score/decoder-pool.ts')
-          const pool = createDecoderPool(4, new AbortController().signal)
-          const frame = await (await fetch(`/compute-data/world/${chunk.file}`)).arrayBuffer()
-          const corrupt = frame.slice(0)
-          new Uint8Array(corrupt)[0] ^= 255
-          const { packedBytes, rows } = chunk
-          try {
-            const [packed, error] = await Promise.all([
-              pool.decode({ frame, packedBytes, rows, fields }),
-              pool.decode({ frame: corrupt, packedBytes, rows, fields }).then(() => null, error => error.message),
-            ])
-            const hash = await crypto.subtle.digest('SHA-256', packed)
-            return {
-              isolated: crossOriginIsolated,
-              transferred: frame.byteLength === 0,
-              hash: Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join(''),
-              error,
+        const result = await page.evaluate(
+          async ({ chunk, fields }) => {
+            const { createDecoderPool } = await import('/src/earth-score/decoder-pool.ts')
+            const pool = createDecoderPool(4, new AbortController().signal)
+            const frame = await (await fetch(`/compute-data/world/${chunk.file}`)).arrayBuffer()
+            const corrupt = frame.slice(0)
+            new Uint8Array(corrupt)[0] ^= 255
+            const { packedBytes, rows } = chunk
+            try {
+              const [packed, error] = await Promise.all([
+                pool.decode({ frame, packedBytes, rows, fields }),
+                pool.decode({ frame: corrupt, packedBytes, rows, fields }).then(
+                  () => null,
+                  error => error.message,
+                ),
+              ])
+              const hash = await crypto.subtle.digest('SHA-256', packed)
+              return {
+                isolated: crossOriginIsolated,
+                transferred: frame.byteLength === 0,
+                hash: Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join(''),
+                error,
+              }
+            } finally {
+              pool.close()
             }
-          } finally {
-            pool.close()
-          }
-        }, { chunk, fields: manifest.columns.length })
+          },
+          { chunk, fields: manifest.columns.length },
+        )
         if (omitWorkerIsolation) assert.ok(intercepted > 0)
         assert.deepEqual(result, {
           isolated: true,

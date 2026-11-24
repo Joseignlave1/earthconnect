@@ -48,12 +48,18 @@ export function motionBlurUniforms(
   const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
   const packed = new Float32Array(24)
   for (const [column, axis] of after.entries()) {
-    packed.set(before.map(basis => dot(basis, axis)), column * 4)
+    packed.set(
+      before.map(basis => dot(basis, axis)),
+      column * 4,
+    )
   }
-  packed.set(before.map(basis => dot(basis, delta)), 12)
+  packed.set(
+    before.map(basis => dot(basis, delta)),
+    12,
+  )
   packed[15] = current.near
   packed.set([tangent * current.aspect, tangent, tangent * previous.aspect, tangent], 16)
-  packed.set([Math.min(3.5, shutterMilliseconds / elapsed), 20 * pixelRatio, .7 * pixelRatio, 0], 20)
+  packed.set([Math.min(3.5, shutterMilliseconds / elapsed), 20 * pixelRatio, 0.7 * pixelRatio, 0], 20)
   return packed
 }
 

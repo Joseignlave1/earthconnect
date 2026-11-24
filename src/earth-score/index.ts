@@ -7,20 +7,33 @@ import { parseManifest, WORKGROUP_SIZE, type FieldEncoding, type ScoreFeature } 
 import { createQueryShaderSource, type EarthQuery } from './query.ts'
 import { createLookup } from './scoring.ts'
 
-export { DEFAULT_SCORE_SHADER, SCORE_SHADER_EXAMPLES, SCORE_SHADER_FIELDS, SCORE_SHADER_PRELUDE, ScoreShaderError } from './custom-shader.ts'
+export {
+  DEFAULT_SCORE_SHADER,
+  SCORE_SHADER_EXAMPLES,
+  SCORE_SHADER_FIELDS,
+  SCORE_SHADER_PRELUDE,
+  ScoreShaderError,
+} from './custom-shader.ts'
 export type { ScoreShaderDiagnostic } from './custom-shader.ts'
 export { freezePlanetaryShaderPoint } from './planetShaderSchema.ts'
-export type { PlanetaryShaderCall, PlanetaryShaderData, PlanetaryShaderMeasurement, PlanetaryShaderSample } from './planetShaderSchema.ts'
+export type {
+  PlanetaryShaderCall,
+  PlanetaryShaderData,
+  PlanetaryShaderMeasurement,
+  PlanetaryShaderSample,
+} from './planetShaderSchema.ts'
 export { buildEarthQuery } from './query.ts'
 export type { EarthQuery, EarthQueryCriterion } from './query.ts'
 export { SCORE_MAX, SCORE_MISSING, SOURCE_MISSING, sourceCodeWGSL } from './scoring.ts'
 export type { ScoreAddress, ChunkLayout, ScoreLayout } from './layout.ts'
 export type { FieldEncoding, ScoreFeature } from './manifest.ts'
 
-export type ScoreChunk = Readonly<ChunkLayout & {
-  packedInput: GPUBuffer
-  scores: GPUBuffer
-}>
+export type ScoreChunk = Readonly<
+  ChunkLayout & {
+    packedInput: GPUBuffer
+    scores: GPUBuffer
+  }
+>
 
 export type EarthScore = Readonly<{
   layout: ScoreLayout
@@ -49,16 +62,19 @@ const shaderChunksPerFence = 4
 // A caller can cancel while the shared queue is waiting on unrelated GPU work.
 function waitForLoad<T>(work: Promise<T>, signal: AbortSignal) {
   return new Promise<T>((resolve, reject) => {
-    function abort() { reject(signal.reason) }
+    function abort() {
+      reject(signal.reason)
+    }
     signal.addEventListener('abort', abort, { once: true })
     if (signal.aborted) abort()
     void work.then(resolve, reject).then(() => signal.removeEventListener('abort', abort))
   })
 }
 
-export async function loadEarthScore(device: GPUDevice, {
-  manifestUrl, signal, readAsset = (url, signal) => fetch(url, { signal }),
-}: EarthScoreOptions): Promise<EarthScore> {
+export async function loadEarthScore(
+  device: GPUDevice,
+  { manifestUrl, signal, readAsset = (url, signal) => fetch(url, { signal }) }: EarthScoreOptions,
+): Promise<EarthScore> {
   signal?.throwIfAborted()
   const { controller, state: lifetime } = deviceLifetime(device)
   const loading = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
@@ -88,32 +104,51 @@ export async function loadEarthScore(device: GPUDevice, {
     const base = response.url || new URL(manifestUrl, globalThis.location?.href).href
     checkDeviceLimits(device, manifest)
     const layout = createLayout(manifest)
-    const fields = Object.freeze(manifest.columns.map((name, i) => Object.freeze({ name, encoding: manifest.encodings[i] })))
+    const fields = Object.freeze(
+      manifest.columns.map((name, i) => Object.freeze({ name, encoding: manifest.encodings[i] })),
+    )
     const queue = device.queue
 
-    const { shaderLayout, shaderBindings, lookup, emptyPoints, firstSites, firstSiteStride } = await waitForLoad(checkedGpu(device, () => {
-      const shaderBindings = device.createBindGroupLayout({
-        label: 'Custom Earth score inputs',
-        entries: [
-          { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-          { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-          { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-          { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-          { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        ],
-      })
-      const shaderLayout = device.createPipelineLayout({ bindGroupLayouts: [shaderBindings] })
-      const values = createLookup(manifest)
-      const lookup = buffer('Earth Score float lookup', values.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST)
-      queue.writeBuffer(lookup, 0, values)
-      const emptyPoints = buffer('WGSL empty planetary samples', 4, GPUBufferUsage.STORAGE)
-      const firstSiteStride = device.limits.minUniformBufferOffsetAlignment
-      const siteWords = new Uint32Array((firstSiteStride / 4) * layout.chunks.length)
-      layout.chunks.forEach((range, i) => { siteWords[i * (firstSiteStride / 4)] = range.firstAddress / PIXELS_PER_SITE })
-      const firstSites = buffer('Earth Score first sites', siteWords.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST)
-      queue.writeBuffer(firstSites, 0, siteWords)
-      return { shaderLayout, shaderBindings, lookup, emptyPoints, firstSites, firstSiteStride }
-    }, 'Earth Score GPU setup'), loading)
+    const { shaderLayout, shaderBindings, lookup, emptyPoints, firstSites, firstSiteStride } = await waitForLoad(
+      checkedGpu(
+        device,
+        () => {
+          const shaderBindings = device.createBindGroupLayout({
+            label: 'Custom Earth score inputs',
+            entries: [
+              { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+              { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+              { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+              { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+              { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+            ],
+          })
+          const shaderLayout = device.createPipelineLayout({ bindGroupLayouts: [shaderBindings] })
+          const values = createLookup(manifest)
+          const lookup = buffer(
+            'Earth Score float lookup',
+            values.byteLength,
+            GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+          )
+          queue.writeBuffer(lookup, 0, values)
+          const emptyPoints = buffer('WGSL empty planetary samples', 4, GPUBufferUsage.STORAGE)
+          const firstSiteStride = device.limits.minUniformBufferOffsetAlignment
+          const siteWords = new Uint32Array((firstSiteStride / 4) * layout.chunks.length)
+          layout.chunks.forEach((range, i) => {
+            siteWords[i * (firstSiteStride / 4)] = range.firstAddress / PIXELS_PER_SITE
+          })
+          const firstSites = buffer(
+            'Earth Score first sites',
+            siteWords.byteLength,
+            GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          )
+          queue.writeBuffer(firstSites, 0, siteWords)
+          return { shaderLayout, shaderBindings, lookup, emptyPoints, firstSites, firstSiteStride }
+        },
+        'Earth Score GPU setup',
+      ),
+      loading,
+    )
 
     const residents: { output: ScoreChunk; defaultGroup: GPUBindGroup; firstSiteOffset: number }[] = []
     const decoder = createDecoderPool(Math.min(workerCount, manifest.chunks.length), loading)
@@ -131,7 +166,11 @@ export async function loadEarthScore(device: GPUDevice, {
           if (frame.size !== compressedBytes) throw new Error('Incorrect compressed length')
           const packed = await decoder.decode({ frame, packedBytes, rows, fields: fields.length })
           return { index, packed }
-        })().catch(error => ({ error: new Error(`Earth Score chunk ${file}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }) }))
+        })().catch(error => ({
+          error: new Error(`Earth Score chunk ${file}: ${error instanceof Error ? error.message : String(error)}`, {
+            cause: error,
+          }),
+        }))
         jobs.set(index, job)
       }
 
@@ -146,31 +185,48 @@ export async function loadEarthScore(device: GPUDevice, {
         const range = layout.chunks[index]
         jobs.delete(index)
         launch()
-        const check = checkedGpu(device, () => {
-          const inputBuffer = device.createBuffer({
-            label: `Earth Score input ${index}`,
-            size: packed.byteLength,
-            usage: GPUBufferUsage.STORAGE,
-            mappedAtCreation: true,
-          })
-          buffers.add(inputBuffer)
-          new Uint8Array(inputBuffer.getMappedRange()).set(new Uint8Array(packed))
-          inputBuffer.unmap()
-          const scores = buffer(`Earth Score output ${index}`, range.rows * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC)
-          const firstSiteOffset = index * firstSiteStride
-          const defaultGroup = device.createBindGroup({
-            layout: shaderBindings,
-            entries: [
-              { binding: 0, resource: { buffer: inputBuffer } },
-              { binding: 1, resource: { buffer: scores } },
-              { binding: 2, resource: { buffer: lookup } },
-              { binding: 3, resource: { buffer: emptyPoints } },
-              { binding: 4, resource: { buffer: firstSites, offset: firstSiteOffset, size: 4 } },
-            ],
-          })
-          residents[index] = { output: Object.freeze({ ...range, packedInput: inputBuffer, scores }), defaultGroup, firstSiteOffset }
-        }, `Earth Score upload ${index}`)
-        checks.push(check.then(() => undefined, error => error))
+        const check = checkedGpu(
+          device,
+          () => {
+            const inputBuffer = device.createBuffer({
+              label: `Earth Score input ${index}`,
+              size: packed.byteLength,
+              usage: GPUBufferUsage.STORAGE,
+              mappedAtCreation: true,
+            })
+            buffers.add(inputBuffer)
+            new Uint8Array(inputBuffer.getMappedRange()).set(new Uint8Array(packed))
+            inputBuffer.unmap()
+            const scores = buffer(
+              `Earth Score output ${index}`,
+              range.rows * 4,
+              GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+            )
+            const firstSiteOffset = index * firstSiteStride
+            const defaultGroup = device.createBindGroup({
+              layout: shaderBindings,
+              entries: [
+                { binding: 0, resource: { buffer: inputBuffer } },
+                { binding: 1, resource: { buffer: scores } },
+                { binding: 2, resource: { buffer: lookup } },
+                { binding: 3, resource: { buffer: emptyPoints } },
+                { binding: 4, resource: { buffer: firstSites, offset: firstSiteOffset, size: 4 } },
+              ],
+            })
+            residents[index] = {
+              output: Object.freeze({ ...range, packedInput: inputBuffer, scores }),
+              defaultGroup,
+              firstSiteOffset,
+            }
+          },
+          `Earth Score upload ${index}`,
+        )
+        checks.push(
+          check.then(
+            () => undefined,
+            error => error,
+          ),
+        )
         // Flush pending unmap copies every 4 chunks without stalling on a CPU/GPU fence
         // so Dawn reclaims staging memory incrementally at full decode speed.
         if ((++uploaded & 3) === 0) queue.submit([])
@@ -196,7 +252,11 @@ export async function loadEarthScore(device: GPUDevice, {
       return work
     }
 
-    function submit(active: typeof residents, compute: GPUComputePipeline, bind: (resident: typeof residents[number]) => GPUBindGroup) {
+    function submit(
+      active: typeof residents,
+      compute: GPUComputePipeline,
+      bind: (resident: (typeof residents)[number]) => GPUBindGroup,
+    ) {
       const encoder = device.createCommandEncoder({ label: 'Earth Score query' })
       const pass = encoder.beginComputePass()
       pass.setPipeline(compute)
@@ -213,7 +273,10 @@ export async function loadEarthScore(device: GPUDevice, {
       const active = activeWork()
       const limits = device.limits
       const hasPoints = Boolean(points?.samples.length)
-      if (planetShaderBytes(points?.samples.length ?? 0) > Math.min(limits.maxStorageBufferBindingSize, limits.maxBufferSize)) {
+      if (
+        planetShaderBytes(points?.samples.length ?? 0) >
+        Math.min(limits.maxStorageBufferBindingSize, limits.maxBufferSize)
+      ) {
         throw new Error('The planetary point data exceeds the device’s storage binding limit.')
       }
       const shader = prepareScoreShader(source, manifest, points)
@@ -245,37 +308,46 @@ export async function loadEarthScore(device: GPUDevice, {
         // Start with a small probe batch so slow user shaders stay cancellable
         // and avoid GPU TDR, then widen to a single submit for fast shaders.
         let batchSize = shaderChunksPerFence
-        for (let first = 0; first < active.residents.length;) {
+        for (let first = 0; first < active.residents.length; ) {
           current()
           const batch = active.residents.slice(first, first + batchSize)
           const batchStart = performance.now()
-          const dispatched = checkedGpu(device, () => {
-            if (pointData && !samplesBuffer) {
-              samplesBuffer = buffer('WGSL planetary samples', pointData.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST)
-              queue.writeBuffer(samplesBuffer, 0, pointData)
-            }
-            const input = samplesBuffer
-            submit(batch, pipeline, resident => input
-              ? device.createBindGroup({
-                layout: shaderBindings,
-                entries: [
-                  { binding: 0, resource: { buffer: resident.output.packedInput } },
-                  { binding: 1, resource: { buffer: resident.output.scores } },
-                  { binding: 2, resource: { buffer: lookup } },
-                  { binding: 3, resource: { buffer: input } },
-                  { binding: 4, resource: { buffer: firstSites, offset: resident.firstSiteOffset, size: 4 } },
-                ],
-              })
-              : resident.defaultGroup)
-          }, 'Custom Earth score dispatch')
+          const dispatched = checkedGpu(
+            device,
+            () => {
+              if (pointData && !samplesBuffer) {
+                samplesBuffer = buffer(
+                  'WGSL planetary samples',
+                  pointData.byteLength,
+                  GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                )
+                queue.writeBuffer(samplesBuffer, 0, pointData)
+              }
+              const input = samplesBuffer
+              submit(batch, pipeline, resident =>
+                input
+                  ? device.createBindGroup({
+                      layout: shaderBindings,
+                      entries: [
+                        { binding: 0, resource: { buffer: resident.output.packedInput } },
+                        { binding: 1, resource: { buffer: resident.output.scores } },
+                        { binding: 2, resource: { buffer: lookup } },
+                        { binding: 3, resource: { buffer: input } },
+                        { binding: 4, resource: { buffer: firstSites, offset: resident.firstSiteOffset, size: 4 } },
+                      ],
+                    })
+                  : resident.defaultGroup,
+              )
+            },
+            'Custom Earth score dispatch',
+          )
           const completed = await Promise.allSettled([dispatched, queue.onSubmittedWorkDone()])
           const failure = completed.find(result => result.status === 'rejected')
           if (failure) throw failure.reason
           first += batch.length
           const elapsed = performance.now() - batchStart
-          batchSize = elapsed < 15
-            ? active.residents.length - first
-            : Math.max(1, Math.floor(batch.length * 50 / elapsed))
+          batchSize =
+            elapsed < 15 ? active.residents.length - first : Math.max(1, Math.floor((batch.length * 50) / elapsed))
         }
         current()
       } finally {
@@ -284,10 +356,19 @@ export async function loadEarthScore(device: GPUDevice, {
     }
 
     return Object.freeze({
-      fields, baseline: manifest.features, layout, lookup, chunks, dispatchShader,
+      fields,
+      baseline: manifest.features,
+      layout,
+      lookup,
+      chunks,
+      dispatchShader,
       queryShaderSource(query) {
         const limits = device.limits
-        return createQueryShaderSource(manifest, query, Math.min(limits.maxStorageBufferBindingSize, limits.maxBufferSize))
+        return createQueryShaderSource(
+          manifest,
+          query,
+          Math.min(limits.maxStorageBufferBindingSize, limits.maxBufferSize),
+        )
       },
       destroy() {
         work = undefined

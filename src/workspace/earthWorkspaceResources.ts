@@ -4,7 +4,13 @@ import { raceAbort } from '../shader-test/gpu.ts'
 import { createSurfaceDevicePool } from '../shader-test/surface-device.ts'
 import type { TerrainPackFormat } from '../shader-test/terrain.ts'
 import { loadPreparedTerrain, type PreparedTerrain } from '../shader-test/terrain-loader.ts'
-import { canonicalPoint, coordinatesValid, createPlanetaryPointCache, pointKey, type PlanetaryCoordinates } from './planetaryPointCache.ts'
+import {
+  canonicalPoint,
+  coordinatesValid,
+  createPlanetaryPointCache,
+  pointKey,
+  type PlanetaryCoordinates,
+} from './planetaryPointCache.ts'
 
 type World = {
   loading: Promise<EarthScore>
@@ -56,8 +62,7 @@ export function createEarthWorkspaceResources(acquireDevice = createSurfaceDevic
     let pending = terrains.get(key) as Promise<PreparedTerrain<F>> | undefined
     if (!pending) {
       const controller = new AbortController()
-      pending = getUrl(controller.signal)
-        .then(url => loadPreparedTerrain(url, format, controller.signal))
+      pending = getUrl(controller.signal).then(url => loadPreparedTerrain(url, format, controller.signal))
       terrains.set(key, pending)
       void pending.catch(() => {
         if (terrains.get(key) === pending) terrains.delete(key)
@@ -95,12 +100,15 @@ export function createEarthWorkspaceResources(acquireDevice = createSurfaceDevic
         }
         entry = created
         worlds.set(device, created)
-        void world.loading.then(earth => {
-          if (controller.signal.aborted) earth.destroy()
-          else controller.signal.addEventListener('abort', () => earth.destroy(), { once: true })
-        }, () => {
-          if (worlds.get(device) === created) worlds.delete(device)
-        })
+        void world.loading.then(
+          earth => {
+            if (controller.signal.aborted) earth.destroy()
+            else controller.signal.addEventListener('abort', () => earth.destroy(), { once: true })
+          },
+          () => {
+            if (worlds.get(device) === created) worlds.delete(device)
+          },
+        )
       }
       const active = entry
       active.users++

@@ -47,7 +47,9 @@ function getBakeNormalsPipeline(device: GPUDevice): Promise<GPURenderPipeline> {
       })
     })()
     cache.pipeline = pending
-    void pending.catch(() => { if (cache.pipeline === pending) cache.pipeline = undefined })
+    void pending.catch(() => {
+      if (cache.pipeline === pending) cache.pipeline = undefined
+    })
   }
   return cache.pipeline
 }
@@ -79,11 +81,13 @@ export function getSharedTerrainNormals(device: GPUDevice, terrain: GPUTexture):
           })
           const pass = encoder.beginRenderPass({
             label: `Bake terrain normals mip ${mip}`,
-            colorAttachments: [{
-              view: texture.createView({ baseMipLevel: mip, mipLevelCount: 1 }),
-              loadOp: 'clear',
-              storeOp: 'store',
-            }],
+            colorAttachments: [
+              {
+                view: texture.createView({ baseMipLevel: mip, mipLevelCount: 1 }),
+                loadOp: 'clear',
+                storeOp: 'store',
+              },
+            ],
           })
           pass.setPipeline(pipeline)
           pass.setBindGroup(0, group)
@@ -99,7 +103,9 @@ export function getSharedTerrainNormals(device: GPUDevice, terrain: GPUTexture):
       }
     })()
     cache.textures.set(terrain, pending)
-    void pending.catch(() => { if (cache.textures.get(terrain) === pending) cache.textures.delete(terrain) })
+    void pending.catch(() => {
+      if (cache.textures.get(terrain) === pending) cache.textures.delete(terrain)
+    })
   }
   return pending
 }

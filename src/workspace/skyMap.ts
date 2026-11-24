@@ -34,23 +34,31 @@ async function buildSkyMap(device: GPUDevice, cache: DeviceSkyCache, skyMapUrl: 
   let texture: GPUTexture | undefined
   try {
     signal.throwIfAborted()
-    const created = await checkedGpu(device, () => {
-      texture = device.createTexture({
-        label: 'NASA Deep Star Maps 2020',
-        size: [bitmap.width, bitmap.height],
-        mipLevelCount: Math.floor(Math.log2(Math.max(bitmap.width, bitmap.height))) + 1,
-        format: 'rgba8unorm-srgb',
-        usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
-      })
-      return texture
-    }, 'Creating sky map')
+    const created = await checkedGpu(
+      device,
+      () => {
+        texture = device.createTexture({
+          label: 'NASA Deep Star Maps 2020',
+          size: [bitmap.width, bitmap.height],
+          mipLevelCount: Math.floor(Math.log2(Math.max(bitmap.width, bitmap.height))) + 1,
+          format: 'rgba8unorm-srgb',
+          usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+        })
+        return texture
+      },
+      'Creating sky map',
+    )
     signal.throwIfAborted()
     await copyExternalImageChunked(device.queue, bitmap, created, signal)
     signal.throwIfAborted()
-    const atlas = await checkedGpu(device, () => {
-      generateMipmaps(device, created, { label: 'Build sky map mipmaps' })
-      return created
-    }, 'Uploading sky map')
+    const atlas = await checkedGpu(
+      device,
+      () => {
+        generateMipmaps(device, created, { label: 'Build sky map mipmaps' })
+        return created
+      },
+      'Uploading sky map',
+    )
     if (signal.aborted) {
       atlas.destroy()
       signal.throwIfAborted()

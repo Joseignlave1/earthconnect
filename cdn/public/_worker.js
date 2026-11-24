@@ -1,4 +1,5 @@
-const versionedKey = /^(?:(?:assets\/(?:data|textures)|compute-data\/world)\/[a-zA-Z0-9_-]+-[a-f0-9]{64}\.[a-zA-Z0-9]+|releases\/[a-f0-9]{64}\.json)$/
+const versionedKey =
+  /^(?:(?:assets\/(?:data|textures)|compute-data\/world)\/[a-zA-Z0-9_-]+-[a-f0-9]{64}\.[a-zA-Z0-9]+|releases\/[a-f0-9]{64}\.json)$/
 const readMethods = 'GET, HEAD, OPTIONS'
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -13,10 +14,13 @@ function message(request, status, text, headers = {}) {
 }
 
 function matchesEtag(request, etag) {
-  return request.headers.get('If-None-Match')?.split(',').some(value => {
-    const candidate = value.trim()
-    return candidate === '*' || candidate.replace(/^W\//, '') === etag
-  })
+  return request.headers
+    .get('If-None-Match')
+    ?.split(',')
+    .some(value => {
+      const candidate = value.trim()
+      return candidate === '*' || candidate.replace(/^W\//, '') === etag
+    })
 }
 
 function sendObject(request, headers, body) {
@@ -79,9 +83,10 @@ export default {
     object.writeHttpMetadata(headers)
     headers.set('ETag', object.httpEtag)
     headers.set('Content-Length', String(object.size))
-    headers.set('Cache-Control', immutable
-      ? 'public, max-age=31536000, immutable'
-      : 'public, max-age=0, must-revalidate')
+    headers.set(
+      'Cache-Control',
+      immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate',
+    )
     if (immutable) headers.set('Cache-Status', 'EarthConnect; fwd=miss')
 
     const response = sendObject(request, headers, object.body)

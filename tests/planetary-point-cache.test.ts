@@ -9,19 +9,29 @@ import {
 } from '../src/workspace/planetaryPointCache.ts'
 
 const complete: SampleResult = {
-  measurements: [{ variableId: 'moon.slope_1km', unit: 'degree', status: 1, qualityFlags: [], decoded: 12.5 } as SampleMeasurement],
+  measurements: [
+    { variableId: 'moon.slope_1km', unit: 'degree', status: 1, qualityFlags: [], decoded: 12.5 } as SampleMeasurement,
+  ],
   partial: false,
   cached: false,
 }
 const moon = { body: 'moon', latitude: 2, longitude: 180 } as const
 
-function memoryStorage(initial: PersistedPointRecord[] = []): PlanetaryPointStorage & { map: Map<string, PersistedPointRecord> } {
+function memoryStorage(
+  initial: PersistedPointRecord[] = [],
+): PlanetaryPointStorage & { map: Map<string, PersistedPointRecord> } {
   const map = new Map(initial.map(item => [item.key, structuredClone(item)]))
   return {
     map,
-    async loadAll() { return [...map.values()].map(item => structuredClone(item)) },
-    async put(record) { map.set(record.key, structuredClone(record)) },
-    async delete(key) { map.delete(key) },
+    async loadAll() {
+      return [...map.values()].map(item => structuredClone(item))
+    },
+    async put(record) {
+      map.set(record.key, structuredClone(record))
+    },
+    async delete(key) {
+      map.delete(key)
+    },
   }
 }
 
@@ -45,7 +55,10 @@ test('samples are shared between consumers and keyed by body and canonical coord
 test('cancelled revisions do not consume responses, while the next revision can reuse the request', async () => {
   const response = Promise.withResolvers<SampleResult>()
   let calls = 0
-  const read = createPlanetaryPointCache(() => { calls++; return response.promise }, new AbortController().signal)
+  const read = createPlanetaryPointCache(() => {
+    calls++
+    return response.promise
+  }, new AbortController().signal)
   const previous = new AbortController()
   const obsolete = read(moon, previous.signal)
   previous.abort()
@@ -80,7 +93,9 @@ test('complete samples persist across sessions and evict lowest-frecency entries
   const signal = new AbortController().signal
   let calls = 0
   const makeSample = (value: number): SampleResult => ({
-    measurements: [{ variableId: 'moon.elevation', unit: 'm', status: 1, qualityFlags: [], decoded: value } as SampleMeasurement],
+    measurements: [
+      { variableId: 'moon.elevation', unit: 'm', status: 1, qualityFlags: [], decoded: value } as SampleMeasurement,
+    ],
     partial: false,
     cached: false,
   })
@@ -89,10 +104,14 @@ test('complete samples persist across sessions and evict lowest-frecency entries
   const p3 = { body: 'moon', latitude: 3, longitude: 3 } as const
 
   // Allow ~2 records in the budget so inserting a 3rd evicts the lowest-frecency entry.
-  const first = createPlanetaryPointCache(async (_b, lat) => {
-    calls++
-    return makeSample(lat * 10)
-  }, signal, { maxBytes: 420, storage })
+  const first = createPlanetaryPointCache(
+    async (_b, lat) => {
+      calls++
+      return makeSample(lat * 10)
+    },
+    signal,
+    { maxBytes: 420, storage },
+  )
 
   await first(p1, signal)
   await first(p1, signal) // bump p1 frecency
@@ -104,10 +123,14 @@ test('complete samples persist across sessions and evict lowest-frecency entries
   assert.equal(calls, 3)
 
   // New cache instance hydrates from persisted storage and avoids API calls for p1 and p3.
-  const second = createPlanetaryPointCache(async (_b, lat) => {
-    calls++
-    return makeSample(lat * 100)
-  }, signal, { maxBytes: 420, storage })
+  const second = createPlanetaryPointCache(
+    async (_b, lat) => {
+      calls++
+      return makeSample(lat * 100)
+    },
+    signal,
+    { maxBytes: 420, storage },
+  )
 
   const cached1 = await second(p1, signal)
   const cached3 = await second(p3, signal)

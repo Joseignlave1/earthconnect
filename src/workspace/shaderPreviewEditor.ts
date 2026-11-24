@@ -4,9 +4,16 @@ import { Registry } from '@codingame/monaco-vscode-api/vscode/vs/platform/regist
 import { IStorageService } from '@codingame/monaco-vscode-api/vscode/vs/platform/storage/common/storage.service'
 import { ITelemetryService } from '@codingame/monaco-vscode-api/vscode/vs/platform/telemetry/common/telemetry.service'
 import { IThemeService } from '@codingame/monaco-vscode-api/vscode/vs/platform/theme/common/themeService.service'
-import { EditorPaneDescriptor, type IEditorPaneRegistry } from '@codingame/monaco-vscode-api/vscode/vs/workbench/browser/editor'
+import {
+  EditorPaneDescriptor,
+  type IEditorPaneRegistry,
+} from '@codingame/monaco-vscode-api/vscode/vs/workbench/browser/editor'
 import { EditorPane } from '@codingame/monaco-vscode-api/vscode/vs/workbench/browser/parts/editor/editorPane'
-import { EditorExtensions, EditorInputCapabilities, type IUntypedEditorInput } from '@codingame/monaco-vscode-api/vscode/vs/workbench/common/editor'
+import {
+  EditorExtensions,
+  EditorInputCapabilities,
+  type IUntypedEditorInput,
+} from '@codingame/monaco-vscode-api/vscode/vs/workbench/common/editor'
 import { EditorInput } from '@codingame/monaco-vscode-api/vscode/vs/workbench/common/editor/editorInput'
 import type { IEditorGroup } from '@codingame/monaco-vscode-api/vscode/vs/workbench/services/editor/common/editorGroupsService'
 
@@ -16,24 +23,37 @@ export const shaderPreviewScheme = 'earth-connect'
 export function getPreviewFileId(resource: URI | undefined) {
   const prefix = '/preview/'
   if (resource?.scheme !== shaderPreviewScheme || !resource.path.startsWith(prefix)) return
-  try { return decodeURIComponent(resource.path.slice(prefix.length)) || undefined } catch { return undefined }
+  try {
+    return decodeURIComponent(resource.path.slice(prefix.length)) || undefined
+  } catch {
+    return undefined
+  }
 }
 
 export class ShaderPreviewInput extends EditorInput {
   override readonly resource: URI
 
-  constructor(readonly fileId: string, private fileName: string) {
+  constructor(
+    readonly fileId: string,
+    private fileName: string,
+  ) {
     super()
     this.resource = URI.from({ scheme: shaderPreviewScheme, path: `/preview/${encodeURIComponent(fileId)}` })
   }
 
-  get typeId() { return previewId }
-  get editorId() { return previewId }
+  get typeId() {
+    return previewId
+  }
+  get editorId() {
+    return previewId
+  }
   get capabilities() {
     return EditorInputCapabilities.Readonly | EditorInputCapabilities.Singleton | EditorInputCapabilities.ForceReveal
   }
 
-  getName() { return `Preview of ${this.fileName}` }
+  getName() {
+    return `Preview of ${this.fileName}`
+  }
 
   setFileName(name: string) {
     if (name === this.fileName) return
@@ -64,7 +84,9 @@ export class ShaderPreviewPane extends EditorPane {
     if (host.parentElement !== this.surface) movePreviewHost(host, this.surface)
   }
 
-  override focus() { this.surface.focus() }
+  override focus() {
+    this.surface.focus()
+  }
   layout() {}
 }
 

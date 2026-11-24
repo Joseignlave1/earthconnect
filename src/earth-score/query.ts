@@ -1,17 +1,35 @@
 import type { FieldEncoding, ScoreManifest } from './manifest.ts'
 
 const scoreFields = new Set([
-  'annual_precip_mm', 'bare_fraction', 'coldest_month_air_c', 'dominant_lithology_code',
-  'elevation_median_m', 'permafrost_fraction', 'permanent_snow_ice_fraction',
-  'relief_21km_m', 'relief_5km_m', 'slope_mean_deg', 'surface_day_c', 'surface_high_c',
-  'surface_low_c', 'surface_mean_c', 'surface_night_c', 'surface_range_c', 'tpi_21km_m',
-  'tpi_5km_m', 'warmest_month_air_c',
+  'annual_precip_mm',
+  'bare_fraction',
+  'coldest_month_air_c',
+  'dominant_lithology_code',
+  'elevation_median_m',
+  'permafrost_fraction',
+  'permanent_snow_ice_fraction',
+  'relief_21km_m',
+  'relief_5km_m',
+  'slope_mean_deg',
+  'surface_day_c',
+  'surface_high_c',
+  'surface_low_c',
+  'surface_mean_c',
+  'surface_night_c',
+  'surface_range_c',
+  'tpi_21km_m',
+  'tpi_5km_m',
+  'warmest_month_air_c',
 ])
 const coverageFields = new Set([
-  'landcover_valid_fraction', 'permafrost_valid_fraction', 'terrain_valid_fraction',
-  'surface_day_valid_fraction', 'surface_night_valid_fraction', 'surface_paired_valid_fraction',
+  'landcover_valid_fraction',
+  'permafrost_valid_fraction',
+  'terrain_valid_fraction',
+  'surface_day_valid_fraction',
+  'surface_night_valid_fraction',
+  'surface_paired_valid_fraction',
 ])
-const minimumCoverage = .9
+const minimumCoverage = 0.9
 const firstCode = 1
 const lastCode = 65535
 const numericTerm = lastCode + 1
@@ -75,8 +93,11 @@ export function buildEarthQuery(criteria: readonly EarthQueryCriterion[]): Earth
       throw new Error(`${label}: tolerance must be at least 0.000001`)
     }
     term.soft = {
-      target: number(criterion.target), tolerance: categorical ? 1 : number(criterion.tolerance),
-      weight, categorical, group,
+      target: number(criterion.target),
+      tolerance: categorical ? 1 : number(criterion.tolerance),
+      weight,
+      categorical,
+      group,
     }
     const family = families.get(group) ?? { sum: 0, max: 0 }
     family.sum += weight
@@ -131,14 +152,20 @@ export function createQueryParameters(manifest: ScoreManifest, query: EarthQuery
     const index = fieldIndex(field)
     const encoding = manifest.encodings[index]
     const start = headerWords + termWords * i
-    words.set([index, min == null ? firstCode : codeBound(encoding, min),
-      max == null ? lastCode : codeBound(encoding, max, true) - 1, numericTerm], start)
+    words.set(
+      [
+        index,
+        min == null ? firstCode : codeBound(encoding, min),
+        max == null ? lastCode : codeBound(encoding, max, true) - 1,
+        numericTerm,
+      ],
+      start,
+    )
     if (!soft) continue
     const family = families.get(soft.group)!
     // Apply the square root of the normalized weight before squaring the loss.
     // This retains the effect of small weights on large distances in float32.
-    const factor = (Math.sqrt(soft.weight) / Math.sqrt(family.sum)) *
-      (Math.sqrt(family.max) / Math.sqrt(totalWeight))
+    const factor = (Math.sqrt(soft.weight) / Math.sqrt(family.sum)) * (Math.sqrt(family.max) / Math.sqrt(totalWeight))
     const { origin, denominator } = encoding
     if (soft.categorical) {
       const code = codeBound(encoding, soft.target)
@@ -177,32 +204,49 @@ export function createQueryShaderSource(manifest: ScoreManifest, query: EarthQue
   const terms = plan.terms.map((term, i) => {
     const start = headerWords + i * termWords
     return {
-      name: `code_${i + 1}`, term,
-      decode: code(words[start]), min: words[start + 1], max: words[start + 2], category: words[start + 3],
-      pivot: floats[start + 4], offset: floats[start + 5], factor: floats[start + 6],
+      name: `code_${i + 1}`,
+      term,
+      decode: code(words[start]),
+      min: words[start + 1],
+      max: words[start + 2],
+      category: words[start + 3],
+      pivot: floats[start + 4],
+      offset: floats[start + 5],
+      factor: floats[start + 6],
     }
   })
-  const required = terms.map(({ name, term, decode }) =>
-    `  // ${term.field}
+  const required = terms.map(
+    ({ name, term, decode }) =>
+      `  // ${term.field}
   let ${name} = ${decode};
-  if (${name} == 0u) { return NO_SCORE; }`)
+  if (${name} == 0u) { return NO_SCORE; }`,
+  )
   const limits = terms.flatMap(({ name, term, min, max }) => {
     if (term.min == null && term.max == null) return []
     const tests = [term.min != null && `${name} < ${min}u`, term.max != null && `${name} > ${max}u`].filter(Boolean)
-    const bounds = [term.min != null && `minimum ${term.min}`, term.max != null && `maximum ${term.max}`].filter(Boolean)
-    return [`  // ${term.field}: ${bounds.join(', ')} in physical units.
-  if (${tests.join(' || ')}) { return 0.0; }`]
+    const bounds = [term.min != null && `minimum ${term.min}`, term.max != null && `maximum ${term.max}`].filter(
+      Boolean,
+    )
+    return [
+      `  // ${term.field}: ${bounds.join(', ')} in physical units.
+  if (${tests.join(' || ')}) { return 0.0; }`,
+    ]
   })
   const termsCode = terms.flatMap(({ name, term, category, pivot, offset, factor }, i) => {
     const { soft, field } = term
     if (!soft || factor === 0) return []
     const distance = `distance_${i + 1}`
-    if (category !== numericTerm) return [`  // ${field}: class ${soft.target}, weight ${soft.weight}.
+    if (category !== numericTerm)
+      return [
+        `  // ${field}: class ${soft.target}, weight ${soft.weight}.
   let ${distance} = select(${literal(factor)}, 0.0, ${name} == ${category}u);
-  loss += ${distance} * ${distance};`]
-    return [`  // ${field}: target ${soft.target}, tolerance ${soft.tolerance}, weight ${soft.weight}.
+  loss += ${distance} * ${distance};`,
+      ]
+    return [
+      `  // ${field}: target ${soft.target}, tolerance ${soft.tolerance}, weight ${soft.weight}.
   let ${distance} = (f32(i32(${name}) - ${pivot}i) + ${literal(offset)}) * ${literal(factor)};
-  loss += ${distance} * ${distance};`]
+  loss += ${distance} * ${distance};`,
+    ]
   })
   return `// Sampled Earth analogue
 // Work in measurement codes so cutoffs and narrow tolerances retain source precision.

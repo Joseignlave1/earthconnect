@@ -45,7 +45,9 @@ ECVT_MAGIC = 0x54564345
 
 
 def fetch_gebco_index() -> tuple[tuple[int, ...], tuple[int, ...]]:
-    req = urllib.request.Request(GEBCO_URL, headers={"Range": f"bytes=9148-{124068 + COG_COUNT * 4 - 1}"})
+    req = urllib.request.Request(
+        GEBCO_URL, headers={"Range": f"bytes=9148-{124068 + COG_COUNT * 4 - 1}"}
+    )
     with urllib.request.urlopen(req, timeout=30) as r:
         tbl = r.read()
     offsets = struct.unpack_from(f"<{COG_COUNT}Q", tbl, 0)
@@ -57,7 +59,9 @@ def fetch_cog_tile(args: tuple[int, int, int]) -> tuple[int, np.ndarray]:
     tid, off, cnt = args
     for attempt in range(5):
         try:
-            req = urllib.request.Request(GEBCO_URL, headers={"Range": f"bytes={off}-{off + cnt - 1}"})
+            req = urllib.request.Request(
+                GEBCO_URL, headers={"Range": f"bytes={off}-{off + cnt - 1}"}
+            )
             with urllib.request.urlopen(req, timeout=45) as r:
                 raw = zlib.decompress(r.read())
             arr = np.frombuffer(raw, dtype="<i2").reshape(COG_TILE, COG_TILE).copy()
@@ -110,8 +114,17 @@ def compute_tile_land_alpha(
     lvl_h = rows * INNER
 
     # Pixel centers in [0, 1) geographic coordinates (with 2 px gutter wrapping/clamping)
-    xs = ((np.arange(tx * INNER - GUTTER, tx * INNER - GUTTER + TILE_SIZE) % lvl_w) + 0.5) / lvl_w
-    ys = (np.clip(np.arange(ty * INNER - GUTTER, ty * INNER - GUTTER + TILE_SIZE), 0, lvl_h - 1) + 0.5) / lvl_h
+    xs = (
+        (np.arange(tx * INNER - GUTTER, tx * INNER - GUTTER + TILE_SIZE) % lvl_w) + 0.5
+    ) / lvl_w
+    ys = (
+        np.clip(
+            np.arange(ty * INNER - GUTTER, ty * INNER - GUTTER + TILE_SIZE),
+            0,
+            lvl_h - 1,
+        )
+        + 0.5
+    ) / lvl_h
 
     # Sample 2x2 sub-grid at GEBCO native 86400x43200 for crisp anti-aliased coastlines
     # (for L2, pixel ratio is 86400/81280 = 1.063; for L1 it's 2.13; for L0 it's 4.25).
@@ -132,7 +145,9 @@ def compute_tile_land_alpha(
     # Bright green farmland polders below sea level (e.g. Netherlands) stay land
     green_polder = (g > r + 4) & (g > b + 12) & (g > 28)
     # NASA BMNG 500 m water signature (inland lakes & enclosed seas like Caspian, Great Lakes, Baikal, Victoria)
-    navy_water = (r <= 10) & (g <= 18) & (b >= 6) & (b <= 34) & ((b - r) >= 4) & ((b - g) >= 2)
+    navy_water = (
+        (r <= 10) & (g <= 18) & (b >= 6) & (b <= 34) & ((b - r) >= 4) & ((b - g) >= 2)
+    )
     dark_lake = (r <= 6) & (g <= 12) & (b <= 28) & (b >= r + 1)
     # Coastal turquoise intertidal shoals where BMNG high-tide water sits on GEBCO 0..+3m flats
     teal_shallow = (b > r + 10) & (g > r + 6) & (r < 55) & (b < 140)
@@ -141,10 +156,17 @@ def compute_tile_land_alpha(
 
     for sy in range(sub_n):
         oy = (sy + 0.5) / sub_n - 0.5
-        gy = np.clip(np.floor((ys + oy * dy_step * sub_n) * GEBCO_H).astype(np.int32), 0, GEBCO_H - 1)
+        gy = np.clip(
+            np.floor((ys + oy * dy_step * sub_n) * GEBCO_H).astype(np.int32),
+            0,
+            GEBCO_H - 1,
+        )
         for sx in range(sub_n):
             ox = (sx + 0.5) / sub_n - 0.5
-            gx = np.floor(((xs + ox * dx_step * sub_n) % 1.0) * GEBCO_W).astype(np.int32) % GEBCO_W
+            gx = (
+                np.floor(((xs + ox * dx_step * sub_n) % 1.0) * GEBCO_W).astype(np.int32)
+                % GEBCO_W
+            )
             elev = sample_gebco_window(tile_cache, gx, gy)
 
             near_sea = coast_macro < 2.5
@@ -168,9 +190,9 @@ def compute_tile_land_alpha(
 def needed_cog_ids_for_pack(entries: list[tuple[int, bytes]]) -> set[int]:
     cids: set[int] = set()
     for key, _ in entries:
-        level = (key >> 16) & 0xf
-        ty = (key >> 8) & 0xff
-        tx = key & 0xff
+        level = (key >> 16) & 0xF
+        ty = (key >> 8) & 0xFF
+        tx = key & 0xFF
         cols = BASE_COLS << level
         rows = BASE_ROWS << level
         lvl_w = cols * INNER
@@ -214,26 +236,36 @@ def process_pack(
 
     cids = sorted(needed_cog_ids_for_pack(entries))
     dl_bytes = sum(counts[c] for c in cids)
-    print(f"[pack {pack_id}] {cnt} tiles -> fetching {len(cids)} GEBCO COG tiles ({dl_bytes / 1e6:.1f} MB) ...", flush=True)
+    print(
+        f"[pack {pack_id}] {cnt} tiles -> fetching {len(cids)} GEBCO COG tiles ({dl_bytes / 1e6:.1f} MB) ...",
+        flush=True,
+    )
     t_dl = time.time()
     tile_cache: dict[int, np.ndarray] = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=dl_workers) as ex:
-        for tid, tile in ex.map(fetch_cog_tile, [(c, offsets[c], counts[c]) for c in cids]):
+        for tid, tile in ex.map(
+            fetch_cog_tile, [(c, offsets[c], counts[c]) for c in cids]
+        ):
             tile_cache[tid] = tile
-    print(f"[pack {pack_id}] fetched GEBCO in {time.time() - t_dl:.1f}s; encoding RGBA WebP ...", flush=True)
+    print(
+        f"[pack {pack_id}] fetched GEBCO in {time.time() - t_dl:.1f}s; encoding RGBA WebP ...",
+        flush=True,
+    )
 
     def bake_one(item: tuple[int, bytes]) -> tuple[int, bytes]:
         key, blob = item
-        level = (key >> 16) & 0xf
-        ty = (key >> 8) & 0xff
-        tx = key & 0xff
+        level = (key >> 16) & 0xF
+        ty = (key >> 8) & 0xFF
+        tx = key & 0xFF
         rgb = np.asarray(Image.open(io.BytesIO(blob)).convert("RGB"), dtype=np.uint8)
         alpha = compute_tile_land_alpha(rgb, level, tx, ty, tile_cache, coast_4k)
         rgba = np.empty((TILE_SIZE, TILE_SIZE, 4), dtype=np.uint8)
         rgba[:, :, :3] = rgb
         rgba[:, :, 3] = alpha
         buf = io.BytesIO()
-        Image.fromarray(rgba, mode="RGBA").save(buf, format="WEBP", quality=84, alpha_quality=92, method=4, exact=True)
+        Image.fromarray(rgba, mode="RGBA").save(
+            buf, format="WEBP", quality=84, alpha_quality=92, method=4, exact=True
+        )
         return key, buf.getvalue()
 
     new_entries: list[tuple[int, bytes]] = []
@@ -265,9 +297,20 @@ def main() -> None:
     offsets, counts = fetch_gebco_index()
     t_all = time.time()
     for pack_id in range(8):
-        process_pack(pack_id, tex_dir, offsets, counts, coast_4k, dl_workers=20, enc_workers=min(16, os.cpu_count() or 8))
+        process_pack(
+            pack_id,
+            tex_dir,
+            offsets,
+            counts,
+            coast_4k,
+            dl_workers=20,
+            enc_workers=min(16, os.cpu_count() or 8),
+        )
     total = sum((tex_dir / f"earth-tiles-{i}.bin").stat().st_size for i in range(8))
-    print(f"ALL 8 EARTH PACKS BAKED WITH 463m GEBCO WATER MASK in {time.time() - t_all:.1f}s ({total / (1024 * 1024):.2f} MiB)", flush=True)
+    print(
+        f"ALL 8 EARTH PACKS BAKED WITH 463m GEBCO WATER MASK in {time.time() - t_all:.1f}s ({total / (1024 * 1024):.2f} MiB)",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":

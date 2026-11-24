@@ -38,9 +38,10 @@ export function reportStartupTiming(note?: string) {
   const width = Math.max(...rows.map(row => row.phase.length), 8)
   const lines = rows.map(row => {
     const label = row.phase.padEnd(width)
-    const timing = row.end > row.start
-      ? `${fmt(row.end - row.start).padStart(7)}  (${fmt(row.start)} → ${fmt(row.end)})`
-      : `      —  (at ${fmt(row.start)})`
+    const timing =
+      row.end > row.start
+        ? `${fmt(row.end - row.start).padStart(7)}  (${fmt(row.start)} → ${fmt(row.end)})`
+        : `      —  (at ${fmt(row.start)})`
     return `  ${label}  ${timing}${row.detail ? `  ${row.detail}` : ''}`
   })
   console.log(`[Earth Connect] ready in ${fmt(total)}${note ? ` (${note})` : ''}\n${lines.join('\n')}`)

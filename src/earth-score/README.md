@@ -90,12 +90,12 @@ narrow numeric tolerances.
 
 ## Earth cell coordinates
 
-| `EarthCell` field | WGSL type | Meaning |
-| --- | --- | --- |
-| `latitude_deg` | `f32` | Latitude at the cell center in decimal degrees, positive north |
-| `longitude_deg` | `f32` | Longitude at the cell center in decimal degrees, positive east |
-| `grid_x` | `u32` | Zero-based column in the full 10,008-column MODIS sinusoidal raster, increasing rightward |
-| `grid_y` | `u32` | Zero-based row in the full 5,004-row raster, increasing southward |
+| `EarthCell` field | WGSL type | Meaning                                                                                   |
+| ----------------- | --------- | ----------------------------------------------------------------------------------------- |
+| `latitude_deg`    | `f32`     | Latitude at the cell center in decimal degrees, positive north                            |
+| `longitude_deg`   | `f32`     | Longitude at the cell center in decimal degrees, positive east                            |
+| `grid_x`          | `u32`     | Zero-based column in the full 10,008-column MODIS sinusoidal raster, increasing rightward |
+| `grid_y`          | `u32`     | Zero-based row in the full 5,004-row raster, increasing southward                         |
 
 Grid indices retain their positions across missing tiles and dispatch chunks. In
 padding outside the curved Earth footprint, both geographic fields are

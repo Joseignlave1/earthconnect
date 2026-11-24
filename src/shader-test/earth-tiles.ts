@@ -1,9 +1,19 @@
 import { cameraBasis, equalEarthInverse, FOV, type Camera, type Vec3 } from './geometry.ts'
 import { generateMipmaps } from './gpu.ts'
 import {
-  createTileSampler, findLruSlot, intersectUnitSphere, loadPackIndexEntries, MAX_CONCURRENT_TILE_DECODES,
-  paintTilePageTable, readTileWebpBlob, tileKey, toPackHandle, VIRTUAL_TILE_MIPS, VIRTUAL_TILE_SIZE,
-  type PackHandle, type TileEntry,
+  createTileSampler,
+  findLruSlot,
+  intersectUnitSphere,
+  loadPackIndexEntries,
+  MAX_CONCURRENT_TILE_DECODES,
+  paintTilePageTable,
+  readTileWebpBlob,
+  tileKey,
+  toPackHandle,
+  VIRTUAL_TILE_MIPS,
+  VIRTUAL_TILE_SIZE,
+  type PackHandle,
+  type TileEntry,
 } from './virtual-tiles.ts'
 
 export { tileKey }
@@ -21,9 +31,15 @@ type TileJob = { key: number; level: number; tx: number; ty: number; priority: n
 
 export type EarthTilePackLoader = (packId: number, signal: AbortSignal) => Promise<Blob | string | null>
 
-function keyLevel(key: number) { return key >>> 16 }
-function keyTy(key: number) { return (key >>> 8) & 0xff }
-function keyTx(key: number) { return key & 0xff }
+function keyLevel(key: number) {
+  return key >>> 16
+}
+function keyTy(key: number) {
+  return (key >>> 8) & 0xff
+}
+function keyTx(key: number) {
+  return key & 0xff
+}
 
 export class EarthTileCache {
   private readonly controller = new AbortController()
@@ -69,9 +85,15 @@ export class EarthTileCache {
     this.pageData.fill(255)
   }
 
-  get ready() { return this.activated }
-  get residentCount() { return this.resident.size }
-  get indexedCount() { return this.index.size }
+  get ready() {
+    return this.activated
+  }
+  get residentCount() {
+    return this.resident.size
+  }
+  get indexedCount() {
+    return this.index.size
+  }
 
   subscribe(onTileReady: () => void, onTexturesChanged: () => void) {
     this.tileListeners.add(onTileReady)
@@ -128,12 +150,10 @@ export class EarthTileCache {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     })
     this.pageData.fill(255)
-    device.queue.writeTexture(
-      { texture: this.pageTexture },
-      this.pageData,
-      { bytesPerRow: EARTH_TILE_PAGE_W * 4 },
-      [EARTH_TILE_PAGE_W, EARTH_TILE_PAGE_H],
-    )
+    device.queue.writeTexture({ texture: this.pageTexture }, this.pageData, { bytesPerRow: EARTH_TILE_PAGE_W * 4 }, [
+      EARTH_TILE_PAGE_W,
+      EARTH_TILE_PAGE_H,
+    ])
     this.poolTexture = device.createTexture({
       label: 'Earth 500m virtual tile cache',
       size: [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE, EARTH_TILE_SLOTS],
@@ -142,10 +162,13 @@ export class EarthTileCache {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
     })
     this.notifyTexturesChanged()
-    void device.queue.onSubmittedWorkDone().then(() => {
-      oldPage.destroy()
-      oldPool.destroy()
-    }).catch(() => undefined)
+    void device.queue
+      .onSubmittedWorkDone()
+      .then(() => {
+        oldPage.destroy()
+        oldPool.destroy()
+      })
+      .catch(() => undefined)
   }
 
   /**
@@ -169,7 +192,7 @@ export class EarthTileCache {
 
     const requestPoint = (lon: number, lat: number, mpp: number, distSq: number, halo: number) => {
       if (mpp > 3900) return
-      const u = ((lon / (2 * Math.PI) + 0.5) % 1 + 1) % 1
+      const u = (((lon / (2 * Math.PI) + 0.5) % 1) + 1) % 1
       const v = Math.max(0, Math.min(0.999999, 0.5 - lat / Math.PI))
       let targetLevel = 0
       if (mpp < 750) targetLevel = 2
@@ -339,7 +362,9 @@ function intersectEarth(
   const ry = right[1] * sx + up[1] * sy - back[1]
   const rz = right[2] * sx + up[2] * sy - back[2]
   const invLen = 1 / Math.hypot(rx, ry, rz)
-  const dx = rx * invLen, dy = ry * invLen, dz = rz * invLen
+  const dx = rx * invLen,
+    dy = ry * invLen,
+    dz = rz * invLen
   // Flat Equal Earth plane at z = 0
   if (Math.abs(dz) < 1e-6) return null
   const t = -eye[2] / dz

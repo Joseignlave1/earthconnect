@@ -30,7 +30,7 @@ export async function compileZstdModule(signal?: AbortSignal): Promise<WebAssemb
 }
 
 async function loadDecoder(module?: WebAssembly.Module, signal?: AbortSignal) {
-  const compiled = module ?? await compileZstdModule(signal)
+  const compiled = module ?? (await compileZstdModule(signal))
   const instance = await WebAssembly.instantiate(compiled)
   return instance.exports as Decoder
 }
@@ -59,8 +59,12 @@ function unpack(zstd: Decoder, scratch: Scratch, frame: ArrayBuffer, { packedByt
   if (status === 1) throw new Error('Incorrect Zstd frame content size')
   if (status !== 0) throw new Error('Zstd decompression or checksum failed')
   const header = new DataView(zstd.memory.buffer, scratch.outputPtr, 16)
-  if (header.getUint32(0, true) !== 0x31425045 || header.getUint32(4, true) !== BLOCK_SIZE ||
-      header.getUint32(8, true) !== rows || header.getUint32(12, true) !== fields) {
+  if (
+    header.getUint32(0, true) !== 0x31425045 ||
+    header.getUint32(4, true) !== BLOCK_SIZE ||
+    header.getUint32(8, true) !== rows ||
+    header.getUint32(12, true) !== fields
+  ) {
     throw new Error('Incorrect GPU block header')
   }
   // WASM memory cannot be transferred. Copy the compact chunk once into a
@@ -70,7 +74,11 @@ function unpack(zstd: Decoder, scratch: Scratch, frame: ArrayBuffer, { packedByt
 
 let sharedZstdModule: Promise<WebAssembly.Module> | undefined
 
-export async function decompressZstd(frame: ArrayBuffer, outputBytes: number, signal?: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
+export async function decompressZstd(
+  frame: ArrayBuffer,
+  outputBytes: number,
+  signal?: AbortSignal,
+): Promise<Uint8Array<ArrayBuffer>> {
   sharedZstdModule ??= compileZstdModule().catch(error => {
     sharedZstdModule = undefined
     throw error

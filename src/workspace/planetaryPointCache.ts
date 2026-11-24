@@ -33,7 +33,9 @@ const partialLifetime = 8000
 const reuseWindow = 800
 
 export function coordinatesValid(latitude: number, longitude: number) {
-  return Number.isFinite(latitude) && Math.abs(latitude) <= 90 && Number.isFinite(longitude) && Math.abs(longitude) <= 180
+  return (
+    Number.isFinite(latitude) && Math.abs(latitude) <= 90 && Number.isFinite(longitude) && Math.abs(longitude) <= 180
+  )
 }
 
 export function canonicalPoint({ body, latitude, longitude }: PlanetaryCoordinates): PlanetaryCoordinates {
@@ -58,13 +60,16 @@ function compactSample(sample: SampleResult): SampleResult {
   return {
     partial: sample.partial,
     cached: true,
-    measurements: sample.measurements.map(item => ({
-      variableId: item.variableId,
-      unit: item.unit,
-      status: item.status,
-      qualityFlags: [...item.qualityFlags],
-      decoded: item.decoded,
-    }) as SampleMeasurement),
+    measurements: sample.measurements.map(
+      item =>
+        ({
+          variableId: item.variableId,
+          unit: item.unit,
+          status: item.status,
+          qualityFlags: [...item.qualityFlags],
+          decoded: item.decoded,
+        }) as SampleMeasurement,
+    ),
   }
 }
 
@@ -97,12 +102,18 @@ function createIndexedDbStorage(): PlanetaryPointStorage | null {
           }
           request.onsuccess = () => {
             const db = request.result
-            db.onversionchange = () => { db.close(); dbPromise = undefined }
+            db.onversionchange = () => {
+              db.close()
+              dbPromise = undefined
+            }
             if (blocked) db.close()
             else resolve(db)
           }
           request.onerror = () => resolve(undefined)
-          request.onblocked = () => { blocked = true; resolve(undefined) }
+          request.onblocked = () => {
+            blocked = true
+            resolve(undefined)
+          }
         } catch {
           resolve(undefined)
         }
@@ -208,38 +219,59 @@ export function createPlanetaryPointCache(
     totalBytes += entry.bytes
     evictIfNeeded(now, entry.key)
     if (persist && entry.persistent && storage) {
-      void storage.put({
-        key: entry.key,
-        sample: entry.sample,
-        bytes: entry.bytes,
-        score: entry.score,
-        lastUsed: entry.lastUsed,
-      }).catch(() => {})
+      void storage
+        .put({
+          key: entry.key,
+          sample: entry.sample,
+          bytes: entry.bytes,
+          score: entry.score,
+          lastUsed: entry.lastUsed,
+        })
+        .catch(() => {})
     }
   }
 
   let hydration: Promise<void> | undefined = storage
-    ? storage.loadAll().then(records => {
-      const now = Date.now()
-      for (const record of records) {
-        if (!record || typeof record.key !== 'string' || !record.sample || !Array.isArray(record.sample.measurements)) continue
-        if (completed.has(record.key)) continue
-        const bytes = typeof record.bytes === 'number' && record.bytes > 0
-          ? record.bytes
-          : estimateBytes(record.key, record.sample)
-        const score = typeof record.score === 'number' && Number.isFinite(record.score) && record.score > 0 ? record.score : 1
-        const lastUsed = typeof record.lastUsed === 'number' && Number.isFinite(record.lastUsed) ? record.lastUsed : now
-        insertEntry({
-          key: record.key,
-          sample: record.sample,
-          expires: Infinity,
-          bytes,
-          score,
-          lastUsed,
-          persistent: true,
-        }, now, false)
-      }
-    }).catch(() => {}).finally(() => { hydration = undefined })
+    ? storage
+        .loadAll()
+        .then(records => {
+          const now = Date.now()
+          for (const record of records) {
+            if (
+              !record ||
+              typeof record.key !== 'string' ||
+              !record.sample ||
+              !Array.isArray(record.sample.measurements)
+            )
+              continue
+            if (completed.has(record.key)) continue
+            const bytes =
+              typeof record.bytes === 'number' && record.bytes > 0
+                ? record.bytes
+                : estimateBytes(record.key, record.sample)
+            const score =
+              typeof record.score === 'number' && Number.isFinite(record.score) && record.score > 0 ? record.score : 1
+            const lastUsed =
+              typeof record.lastUsed === 'number' && Number.isFinite(record.lastUsed) ? record.lastUsed : now
+            insertEntry(
+              {
+                key: record.key,
+                sample: record.sample,
+                expires: Infinity,
+                bytes,
+                score,
+                lastUsed,
+                persistent: true,
+              },
+              now,
+              false,
+            )
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          hydration = undefined
+        })
     : undefined
 
   return async (reference: PlanetaryCoordinates, signal: AbortSignal): Promise<SampleResult> => {
@@ -262,13 +294,15 @@ export function createPlanetaryPointCache(
         cached.score = decayedScore(cached.score, cached.lastUsed, now) + 1
         cached.lastUsed = now
         if (cached.persistent && storage) {
-          void storage.put({
-            key: cached.key,
-            sample: cached.sample,
-            bytes: cached.bytes,
-            score: cached.score,
-            lastUsed: cached.lastUsed,
-          }).catch(() => {})
+          void storage
+            .put({
+              key: cached.key,
+              sample: cached.sample,
+              bytes: cached.bytes,
+              score: cached.score,
+              lastUsed: cached.lastUsed,
+            })
+            .catch(() => {})
         }
         return cached.sample
       }
@@ -280,29 +314,36 @@ export function createPlanetaryPointCache(
     if (!entry) {
       const controller = new AbortController()
       const requestSignal = AbortSignal.any([controller.signal, lifetime])
-      const request = load(point.body, point.latitude, point.longitude, requestSignal).then(sample => {
-        requestSignal.throwIfAborted()
-        const savedAt = Date.now()
-        const refresh = sample.partial || !sample.measurements.some(measurement => typeof measurement.decoded === 'number')
-        const storedSample = refresh ? sample : compactSample(sample)
-        const bytes = estimateBytes(key, storedSample)
-        insertEntry({
-          key,
-          sample: storedSample,
-          expires: refresh ? savedAt + partialLifetime : Infinity,
-          bytes,
-          score: 1,
-          lastUsed: savedAt,
-          persistent: !refresh,
-        }, savedAt, !refresh)
-        return sample
-      }).finally(() => {
-        const active = pending.get(key)
-        if (active?.controller === controller) {
-          clearTimeout(active.abortTimer)
-          pending.delete(key)
-        }
-      })
+      const request = load(point.body, point.latitude, point.longitude, requestSignal)
+        .then(sample => {
+          requestSignal.throwIfAborted()
+          const savedAt = Date.now()
+          const refresh =
+            sample.partial || !sample.measurements.some(measurement => typeof measurement.decoded === 'number')
+          const storedSample = refresh ? sample : compactSample(sample)
+          const bytes = estimateBytes(key, storedSample)
+          insertEntry(
+            {
+              key,
+              sample: storedSample,
+              expires: refresh ? savedAt + partialLifetime : Infinity,
+              bytes,
+              score: 1,
+              lastUsed: savedAt,
+              persistent: !refresh,
+            },
+            savedAt,
+            !refresh,
+          )
+          return sample
+        })
+        .finally(() => {
+          const active = pending.get(key)
+          if (active?.controller === controller) {
+            clearTimeout(active.abortTimer)
+            pending.delete(key)
+          }
+        })
       entry = { request, controller, consumers: 0 }
       pending.set(key, entry)
     }

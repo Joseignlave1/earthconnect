@@ -25,10 +25,13 @@
   border-radius: 4px;
   background: var(--editor-popup);
   color: var(--editor-text);
-  font: 11px/16px monospace;
+  font: 11px / 16px monospace;
 }
 
-.wgsl-vim-status[hidden], .wgsl-vim-status:empty { display: none; }
+.wgsl-vim-status[hidden],
+.wgsl-vim-status:empty {
+  display: none;
+}
 
 .wgsl-vim-status input {
   width: min(22ch, 30vw);
@@ -39,4 +42,6 @@
   font: inherit;
 }
 
-.wgsl-vim-status input:focus-visible { outline: 1px solid var(--editor-accent); }
+.wgsl-vim-status input:focus-visible {
+  outline: 1px solid var(--editor-accent);
+}

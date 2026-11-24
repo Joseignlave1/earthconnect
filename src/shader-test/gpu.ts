@@ -11,11 +11,19 @@ export async function shaderModule(device: GPUDevice, label: string, code: strin
   const module = device.createShaderModule({ label, code })
   const info = await module.getCompilationInfo()
   const errors = info.messages.filter(message => message.type === 'error')
-  if (errors.length) throw new Error(`${label}: ${errors.map(message => `${message.lineNum}:${message.linePos} ${message.message}`).join('\n')}`)
+  if (errors.length)
+    throw new Error(
+      `${label}: ${errors.map(message => `${message.lineNum}:${message.linePos} ${message.message}`).join('\n')}`,
+    )
   return module
 }
 
-export function uploadBuffer(device: GPUDevice, label: string, data: Float32Array<ArrayBuffer> | Uint32Array<ArrayBuffer>, usage: GPUBufferUsageFlags) {
+export function uploadBuffer(
+  device: GPUDevice,
+  label: string,
+  data: Float32Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+  usage: GPUBufferUsageFlags,
+) {
   const buffer = device.createBuffer({ label, size: data.byteLength, usage, mappedAtCreation: true })
   new Uint8Array(buffer.getMappedRange()).set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength))
   buffer.unmap()
@@ -162,9 +170,10 @@ export function generateMipmaps(
   const isArray = texture.depthOrArrayLayers > 1
   for (const layer of layers) {
     for (let mip = 1; mip < mipLevelCount; mip++) {
-      const viewDesc = (baseMipLevel: number): GPUTextureViewDescriptor => isArray
-        ? { dimension: '2d', baseArrayLayer: layer, arrayLayerCount: 1, baseMipLevel, mipLevelCount: 1 }
-        : { baseMipLevel, mipLevelCount: 1 }
+      const viewDesc = (baseMipLevel: number): GPUTextureViewDescriptor =>
+        isArray
+          ? { dimension: '2d', baseArrayLayer: layer, arrayLayerCount: 1, baseMipLevel, mipLevelCount: 1 }
+          : { baseMipLevel, mipLevelCount: 1 }
       const group = device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
         entries: [

@@ -8,6 +8,8 @@
     "build": "tsc -b && vite build",
     "build:pages": "tsc -b && vite build --mode pages",
     "lint": "eslint .",
+    "format": "biome format --write",
+    "format:check": "biome format",
     "fetch:assets": "node scripts/hydrate-assets.mjs",
     "test:shader": "npm run fetch:assets -- render && node --test tests/shader-test.test.ts tests/planet-terrain.test.ts tests/solar-camera.test.ts tests/solar-system.test.ts tests/wgsl-project.test.ts tests/planetary-point-cache.test.ts tests/planetary-shader-analysis.test.ts",
     "export:workspace": "node scripts/export-workspace.mjs",
@@ -37,6 +39,7 @@
     "wgsl-analyzer-web": "^0.11.539"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.8",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",

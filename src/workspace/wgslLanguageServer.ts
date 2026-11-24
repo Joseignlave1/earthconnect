@@ -1,6 +1,4 @@
-import type {
-  CompletionItem, CompletionList, Diagnostic, Hover, Position,
-} from 'vscode-languageserver-types'
+import type { CompletionItem, CompletionList, Diagnostic, Hover, Position } from 'vscode-languageserver-types'
 import type { WgslAnalyzerServer } from 'wgsl-analyzer-web'
 
 type PublishDiagnosticsParams = { uri: string; version?: number; diagnostics: Diagnostic[] }
@@ -52,10 +50,13 @@ export async function startWgslLanguageServer(
   let disposed = false
   let diagnosticTimer: ReturnType<typeof setTimeout> | undefined
   const pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>()
-  const subscription = server.onMessage((message) => {
+  const subscription = server.onMessage(message => {
     const reply = message as Reply
-    if (reply.method === 'textDocument/publishDiagnostics' && reply.params?.uri === uri &&
-        (reply.params.version === undefined || reply.params.version === version)) {
+    if (
+      reply.method === 'textDocument/publishDiagnostics' &&
+      reply.params?.uri === uri &&
+      (reply.params.version === undefined || reply.params.version === version)
+    ) {
       publishDiagnostics?.(reply.params)
     } else if (reply.method && reply.id != null) {
       // A server request needs a reply even when the client has no handler.
@@ -93,11 +94,15 @@ export async function startWgslLanguageServer(
     diagnosticTimer = setTimeout(() => {
       void request<{ kind: string; items?: Diagnostic[] }>('textDocument/diagnostic', {
         textDocument: { uri },
-      }).then(result => {
-        if (result?.kind === 'full' && requestedVersion === version) {
-          publishDiagnostics({ uri, version, diagnostics: result.items ?? [] })
-        }
-      }).catch(() => { /* Diagnostics can be superseded or canceled by editor changes. */ })
+      })
+        .then(result => {
+          if (result?.kind === 'full' && requestedVersion === version) {
+            publishDiagnostics({ uri, version, diagnostics: result.items ?? [] })
+          }
+        })
+        .catch(() => {
+          /* Diagnostics can be superseded or canceled by editor changes. */
+        })
     }, 180)
   }
 
@@ -150,7 +155,8 @@ export async function startWgslLanguageServer(
     },
     complete(position: Position) {
       return request<CompletionList | CompletionItem[] | null>('textDocument/completion', {
-        textDocument: { uri }, position,
+        textDocument: { uri },
+        position,
       })
     },
     hover(position: Position) {
@@ -200,7 +206,10 @@ export async function startWgslLanguageServer(
         }
         throw new Error('The WGSL analyzer could not produce a syntax tree.')
       })
-      analysisQueue = task.then(() => undefined, () => undefined)
+      analysisQueue = task.then(
+        () => undefined,
+        () => undefined,
+      )
       return task
     },
     dispose,

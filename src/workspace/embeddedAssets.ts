@@ -14,8 +14,11 @@ export function embeddedWorkspaceAssets() {
   return workspaceAssets(path => {
     const scripts = parts.get(path)
     if (!scripts) throw new Error(`Workspace archive is missing ${path}.`)
-    const bytes = scripts.map(script =>
-      typedArrays.fromBase64?.(script.text) ?? Uint8Array.from(atob(script.text), character => character.charCodeAt(0)))
+    const bytes = scripts.map(
+      script =>
+        typedArrays.fromBase64?.(script.text) ??
+        Uint8Array.from(atob(script.text), character => character.charCodeAt(0)),
+    )
     const type = path.endsWith('.jpg') ? 'image/jpeg' : path.endsWith('.webp') ? 'image/webp' : ''
     return new Blob(bytes, { type })
   })

@@ -112,9 +112,9 @@ export function orbitPolyline(id: BodyId, date: Date): readonly Vec3[] {
   const time = MakeTime(date)
   const period = PlanetOrbitalPeriod(body)
   const segments = 180
-  return Array.from({ length: segments + 1 }, (_, index) => (
-    heliocentricPosition(body, time.AddDays(period * (index / segments - 0.5)))
-  ))
+  return Array.from({ length: segments + 1 }, (_, index) =>
+    heliocentricPosition(body, time.AddDays(period * (index / segments - 0.5))),
+  )
 }
 
 /** Simultaneous geometric states at the given UTC instant, before light-time correction. */

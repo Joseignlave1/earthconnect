@@ -20,7 +20,10 @@ if (!navigator.gpu) {
   const devicePool = createSurfaceDevicePool()
   startStartupSpan('gpu-device')
   const initialDeviceLease = devicePool()
-  void initialDeviceLease.ready.then(() => endStartupSpan('gpu-device'), () => undefined)
+  void initialDeviceLease.ready.then(
+    () => endStartupSpan('gpu-device'),
+    () => undefined,
+  )
   let deviceClaimed = false
   function releaseUnclaimedDevice() {
     if (deviceClaimed) return
@@ -37,8 +40,7 @@ if (!navigator.gpu) {
     if (prewarmPromise) return
     const lease = deviceClaimed ? undefined : initialDeviceLease
     deviceClaimed = true
-    prewarmPromise = prewarmModule.then(({ startWorkspacePrewarm }) =>
-      startWorkspacePrewarm(assets, devicePool, lease))
+    prewarmPromise = prewarmModule.then(({ startWorkspacePrewarm }) => startWorkspacePrewarm(assets, devicePool, lease))
     void prewarmPromise.catch(() => lease?.release())
   }
 
@@ -46,22 +48,28 @@ if (!navigator.gpu) {
   // for React's first render and let retries use the ordinary release loader.
   let latestAssets: WorkspaceAssets | undefined
   let latestProgress: DownloadProgress | undefined
-  let listener: {
-    onAssets?: (assets: WorkspaceAssets) => void
-    onProgress: (progress: DownloadProgress) => void
-  } | undefined
+  let listener:
+    | {
+        onAssets?: (assets: WorkspaceAssets) => void
+        onProgress: (progress: DownloadProgress) => void
+      }
+    | undefined
   const refresh = new URLSearchParams(location.search).get('refreshCache') === '1'
-  const initialRelease = loadWorkspaceRelease(new AbortController().signal, progress => {
-    latestProgress = progress
-    listener?.onProgress(progress)
-  }, {
-    refresh,
-    onAssets: assets => {
-      latestAssets = assets
-      startBootstrapPrewarm(assets)
-      listener?.onAssets?.(assets)
+  const initialRelease = loadWorkspaceRelease(
+    new AbortController().signal,
+    progress => {
+      latestProgress = progress
+      listener?.onProgress(progress)
     },
-  })
+    {
+      refresh,
+      onAssets: assets => {
+        latestAssets = assets
+        startBootstrapPrewarm(assets)
+        listener?.onAssets?.(assets)
+      },
+    },
+  )
   // A failed network check can settle before the UI starts observing it.
   void initialRelease.catch(() => undefined)
 
@@ -85,13 +93,18 @@ if (!navigator.gpu) {
 
   // Start fetching the workspace & Monaco bundles in parallel with pagesApp.
   startStartupSpan('workspace-js')
-  void import('./SharedSkyWorkspace.tsx').then(() => endStartupSpan('workspace-js'), () => undefined)
+  void import('./SharedSkyWorkspace.tsx').then(
+    () => endStartupSpan('workspace-js'),
+    () => undefined,
+  )
   startStartupSpan('app-bundle')
-  void import('./pagesApp.tsx').then(({ mount }) => {
-    endStartupSpan('app-bundle')
-    mount(loadInitialRelease, devicePool, releaseUnclaimedDevice, () => prewarmPromise)
-  }).catch(() => {
-    releaseUnclaimedDevice()
-    document.querySelector('#initial-status')!.textContent = 'Could not open Earth Connect. Reload to retry.'
-  })
+  void import('./pagesApp.tsx')
+    .then(({ mount }) => {
+      endStartupSpan('app-bundle')
+      mount(loadInitialRelease, devicePool, releaseUnclaimedDevice, () => prewarmPromise)
+    })
+    .catch(() => {
+      releaseUnclaimedDevice()
+      document.querySelector('#initial-status')!.textContent = 'Could not open Earth Connect. Reload to retry.'
+    })
 }

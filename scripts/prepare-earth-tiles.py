@@ -13,6 +13,7 @@ boundaries) for seam-free hardware bilinear/anisotropic mipmap filtering.
 Pure open-ocean tiles are omitted so the shader seamlessly uses the 8K base +
 GEBCO bathymetry over open water.
 """
+
 from __future__ import annotations
 
 import io
@@ -32,16 +33,22 @@ from ect_terrain import load_earth_coast
 Image.MAX_IMAGE_PIXELS = None
 
 PANELS = [
-    ("A1", 0, 0), ("B1", 1, 0), ("C1", 2, 0), ("D1", 3, 0),
-    ("A2", 0, 1), ("B2", 1, 1), ("C2", 2, 1), ("D2", 3, 1),
+    ("A1", 0, 0),
+    ("B1", 1, 0),
+    ("C1", 2, 0),
+    ("D1", 3, 0),
+    ("A2", 0, 1),
+    ("B2", 1, 1),
+    ("C2", 2, 1),
+    ("D2", 3, 1),
 ]
 TILE_INNER = 508
 GUTTER = 2
 TILE_SIZE = TILE_INNER + 2 * GUTTER  # 512
 LEVEL_SPECS = [
     # (level, tiles_per_octant, global_cols, global_rows, octant_px)
-    (0, 10, 40, 20, 10 * TILE_INNER),   # 5080
-    (1, 20, 80, 40, 20 * TILE_INNER),   # 10160
+    (0, 10, 40, 20, 10 * TILE_INNER),  # 5080
+    (1, 20, 80, 40, 20 * TILE_INNER),  # 10160
     (2, 40, 160, 80, 40 * TILE_INNER),  # 20320
 ]
 WEBP_QUALITY = 74
@@ -58,13 +65,27 @@ def resize_panel(args: tuple[str, Path, Path]) -> tuple[str, dict[int, Path]]:
     l0 = work_dir / f"{name}_L0.v"
     if not l2.exists():
         subprocess.run(
-            ["vips", "resize", str(src), str(l2), str(20320 / 21600), "--kernel", "lanczos3"],
+            [
+                "vips",
+                "resize",
+                str(src),
+                str(l2),
+                str(20320 / 21600),
+                "--kernel",
+                "lanczos3",
+            ],
             check=True,
         )
     if not l1.exists():
-        subprocess.run(["vips", "resize", str(l2), str(l1), "0.5", "--kernel", "lanczos3"], check=True)
+        subprocess.run(
+            ["vips", "resize", str(l2), str(l1), "0.5", "--kernel", "lanczos3"],
+            check=True,
+        )
     if not l0.exists():
-        subprocess.run(["vips", "resize", str(l1), str(l0), "0.5", "--kernel", "lanczos3"], check=True)
+        subprocess.run(
+            ["vips", "resize", str(l1), str(l0), "0.5", "--kernel", "lanczos3"],
+            check=True,
+        )
     outputs[2] = l2
     outputs[1] = l1
     outputs[0] = l0
@@ -80,7 +101,9 @@ def load_vips_rgb(path: Path, size: int) -> np.ndarray:
     return arr
 
 
-def is_open_ocean(tile_rgb: np.ndarray, coast_mask: np.ndarray, tx: int, ty: int, cols: int, rows: int) -> bool:
+def is_open_ocean(
+    tile_rgb: np.ndarray, coast_mask: np.ndarray, tx: int, ty: int, cols: int, rows: int
+) -> bool:
     """Return True only if the tile is guaranteed pure open ocean (no land/islands)."""
     ch, cw = coast_mask.shape
     x0 = max(0, int((tx - 0.15) * cw / cols))
@@ -95,7 +118,11 @@ def is_open_ocean(tile_rgb: np.ndarray, coast_mask: np.ndarray, tx: int, ty: int
     g = tile_rgb[:, :, 1]
     b = tile_rgb[:, :, 2]
     # NASA BMNG open ocean is very dark blue (R <= 28, G <= 52, B <= 98, B > R + 6)
-    non_ocean = (r > 32) | (g > 58) | ((r > 18) & (r.astype(np.int16) >= b.astype(np.int16) - 4))
+    non_ocean = (
+        (r > 32)
+        | (g > 58)
+        | ((r > 18) & (r.astype(np.int16) >= b.astype(np.int16) - 4))
+    )
     if int(np.count_nonzero(non_ocean)) > 12:
         return False
     return True
@@ -118,27 +145,29 @@ def pad_octant(
     """Assemble (size + 4, size + 4, 3) uint8 padded array with seamless 2px neighbor gutters."""
     padded = np.empty((size + 2 * GUTTER, size + 2 * GUTTER, 3), dtype=np.uint8)
     center = arrays[(ox, oy)]
-    padded[GUTTER:GUTTER + size, GUTTER:GUTTER + size] = center
+    padded[GUTTER : GUTTER + size, GUTTER : GUTTER + size] = center
 
     left = arrays[((ox - 1) % 4, oy)]
     right = arrays[((ox + 1) % 4, oy)]
-    padded[GUTTER:GUTTER + size, :GUTTER] = left[:, -GUTTER:]
-    padded[GUTTER:GUTTER + size, GUTTER + size:] = right[:, :GUTTER]
+    padded[GUTTER : GUTTER + size, :GUTTER] = left[:, -GUTTER:]
+    padded[GUTTER : GUTTER + size, GUTTER + size :] = right[:, :GUTTER]
 
     if oy == 0:
         # North pole: replicate row 0
-        padded[:GUTTER, :] = padded[GUTTER:GUTTER + 1, :]
+        padded[:GUTTER, :] = padded[GUTTER : GUTTER + 1, :]
         south = arrays[(ox, 1)]
-        padded[GUTTER + size:, GUTTER:GUTTER + size] = south[:GUTTER, :]
-        padded[GUTTER + size:, :GUTTER] = arrays[((ox - 1) % 4, 1)][:GUTTER, -GUTTER:]
-        padded[GUTTER + size:, GUTTER + size:] = arrays[((ox + 1) % 4, 1)][:GUTTER, :GUTTER]
+        padded[GUTTER + size :, GUTTER : GUTTER + size] = south[:GUTTER, :]
+        padded[GUTTER + size :, :GUTTER] = arrays[((ox - 1) % 4, 1)][:GUTTER, -GUTTER:]
+        padded[GUTTER + size :, GUTTER + size :] = arrays[((ox + 1) % 4, 1)][
+            :GUTTER, :GUTTER
+        ]
     else:
         # South pole: replicate last row
         north = arrays[(ox, 0)]
-        padded[:GUTTER, GUTTER:GUTTER + size] = north[-GUTTER:, :]
+        padded[:GUTTER, GUTTER : GUTTER + size] = north[-GUTTER:, :]
         padded[:GUTTER, :GUTTER] = arrays[((ox - 1) % 4, 0)][-GUTTER:, -GUTTER:]
-        padded[:GUTTER, GUTTER + size:] = arrays[((ox + 1) % 4, 0)][-GUTTER:, :GUTTER]
-        padded[GUTTER + size:, :] = padded[GUTTER + size - 1:GUTTER + size, :]
+        padded[:GUTTER, GUTTER + size :] = arrays[((ox + 1) % 4, 0)][-GUTTER:, :GUTTER]
+        padded[GUTTER + size :, :] = padded[GUTTER + size - 1 : GUTTER + size, :]
 
     return padded
 
@@ -153,13 +182,18 @@ def main() -> None:
 
     root = Path(__file__).resolve().parent.parent
     coast_mask = load_earth_coast(root / "public" / "textures" / "earth-terrain.bin")
-    print(f"Loaded GEBCO coast mask {coast_mask.shape} in {time.time() - t0:.1f}s", flush=True)
+    print(
+        f"Loaded GEBCO coast mask {coast_mask.shape} in {time.time() - t0:.1f}s",
+        flush=True,
+    )
 
     # 1. Resize all 8 panels in parallel using libvips
     t1 = time.time()
     panel_paths: dict[tuple[int, int], dict[int, Path]] = {}
     with ProcessPoolExecutor(max_workers=4) as pool:
-        results = list(pool.map(resize_panel, [(name, src_dir, work_dir) for name, _, _ in PANELS]))
+        results = list(
+            pool.map(resize_panel, [(name, src_dir, work_dir) for name, _, _ in PANELS])
+        )
     by_name = dict(results)
     for name, ox, oy in PANELS:
         panel_paths[(ox, oy)] = by_name[name]
@@ -169,7 +203,9 @@ def main() -> None:
     level_arrays: dict[int, dict[tuple[int, int], np.ndarray]] = {0: {}, 1: {}, 2: {}}
     for level, _, _, _, octant_px in LEVEL_SPECS:
         for _, ox, oy in PANELS:
-            level_arrays[level][(ox, oy)] = load_vips_rgb(panel_paths[(ox, oy)][level], octant_px)
+            level_arrays[level][(ox, oy)] = load_vips_rgb(
+                panel_paths[(ox, oy)][level], octant_px
+            )
 
     # 3. Slice and WebP-encode each of the 8 regional packs
     total_tiles = 0
@@ -190,7 +226,7 @@ def main() -> None:
                     for lx in range(n_oct):
                         px = lx * TILE_INNER
                         tx = base_tx + lx
-                        tile = padded[py:py + TILE_SIZE, px:px + TILE_SIZE]
+                        tile = padded[py : py + TILE_SIZE, px : px + TILE_SIZE]
                         if is_open_ocean(tile, coast_mask, tx, ty, cols, rows):
                             skipped += 1
                             continue
