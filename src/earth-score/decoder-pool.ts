@@ -8,7 +8,7 @@ type Job = {
   reject: (error: unknown) => void
 }
 
-type Slot = { worker: Worker; ready: boolean; job?: Job }
+type Slot = { worker: Worker; ready: boolean; sentModule: boolean; job?: Job }
 
 export function createDecoderPool(count: number, signal: AbortSignal) {
   const slots: Slot[] = []
@@ -16,6 +16,7 @@ export function createDecoderPool(count: number, signal: AbortSignal) {
   let mainThreadDecoder: Promise<ReturnType<typeof createDecoder>> | undefined
   let fallbackJob: Job | undefined
   let closed: unknown
+  let compiledModule: WebAssembly.Module | undefined
 
   function close(reason: unknown = new Error('Earth Score decoder pool closed')) {
     if (closed !== undefined) return
@@ -40,7 +41,10 @@ export function createDecoderPool(count: number, signal: AbortSignal) {
     if (!job) return
     slot.job = job
     try {
-      slot.worker.postMessage(job.request, [job.request.frame])
+      const message = !slot.sentModule && compiledModule ? { ...job.request, module: compiledModule } : job.request
+      if (compiledModule) slot.sentModule = true
+      const transfer = job.request.frame instanceof ArrayBuffer ? [job.request.frame] : []
+      slot.worker.postMessage(message, transfer)
     } catch (error) {
       close(error)
     }
@@ -48,25 +52,43 @@ export function createDecoderPool(count: number, signal: AbortSignal) {
 
   function schedule() {
     if (closed !== undefined || !pending.length) return
-    const idle = slots.find(slot => slot.ready && !slot.job)
-    if (idle) start(idle)
-    else if (!slots.length && !fallbackJob) {
+    while (pending.length) {
+      const idle = slots.find(slot => slot.ready && !slot.job)
+      if (!idle) break
+      start(idle)
+    }
+    if (!slots.length && !fallbackJob && pending.length) {
       const job = pending.shift()!
       fallbackJob = job
       // Let the browser update the UI between chunks when workers cannot start.
       setTimeout(() => {
         if (fallbackJob !== job) return
         mainThreadDecoder ??= import('./decode.ts').then(({ createDecoder }) => createDecoder(signal))
-        void mainThreadDecoder.then(decode => decode(job.request)).then(job.resolve, job.reject).finally(() => {
-          fallbackJob = undefined
-          schedule()
-        })
+        const request = compiledModule ? { ...job.request, module: compiledModule } : job.request
+        void mainThreadDecoder
+          .then(decode => decode(request))
+          .then(job.resolve, job.reject)
+          .finally(() => {
+            fallbackJob = undefined
+            schedule()
+          })
       }, 0)
     }
   }
 
   signal.throwIfAborted()
   signal.addEventListener('abort', abort, { once: true })
+  // Compile zstd.wasm once on the main thread while workers boot; if ready
+  // before a worker receives its first job, share the compiled Module to avoid
+  // redundant fetches and compilations (without ever blocking worker dispatch).
+  void import('./decode.ts')
+    .then(({ compileZstdModule }) => compileZstdModule(signal))
+    .then(
+      module => {
+        compiledModule = module
+      },
+      () => undefined,
+    )
   for (let i = 0; i < count; i++) {
     let worker: Worker
     try {
@@ -74,7 +96,7 @@ export function createDecoderPool(count: number, signal: AbortSignal) {
     } catch {
       continue
     }
-    const slot: Slot = { worker, ready: false }
+    const slot: Slot = { worker, ready: false, sentModule: false }
     slots.push(slot)
     worker.onmessage = ({ data }: MessageEvent<DecodeResult>) => {
       if ('ready' in data) {
@@ -89,7 +111,7 @@ export function createDecoderPool(count: number, signal: AbortSignal) {
       else job.resolve(data.packed)
       schedule()
     }
-    worker.onerror = (event) => {
+    worker.onerror = event => {
       event.preventDefault()
       if (closed !== undefined) return
       if (slot.ready) {

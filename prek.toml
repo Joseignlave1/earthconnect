@@ -1,0 +1,30 @@
+exclude = '(^|/)vendor/|(^|/)compute-data/|(^|/)tests/earth-score/reference/|(^|/)tests/fixtures/|(^|/)package-lock\.json$|(^|/)cdn/pinned-release\.json$'
+
+[[repos]]
+repo = "builtin"
+hooks = [
+  { id = "trailing-whitespace" },
+  { id = "end-of-file-fixer" },
+  { id = "check-merge-conflict" },
+  { id = "check-yaml" },
+  { id = "check-toml" },
+  { id = "check-json", exclude = '(^|/)tsconfig.*\.json$' },
+  { id = "check-jsonc", files = '(^|/)tsconfig.*\.json$', types = ["json"] },
+]
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "biome-format"
+name = "biome format"
+entry = "./node_modules/.bin/biome format --write --no-errors-on-unmatched"
+language = "system"
+types_or = ["ts", "tsx", "javascript", "css", "json", "html", "markdown"]
+
+[[repos.hooks]]
+id = "ruff-format"
+name = "ruff format"
+entry = "ruff format"
+language = "system"
+types = ["python"]

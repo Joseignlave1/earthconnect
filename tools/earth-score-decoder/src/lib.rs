@@ -1,5 +1,7 @@
-//! The worker owns this instance and the two disjoint WASM allocations.
+//! The worker owns this instance, its reusable Zstd context, and its WASM allocations.
 use std::alloc::{Layout, alloc, dealloc};
+
+static mut DCTX: *mut zstd_sys::ZSTD_DCtx = std::ptr::null_mut();
 
 #[unsafe(no_mangle)]
 pub extern "C" fn allocate(bytes: usize) -> *mut u8 {
@@ -31,8 +33,21 @@ pub unsafe extern "C" fn decode(
         if zstd_sys::ZSTD_getFrameContentSize(frame.cast(), frame_bytes) != output_bytes as u64 {
             return 1;
         }
-        let count =
-            zstd_sys::ZSTD_decompress(output.cast(), output_bytes, frame.cast(), frame_bytes);
+        let mut dctx = DCTX;
+        if dctx.is_null() {
+            dctx = zstd_sys::ZSTD_createDCtx();
+            if dctx.is_null() {
+                return 2;
+            }
+            DCTX = dctx;
+        }
+        let count = zstd_sys::ZSTD_decompressDCtx(
+            dctx,
+            output.cast(),
+            output_bytes,
+            frame.cast(),
+            frame_bytes,
+        );
         if zstd_sys::ZSTD_isError(count) != 0 || count != output_bytes {
             return 2;
         }

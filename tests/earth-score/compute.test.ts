@@ -4,12 +4,22 @@ import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import { zstdDecompressSync } from 'node:zlib'
 import { buildEarthQuery, freezePlanetaryShaderPoint, type PlanetaryShaderSample } from '../../src/earth-score/index.ts'
-import { lowerPlanetaryCalls, packPlanetaryShaderPoints, planetShaderBytes } from '../../src/earth-score/planetShaderSchema.ts'
-import { prepareScoreShader, SCORE_SHADER_EXAMPLES, SCORE_SHADER_FIELDS, SCORE_SHADER_PRELUDE, ScoreShaderError } from '../../src/earth-score/custom-shader.ts'
+import {
+  lowerPlanetaryCalls,
+  packPlanetaryShaderPoints,
+  planetShaderBytes,
+} from '../../src/earth-score/planetShaderSchema.ts'
+import {
+  prepareScoreShader,
+  SCORE_SHADER_EXAMPLES,
+  SCORE_SHADER_FIELDS,
+  SCORE_SHADER_PRELUDE,
+  ScoreShaderError,
+} from '../../src/earth-score/custom-shader.ts'
 import { createLayout, createScoreGeometry, GRID_WIDTH } from '../../src/earth-score/layout.ts'
 import { parseManifest } from '../../src/earth-score/manifest.ts'
 import { createQueryParameters, type EarthQueryCriterion } from '../../src/earth-score/query.ts'
-import { createLookup, createParameters } from '../../src/earth-score/scoring.ts'
+import { createLookup } from '../../src/earth-score/scoring.ts'
 import type { Criterion } from '../../src/explorerData.ts'
 
 const world = new URL('../../compute-data/world/', import.meta.url)
@@ -55,9 +65,9 @@ test('shader spatial lookup retains absolute tile origins and exact Earth paddin
 
   const y = 1739
   const row = manifest.sites.length + y * 3
-  const latitude = 90 - (y + 0.5) * 180 / 5004
+  const latitude = 90 - ((y + 0.5) * 180) / 5004
   assert.equal(floats[row], Math.fround(latitude))
-  assert.equal(floats[row + 1], Math.fround(180 / (5004 * Math.cos(latitude * Math.PI / 180))))
+  assert.equal(floats[row + 1], Math.fround(180 / (5004 * Math.cos((latitude * Math.PI) / 180))))
   assert.equal(words[row + 2], 4441)
   const layout = createLayout(manifest)
   assert.equal(layout.addressOf('h02v06', 71 * 278 + 6)?.center, null)
@@ -91,25 +101,19 @@ test('exact float lookup preserves valid physical zero and encodes missing separ
   assert.equal(floats[temperature + 65535], Math.fround((65535 - 7501) / 50))
 })
 
-test('target, tolerance and weight overrides keep the baseline reusable', () => {
-  const floats = (overrides?: Parameters<typeof createParameters>[1]) =>
-    new Float32Array(createParameters(manifest, overrides).buffer)
-  const initial = floats()
-  const moved = floats({ slope_mean_deg: { target: 1.25, tolerance: 4, weight: 2 } })
-  assert.equal(moved[16], 1.25)
-  assert.equal(moved[17], 0.25)
-  assert.equal(moved[18], Math.fround(2 / 5.5))
-  assert.equal(initial[18], Math.fround(1 / 4.5))
-  assert.deepEqual(floats(), initial)
-  assert.throws(() => floats({ no_field: { target: 0 } }), /Unknown score feature/)
-  assert.throws(() => floats({ slope_mean_deg: { tolerance: 0 } }), /Invalid score parameters/)
-  assert.throws(() => floats({ slope_mean_deg: { weight: 1e39 } }), /Invalid score parameters/)
-})
-
 function criterion(key: string, settings: Partial<EarthQueryCriterion> = {}): Criterion {
   return {
-    key, label: key, group: key, unit: 'test unit', enabled: true, target: 0,
-    tolerance: 1, weight: 1, min: null, max: null, ...settings,
+    key,
+    label: key,
+    group: key,
+    unit: 'test unit',
+    enabled: true,
+    target: 0,
+    tolerance: 1,
+    weight: 1,
+    min: null,
+    max: null,
+    ...settings,
   }
 }
 
@@ -145,16 +149,17 @@ test('criteria queries validate active fields, coverage and numeric parameters',
   assert.throws(() => buildEarthQuery([{ ...slope, max: 1e13 }]), /enter a finite number/)
   assert.throws(() => buildEarthQuery([{ ...slope, min: 12, max: 3 }]), /minimum exceeds maximum/)
   assert.throws(() => buildEarthQuery([{ ...slope, enabled: false, min: 3 }]), /at least one variable/)
-  assert.doesNotThrow(() => buildEarthQuery([criterion('dominant_lithology_code', { categorical: true, tolerance: NaN })]))
+  assert.doesNotThrow(() =>
+    buildEarthQuery([criterion('dominant_lithology_code', { categorical: true, tolerance: NaN })]),
+  )
 })
 
 test('criteria query hard bounds distinguish a stored decimal from its neighbors', () => {
-  const makeQuery = (min: number, max: number) => buildEarthQuery([
-    criterion('bare_fraction', { min, max, qualityKey: 'landcover_valid_fraction' }),
-  ])
-  const inclusive = createQueryParameters(manifest, makeQuery(.9, .9), Infinity)
-  const above = createQueryParameters(manifest, makeQuery(.9000000000000001, 1), Infinity)
-  const below = createQueryParameters(manifest, makeQuery(0, .8999999999999999), Infinity)
+  const makeQuery = (min: number, max: number) =>
+    buildEarthQuery([criterion('bare_fraction', { min, max, qualityKey: 'landcover_valid_fraction' })])
+  const inclusive = createQueryParameters(manifest, makeQuery(0.9, 0.9), Infinity)
+  const above = createQueryParameters(manifest, makeQuery(0.9000000000000001, 1), Infinity)
+  const below = createQueryParameters(manifest, makeQuery(0, 0.8999999999999999), Infinity)
   assert.equal(inclusive[5], 901) // minimum coverage
   assert.deepEqual(Array.from(inclusive.slice(-7, -5)), [901, 901])
   assert.equal(above.at(-7), 902)
@@ -203,21 +208,31 @@ fn score(pixel: EarthCell) -> f32 {
   const compiled = prepareScoreShader(program, manifest)
   assert.match(compiled.entryPoint, /earth_score_internal_1_/)
   assert.equal(compiled.sourceLines, 7)
+  const bareIndex = manifest.columns.indexOf('bare_fraction')
+  const slopeIndex = manifest.columns.indexOf('slope_mean_deg')
+  assert.match(compiled.code, new RegExp(`_value\\(rows, ${bareIndex}u, row,`))
+  assert.doesNotMatch(compiled.code, new RegExp(`_value\\(rows, ${slopeIndex}u, row,`))
+  const allFieldsProgram = `fn score(pixel: EarthCell) -> f32 {\n  return ${SCORE_SHADER_FIELDS.map(f => `pixel.${f.name}`).join(' + ')};\n}`
+  const compiledAll = prepareScoreShader(allFieldsProgram, manifest)
   for (const field of SCORE_SHADER_FIELDS) {
-    assert.match(compiled.code, new RegExp(`_value\\(rows, ${manifest.columns.indexOf(field.name)}u, row\\)`))
+    assert.match(compiledAll.code, new RegExp(`_value\\(rows, ${manifest.columns.indexOf(field.name)}u, row,`))
   }
 })
 
 test('the score wrapper owns GPU resource bindings', () => {
-  const source = 'fn score(pixel: EarthCell) -> f32 { return 1.0; }\n@/*comment*/group(0) @binding(1) var<storage, read> data: array<f32>;'
-  assert.throws(() => prepareScoreShader(source, manifest), (error: unknown) => {
-    assert.ok(error instanceof ScoreShaderError)
-    const [diagnostic] = error.diagnostics
-    assert.equal(diagnostic.line, 2)
-    assert.equal(diagnostic.column, 13)
-    assert.match(diagnostic.message, /GPU resource bindings/)
-    return true
-  })
+  const source =
+    'fn score(pixel: EarthCell) -> f32 { return 1.0; }\n@/*comment*/group(0) @binding(1) var<storage, read> data: array<f32>;'
+  assert.throws(
+    () => prepareScoreShader(source, manifest),
+    (error: unknown) => {
+      assert.ok(error instanceof ScoreShaderError)
+      const [diagnostic] = error.diagnostics
+      assert.equal(diagnostic.line, 2)
+      assert.equal(diagnostic.column, 13)
+      assert.match(diagnostic.message, /GPU resource bindings/)
+      return true
+    },
+  )
 })
 
 test('float32 physical fields retain the exact encoded measurement for generated queries', () => {
@@ -238,11 +253,20 @@ test('float32 physical fields retain the exact encoded measurement for generated
 
 test('planetary sample layout and frozen values enforce backend status and units', () => {
   const sample: PlanetaryShaderSample = {
-    body: 'moon', latitude: 90, longitude: 180, partial: true,
+    body: 'moon',
+    latitude: 90,
+    longitude: 180,
+    partial: true,
     measurements: [
       { variableId: 'moon.relief_5km', unit: 'm', status: 2, qualityFlags: [], decoded: 4000 },
       { variableId: 'moon.relief_5km', unit: 'km', status: 1, qualityFlags: [], decoded: 4 },
-      { variableId: 'moon.relief_5km', unit: 'm', status: 1, qualityFlags: ['semantic_review_required'], decoded: 4000 },
+      {
+        variableId: 'moon.relief_5km',
+        unit: 'm',
+        status: 1,
+        qualityFlags: ['semantic_review_required'],
+        decoded: 4000,
+      },
       { variableId: 'moon.relief_5km', unit: 'm', status: 1, qualityFlags: [], decoded: 42.25 },
       { variableId: 'moon.surface_noon', unit: 'K', status: 1, qualityFlags: [], decoded: 265.5 },
       { variableId: 'mars.elevation', unit: 'm', status: 1, qualityFlags: [], decoded: 313 },

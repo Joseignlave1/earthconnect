@@ -1,5 +1,18 @@
 import type { WorkspaceAssets } from './workspaceAssets.ts'
-import { Component, lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import {
+  Component,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react'
 import { createPortal } from 'react-dom'
 import type { BodyId } from '../explorerData'
 import { DEFAULT_SCORE_SHADER, SCORE_SHADER_PRELUDE } from '../earth-score/custom-shader.ts'
@@ -10,11 +23,24 @@ import type { WgslDiagnostic } from './WgslEditor'
 import { helloWorldExample, helloWorldInitialView } from './helloWorldExample.ts'
 import { createEarthWorkspaceResources, type EarthWorkspaceResources } from './earthWorkspaceResources'
 import { useEarthWorkspace } from './useEarthWorkspace'
-import { assembleShaderProject, defaultShaderSource, findShaderLocation, readShaderProject, resolveShaderFiles, saveShaderProject, selectShaderModule, shaderModuleId, type ShaderProject } from './shaderProject'
+import {
+  assembleShaderProject,
+  defaultShaderProject,
+  defaultShaderSource,
+  findShaderLocation,
+  readShaderProject,
+  resolveShaderFiles,
+  saveShaderProject,
+  selectShaderModule,
+  shaderModuleId,
+  type ShaderProject,
+} from './shaderProject'
 import { formatPointCall, type PlanetaryCoordinates } from './planetaryPointCache.ts'
+import { endStartupSpan, startStartupSpan } from './startupTiming.ts'
 import './SharedSkyWorkspace.css'
 
-const WgslEditor = import.meta.env.VITE_WORKSPACE_STANDALONE ? null : lazy(() => import('./WgslEditor'))
+const wgslEditorImport = import.meta.env.VITE_WORKSPACE_STANDALONE ? null : import('./WgslEditor')
+const WgslEditor = wgslEditorImport ? lazy(() => wgslEditorImport) : null
 
 class ShaderEditorBoundary extends Component<{ children: ReactNode; onError: () => void }> {
   state = { failed: false }
@@ -48,10 +74,21 @@ const formatPoint = ({ latitude, longitude }: Point) =>
 
 const vimPreference = 'earth-connect-wgsl-vim'
 function readVim() {
-  try { return localStorage.getItem(vimPreference) === 'true' } catch { return false }
+  try {
+    return localStorage.getItem(vimPreference) === 'true'
+  } catch {
+    return false
+  }
 }
 
-function PointPicker({ body, point, onInsert, onCopy, actions, onActions }: {
+function PointPicker({
+  body,
+  point,
+  onInsert,
+  onCopy,
+  actions,
+  onActions,
+}: {
   body: BodyId
   point?: Point
   onInsert?: (text: string) => void
@@ -92,7 +129,7 @@ function PointPicker({ body, point, onInsert, onCopy, actions, onActions }: {
     if (kind === 'sample') {
       setCopyStatus('Sampling point…')
       try {
-        ({ code, partial } = await onCopy(reference, controller.signal))
+        ;({ code, partial } = await onCopy(reference, controller.signal))
       } catch (error) {
         if (!controller.signal.aborted) setCopyStatus(error instanceof Error ? error.message : String(error))
         return
@@ -101,11 +138,16 @@ function PointPicker({ body, point, onInsert, onCopy, actions, onActions }: {
     if (controller.signal.aborted) return
     try {
       await navigator.clipboard.writeText(code)
-      if (!controller.signal.aborted) setCopyStatus(partial ? 'Copied available values. Coverage is partial.' : 'Copied.')
+      if (!controller.signal.aborted)
+        setCopyStatus(partial ? 'Copied available values. Coverage is partial.' : 'Copied.')
     } catch {
       if (controller.signal.aborted) return
       setCopyFallback(code)
-      setCopyStatus(partial ? 'Copy the available values below. Coverage is partial.' : 'Clipboard unavailable. Copy the text below.')
+      setCopyStatus(
+        partial
+          ? 'Copy the available values below. Coverage is partial.'
+          : 'Clipboard unavailable. Copy the text below.',
+      )
     }
   }
 
@@ -124,55 +166,144 @@ function PointPicker({ body, point, onInsert, onCopy, actions, onActions }: {
   if (!point) return <span>Pick a point on {worldName[body]}.</span>
   const text = `${worldName[body]} · ${formatPoint(point)}`
 
-  return <div className="sky-point-picker">
-    <button type="button" title="Copy coordinates" aria-label={`Copy coordinates for ${text}`}
-      onClick={() => void copy('coordinates')} onContextMenu={openAtButton}>
-      {text}
-    </button>
-    <button type="button" title="Point actions" aria-label={`${worldName[body]} point actions`}
-      aria-haspopup="menu" aria-expanded={actions !== null} aria-controls={menuId} onClick={openAtButton}>⋯</button>
-    <div id={menuId} ref={menu} popover="auto" className="sky-point-menu" role="menu" aria-label="Point actions"
-      onToggle={event => {
-        if ((event.nativeEvent as ToggleEvent).newState === 'closed') onActions(null)
-      }}
-      onKeyDown={event => {
-        if (event.key === 'Escape') {
+  return (
+    <div className="sky-point-picker">
+      <button
+        type="button"
+        title="Copy coordinates"
+        aria-label={`Copy coordinates for ${text}`}
+        onClick={() => void copy('coordinates')}
+        onContextMenu={openAtButton}
+      >
+        {text}
+      </button>
+      <button
+        type="button"
+        title="Point actions"
+        aria-label={`${worldName[body]} point actions`}
+        aria-haspopup="menu"
+        aria-expanded={actions !== null}
+        aria-controls={menuId}
+        onClick={openAtButton}
+      >
+        ⋯
+      </button>
+      <div
+        id={menuId}
+        ref={menu}
+        popover="auto"
+        className="sky-point-menu"
+        role="menu"
+        aria-label="Point actions"
+        onToggle={event => {
+          if ((event.nativeEvent as ToggleEvent).newState === 'closed') onActions(null)
+        }}
+        onKeyDown={event => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            closeMenu()
+            return
+          }
+          if (event.key === 'Tab') {
+            closeMenu()
+            return
+          }
+          const keys = ['ArrowDown', 'ArrowUp', 'Home', 'End']
+          if (!keys.includes(event.key)) return
           event.preventDefault()
-          closeMenu()
-          return
-        }
-        if (event.key === 'Tab') {
-          closeMenu()
-          return
-        }
-        const keys = ['ArrowDown', 'ArrowUp', 'Home', 'End']
-        if (!keys.includes(event.key)) return
-        event.preventDefault()
-        const items = Array.from(event.currentTarget.querySelectorAll('button'))
-        const current = items.findIndex(item => item === document.activeElement)
-        const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
-          : (current + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
-        items[next]?.focus()
-      }}>
-      <button type="button" role="menuitem" tabIndex={-1} onClick={() => { closeMenu(); void copy('expression') }}>Copy as WGSL expression</button>
-      {onInsert && <button type="button" role="menuitem" tabIndex={-1} onClick={() => { closeMenu(false); onInsert(formatPointCall({ body, ...point })) }}>
-        Insert WGSL expression
-      </button>}
-      <button type="button" role="menuitem" tabIndex={-1} onClick={() => { closeMenu(); void copy('sample') }}>Copy sampled WGSL values</button>
+          const items = Array.from(event.currentTarget.querySelectorAll('button'))
+          const current = items.findIndex(item => item === document.activeElement)
+          const next =
+            event.key === 'Home'
+              ? 0
+              : event.key === 'End'
+                ? items.length - 1
+                : (current + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
+          items[next]?.focus()
+        }}
+      >
+        <button
+          type="button"
+          role="menuitem"
+          tabIndex={-1}
+          onClick={() => {
+            closeMenu()
+            void copy('expression')
+          }}
+        >
+          Copy as WGSL expression
+        </button>
+        {onInsert && (
+          <button
+            type="button"
+            role="menuitem"
+            tabIndex={-1}
+            onClick={() => {
+              closeMenu(false)
+              onInsert(formatPointCall({ body, ...point }))
+            }}
+          >
+            Insert WGSL expression
+          </button>
+        )}
+        <button
+          type="button"
+          role="menuitem"
+          tabIndex={-1}
+          onClick={() => {
+            closeMenu()
+            void copy('sample')
+          }}
+        >
+          Copy sampled WGSL values
+        </button>
+      </div>
+      {copyStatus && (
+        <span className="sky-point-feedback" role="status">
+          {copyStatus}
+        </span>
+      )}
+      {copyFallback && (
+        <div className="sky-point-fallback">
+          <textarea
+            ref={fallback}
+            readOnly
+            aria-label="Text to copy"
+            value={copyFallback}
+            onFocus={event => event.target.select()}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setCopyFallback('')
+              setCopyStatus('')
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
     </div>
-    {copyStatus && <span className="sky-point-feedback" role="status">{copyStatus}</span>}
-    {copyFallback && <div className="sky-point-fallback">
-      <textarea ref={fallback} readOnly aria-label="Text to copy" value={copyFallback} onFocus={event => event.target.select()} />
-      <button type="button" onClick={() => { setCopyFallback(''); setCopyStatus('') }}>Dismiss</button>
-    </div>}
-  </div>
+  )
 }
 
 type SceneRun = { id: number; source: string }
 type SceneShader = ReturnType<typeof assembleShaderProject>
 const introShader = assembleShaderProject([helloWorldExample])
 
-function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onDiagnostics, onInsert, footer, onReady, preloadWorld = true, initialView }: {
+function SkyScene({
+  assets,
+  resources,
+  fileId,
+  assembled,
+  run,
+  onDiagnostics,
+  onInsert,
+  footer,
+  onReady,
+  preloadWorld = true,
+  initialView,
+}: {
   onReady: (computed: boolean) => void
   preloadWorld?: boolean
   initialView?: { latitude: number; longitude: number }
@@ -181,7 +312,6 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
   resources?: EarthWorkspaceResources
   fileId?: string
   assembled?: SceneShader
-  snapshotOnly?: boolean
   run?: SceneRun
   onDiagnostics?: (diagnostics: WgslDiagnostic[] | undefined) => void
   onInsert?: (text: string) => void
@@ -193,17 +323,15 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
   const [points, setPoints] = useState<Partial<Record<BodyId, Point>>>({})
   const engine = useEarthWorkspace(canvas, assets, pickPoint, resources, preloadWorld, initialView)
   const pendingPreview = useRef<number>(undefined)
-  const previousProgram = useRef<{ source?: string; snapshotOnly?: boolean }>(undefined)
+  const previousProgram = useRef<{ source?: string }>(undefined)
   const previousRun = useRef<number | undefined>(undefined)
   const queuedProgram = useRef<{ source: string; delay: number }>(undefined)
   const diagnostics = engine.shaderDiagnostics
   const failed = engine.shaderSource === assembled?.source && diagnostics.find(item => item.severity === 'error')
   const { runShader, cancelShader } = engine
-  const needsComputedScore = assembled !== undefined && (!snapshotOnly || run !== undefined)
   const computed = engine.frameSource === 'computed' && engine.shaderActive
-  const populated = needsComputedScore
-    ? computed || (engine.frameSource === 'snapshot' && failed)
-    : engine.frameSource === 'snapshot'
+  const populated =
+    assembled !== undefined ? computed || (Boolean(engine.frameSource) && Boolean(failed)) : Boolean(engine.frameSource)
   const dataSettled = !preloadWorld || engine.worldSettled
   useEffect(() => {
     if ((populated && dataSettled) || engine.surfaceFailed) onReady(computed)
@@ -214,10 +342,12 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
       onDiagnostics?.(undefined)
       return
     }
-    onDiagnostics?.(diagnostics.map(diagnostic => {
-      const location = findShaderLocation(assembled.segments, diagnostic.line)
-      return { ...diagnostic, fileId: location?.fileId ?? fileId, line: location?.line ?? diagnostic.line }
-    }))
+    onDiagnostics?.(
+      diagnostics.map(diagnostic => {
+        const location = findShaderLocation(assembled.segments, diagnostic.line)
+        return { ...diagnostic, fileId: location?.fileId ?? fileId, line: location?.line ?? diagnostic.line }
+      }),
+    )
   }, [engine.shaderSource, assembled, diagnostics, fileId, onDiagnostics])
 
   const sourceCode = assembled?.source
@@ -226,11 +356,12 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
     const previous = previousProgram.current
     if (forced || previous?.source !== sourceCode) {
       cancelShader()
-      previousProgram.current = { source: sourceCode, snapshotOnly }
+      previousProgram.current = { source: sourceCode }
       previousRun.current = run?.id
-      queuedProgram.current = forced ? { source: run.source, delay: 0 } :
-        sourceCode !== undefined && !(snapshotOnly && (!previous || previous.snapshotOnly))
-          ? { source: sourceCode, delay: previous ? 550 : 0 }
+      queuedProgram.current = forced
+        ? { source: run.source, delay: 0 }
+        : sourceCode !== undefined
+          ? { source: sourceCode, delay: previous ? 75 : 0 }
           : undefined
     }
     const pending = queuedProgram.current
@@ -240,7 +371,7 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
       runShader(pending.source)
     }, pending.delay)
     return () => window.clearTimeout(pendingPreview.current)
-  }, [sourceCode, snapshotOnly, run, runShader, cancelShader])
+  }, [sourceCode, run, runShader, cancelShader])
 
   function project(next: Projection) {
     setProjection(next)
@@ -257,6 +388,7 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
   function stagePoint(source: BodyId, latitude: number, longitude: number) {
     setPoints(previous => ({ ...previous, [source]: { latitude, longitude } }))
     engine.place({ body: source, latitude, longitude })
+    resources?.prefetchPoints([{ body: source, latitude, longitude }])
   }
 
   function pickPoint(source: BodyId, latitude: number, longitude: number) {
@@ -278,133 +410,277 @@ function SkyScene({ assets, resources, fileId, assembled, snapshotOnly, run, onD
   const progress = (engine.busy || (earth && !engine.ready && !engine.error)) && engine.status
   const partial = earth && engine.shaderActive && engine.shaderPartial
   const scoreLabel = engine.shaderActive ? 'score' : 'similarity'
-  const inspectionScore = inspection?.score == null ? (engine.shaderActive ? 'Score unavailable' : 'Similarity unavailable')
-    : `${(100 * inspection.score).toFixed(1)}% ${scoreLabel}`
-  const inspectionElevation = inspection?.elevation == null ? undefined : `${Math.round(inspection.elevation).toLocaleString()} m`
+  const inspectionScore =
+    inspection?.score == null
+      ? engine.shaderActive
+        ? 'Score unavailable'
+        : 'Similarity unavailable'
+      : `${(100 * inspection.score).toFixed(1)}% ${scoreLabel}`
+  const inspectionElevation =
+    inspection?.elevation == null ? undefined : `${Math.round(inspection.elevation).toLocaleString()} m`
   const point = source ? points[source] : undefined
-  const pointPicker = source && <PointPicker key={`${source}/${point?.latitude}/${point?.longitude}`} body={source} point={point} onInsert={onInsert}
-    onCopy={engine.freezePoint} actions={pointActions} onActions={setPointActions} />
+  const pointPicker = source && (
+    <PointPicker
+      key={`${source}/${point?.latitude}/${point?.longitude}`}
+      body={source}
+      point={point}
+      onInsert={onInsert}
+      onCopy={engine.freezePoint}
+      actions={pointActions}
+      onActions={setPointActions}
+    />
+  )
 
   return (
-    <div className="sky-map" data-focus={body} data-projection={projection} data-preview-file={fileId} data-with-footer={footer || undefined}>
+    <div
+      className="sky-map"
+      data-focus={body}
+      data-projection={projection}
+      data-preview-file={fileId}
+      data-with-footer={footer || undefined}
+    >
       <div className="sky-preview-viewport">
-        <canvas ref={canvas} className="sky-canvas" onContextMenu={openSurfaceActions} aria-label="Interactive solar system. Use arrow keys to move and plus or minus to zoom." tabIndex={0} />
+        <canvas
+          ref={canvas}
+          className="sky-canvas"
+          onContextMenu={openSurfaceActions}
+          aria-label="Interactive solar system. Use arrow keys to move and plus or minus to zoom."
+          tabIndex={0}
+        />
         <div className="sky-map-overlay">
           <nav className="sky-nav" aria-label="Center camera">
             {worlds.map(world => (
-              <button type="button" key={world} aria-label={worldName[world]} title={worldName[world]}
-                aria-pressed={body === world} onClick={() => focus(world)}>
+              <button
+                type="button"
+                key={world}
+                aria-label={worldName[world]}
+                title={worldName[world]}
+                aria-pressed={body === world}
+                onClick={() => focus(world)}
+              >
                 <img src={worldImage[world]} alt="" width="40" height="40" />
               </button>
             ))}
           </nav>
-          {!footer && <section className="sky-status" aria-label="Map status">
-            <div className="sky-status-live" role="status">
-              {partial && <p className="sky-progress">Planetary point coverage is partial.</p>}
-              {progress && <p className="sky-progress">{progress}</p>}
-            </div>
-            {failed && !engine.error && <div className="sky-error"><p role="alert">{failed.message}</p></div>}
-            {engine.error && <div className="sky-error"><p role="alert">{engine.error}</p><button type="button" onClick={engine.retry}>Retry</button></div>}
-          </section>}
+          {!footer && (
+            <section className="sky-status" aria-label="Map status">
+              <div className="sky-status-live" role="status">
+                {partial && <p className="sky-progress">Planetary point coverage is partial.</p>}
+                {progress && <p className="sky-progress">{progress}</p>}
+              </div>
+              {failed && !engine.error && (
+                <div className="sky-error">
+                  <p role="alert">{failed.message}</p>
+                </div>
+              )}
+              {engine.error && (
+                <div className="sky-error">
+                  <p role="alert">{engine.error}</p>
+                  <button type="button" onClick={engine.retry}>
+                    Retry
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
         </div>
 
-        {!footer && earth && engine.ready && <div className="sky-earth-tools">
-          <div className="sky-projection sky-glass" role="group" aria-label="Earth projection">
-            <button type="button" aria-pressed={projection === 'globe'} onClick={() => project('globe')}>Globe</button>
-            <button type="button" aria-pressed={projection === 'plane'} onClick={() => project('plane')}>Flat map</button>
+        {!footer && earth && engine.ready && (
+          <div className="sky-earth-tools">
+            <div className="sky-projection sky-glass" role="group" aria-label="Earth projection">
+              <button type="button" aria-pressed={projection === 'globe'} onClick={() => project('globe')}>
+                Globe
+              </button>
+              <button type="button" aria-pressed={projection === 'plane'} onClick={() => project('plane')}>
+                Flat map
+              </button>
+            </div>
+            {engine.mapName && (
+              <aside
+                className="sky-legend sky-glass"
+                aria-label={engine.shaderActive ? 'Relative score' : 'Relative similarity'}
+              >
+                <strong>{engine.shaderActive ? 'Relative score' : 'Relative similarity'}</strong>
+                <i aria-hidden="true" />
+                <div>
+                  <span>Lower</span>
+                  <span>Higher</span>
+                </div>
+              </aside>
+            )}
           </div>
-          {engine.mapName && <aside className="sky-legend sky-glass" aria-label={engine.shaderActive ? 'Relative score' : 'Relative similarity'}>
-            <strong>{engine.shaderActive ? 'Relative score' : 'Relative similarity'}</strong><i aria-hidden="true" />
-            <div><span>Lower</span><span>Higher</span></div>
-          </aside>}
-        </div>}
-        {!footer && earth && inspection && <div className="sky-inspection sky-glass">
-          <strong>{formatPoint(inspection)}</strong>
-          <div><span>{inspectionScore}</span>{inspectionElevation && <span>{inspectionElevation}</span>}</div>
-        </div>}
+        )}
+        {!footer && earth && inspection && (
+          <div className="sky-inspection sky-glass">
+            <strong>{formatPoint(inspection)}</strong>
+            <div>
+              <span>{inspectionScore}</span>
+              {inspectionElevation && <span>{inspectionElevation}</span>}
+            </div>
+          </div>
+        )}
         {!footer && source && <div className="sky-standalone-point-picker">{pointPicker}</div>}
       </div>
 
-      {footer && <footer className="sky-preview-footer" aria-label="Preview controls and status">
-        {pointPicker}
-        {earth && engine.ready && <button type="button"
-          title={projection === 'globe' ? 'Switch to flat map' : 'Switch to globe'}
-          onClick={() => project(projection === 'globe' ? 'plane' : 'globe')}>
-          {projection === 'globe' ? 'Globe' : 'Flat map'}
-        </button>}
-        {earth && engine.ready && engine.mapName && <div className="sky-preview-legend">
-          <span>{engine.shaderActive ? 'Relative score' : 'Relative similarity'}</span>
-          <span className="sky-preview-ramp" role="img" aria-label="Lower scores in dark purple to higher scores in pale yellow">
-            <span aria-hidden="true">Lower</span><i /><span aria-hidden="true">Higher</span>
-          </span>
-        </div>}
-        {earth && inspection && <div className="sky-preview-reading">
-            <span>{formatPoint(inspection)}</span>
-            <span>{inspectionScore}</span>
-            {inspectionElevation && <span title="Elevation">{inspectionElevation}</span>}
-        </div>}
-        {progress && <span role="status">{progress}</span>}
-        {partial && <span className="sky-preview-warning" role="status">Planetary point coverage is partial.</span>}
-        {(engine.error || failed) && <div className="sky-preview-error">
-          <span role="alert">{engine.error || (failed && failed.message)}</span>
-          {engine.error && <button type="button" onClick={engine.retry}>Retry</button>}
-        </div>}
-      </footer>}
+      {footer && (
+        <footer className="sky-preview-footer" aria-label="Preview controls and status">
+          {pointPicker}
+          {earth && engine.ready && (
+            <button
+              type="button"
+              title={projection === 'globe' ? 'Switch to flat map' : 'Switch to globe'}
+              onClick={() => project(projection === 'globe' ? 'plane' : 'globe')}
+            >
+              {projection === 'globe' ? 'Globe' : 'Flat map'}
+            </button>
+          )}
+          {earth && engine.ready && engine.mapName && (
+            <div className="sky-preview-legend">
+              <span>{engine.shaderActive ? 'Relative score' : 'Relative similarity'}</span>
+              <span
+                className="sky-preview-ramp"
+                role="img"
+                aria-label="Lower scores in dark purple to higher scores in pale yellow"
+              >
+                <span aria-hidden="true">Lower</span>
+                <i />
+                <span aria-hidden="true">Higher</span>
+              </span>
+            </div>
+          )}
+          {earth && inspection && (
+            <div className="sky-preview-reading">
+              <span>{formatPoint(inspection)}</span>
+              <span>{inspectionScore}</span>
+              {inspectionElevation && <span title="Elevation">{inspectionElevation}</span>}
+            </div>
+          )}
+          {progress && <span role="status">{progress}</span>}
+          {partial && (
+            <span className="sky-preview-warning" role="status">
+              Planetary point coverage is partial.
+            </span>
+          )}
+          {(engine.error || failed) && (
+            <div className="sky-preview-error">
+              <span role="alert">{engine.error || (failed && failed.message)}</span>
+              {engine.error && (
+                <button type="button" onClick={engine.retry}>
+                  Retry
+                </button>
+              )}
+            </div>
+          )}
+        </footer>
+      )}
     </div>
   )
-
 }
 
-function FilePreview({ assets, file, files, snapshotOnly, resources, run, onDiagnostics, onInsert, footer, onPreviewReady }: {
+function FilePreview({
+  assets,
+  file,
+  files,
+  resources,
+  run,
+  onDiagnostics,
+  onInsert,
+  footer,
+  onPreviewReady,
+}: {
   onPreviewReady: (fileId: string) => void
   footer?: boolean
   assets: WorkspaceAssets
   file: string
   files: ReturnType<typeof resolveShaderFiles>
-  snapshotOnly?: boolean
   resources: EarthWorkspaceResources
   run?: SceneRun
   onDiagnostics: (fileId: string, diagnostics: WgslDiagnostic[] | undefined) => void
   onInsert: (fileId: string, text: string) => void
 }) {
   const assembled = useMemo(() => assembleShaderProject(selectShaderModule(files, file)), [files, file])
-  const diagnostics = useCallback((value: WgslDiagnostic[] | undefined) => onDiagnostics(file, value), [file, onDiagnostics])
+  const diagnostics = useCallback(
+    (value: WgslDiagnostic[] | undefined) => onDiagnostics(file, value),
+    [file, onDiagnostics],
+  )
   const insert = useCallback((text: string) => onInsert(file, text), [file, onInsert])
   const onReady = useCallback(() => onPreviewReady(file), [file, onPreviewReady])
-  return <SkyScene assets={assets} onReady={onReady} fileId={file} footer={footer} assembled={assembled} snapshotOnly={snapshotOnly} resources={resources}
-    run={run} onDiagnostics={diagnostics} onInsert={insert} initialView={file === helloWorldExample.id ? helloWorldInitialView : undefined} />
+  return (
+    <SkyScene
+      assets={assets}
+      onReady={onReady}
+      fileId={file}
+      footer={footer}
+      assembled={assembled}
+      resources={resources}
+      run={run}
+      onDiagnostics={diagnostics}
+      onInsert={insert}
+      initialView={file === helloWorldExample.id ? helloWorldInitialView : undefined}
+    />
+  )
 }
 
-type WorkspaceProps = { assets: WorkspaceAssets; onReady: () => void }
-
-const standaloneIntroKey = 'earth-connect-standalone-intro-seen'
+type WorkspaceProps = {
+  assets: WorkspaceAssets
+  resources?: EarthWorkspaceResources
+  initialProject?: ShaderProject
+  onReady: () => void
+}
 
 function StandaloneSkyWorkspace({ assets, onReady }: WorkspaceProps) {
-  const [showIntro] = useState(() => {
-    try { return localStorage.getItem(standaloneIntroKey) !== 'true' } catch { return true }
-  })
-  const sceneReady = useCallback((computed: boolean) => {
-    if (showIntro && computed) {
-      try { localStorage.setItem(standaloneIntroKey, 'true') } catch { /* Storage may be unavailable. */ }
-    }
+  const sceneReady = useCallback(() => {
     onReady()
-  }, [showIntro, onReady])
-  return <main className="shared-sky">
-    <SkyScene assets={assets} assembled={showIntro ? introShader : undefined} preloadWorld={showIntro} onReady={sceneReady}
-      initialView={showIntro ? helloWorldInitialView : undefined} />
-  </main>
+  }, [onReady])
+  return (
+    <main className="shared-sky">
+      <SkyScene assets={assets} assembled={introShader} onReady={sceneReady} initialView={helloWorldInitialView} />
+    </main>
+  )
 }
 
-export default function SharedSkyWorkspace({ assets, onReady }: WorkspaceProps) {
+export default function SharedSkyWorkspace({ assets, resources, initialProject, onReady }: WorkspaceProps) {
   if (!WgslEditor) return <StandaloneSkyWorkspace assets={assets} onReady={onReady} />
-  return <ShaderWorkspace assets={assets} onReady={onReady} />
+  return <ShaderWorkspace assets={assets} resources={resources} initialProject={initialProject} onReady={onReady} />
 }
 
-function ShaderWorkspace({ assets, onReady }: WorkspaceProps) {
-  const [resources] = useState(createEarthWorkspaceResources)
+function initialPreviewFileId(files: readonly { id: string }[], activeFileId: string): string | undefined {
+  const valid = new Set(files.map(file => file.id))
+  try {
+    const saved = JSON.parse(localStorage.getItem('earth-connect-wgsl-editor-layout') ?? 'null') as {
+      groups?: {
+        active?: string | { previewFileId?: string } | null
+        tabs?: (string | { previewFileId?: string } | null)[]
+      }[]
+    } | null
+    if (saved && Array.isArray(saved.groups)) {
+      for (const group of saved.groups) {
+        if (
+          group?.active &&
+          typeof group.active === 'object' &&
+          typeof group.active.previewFileId === 'string' &&
+          valid.has(group.active.previewFileId)
+        ) {
+          return group.active.previewFileId
+        }
+        if (group?.active === null && valid.has(activeFileId)) return activeFileId
+      }
+      // Saved layout explicitly exists with no active preview tab; don't prewarm one.
+      return undefined
+    }
+  } catch {
+    /* Storage may be unavailable. */
+  }
+  return valid.has(activeFileId) ? activeFileId : undefined
+}
+
+function ShaderWorkspace({ assets, resources: sharedResources, initialProject, onReady }: WorkspaceProps) {
+  const [resources] = useState(() => sharedResources ?? createEarthWorkspaceResources())
   const [workbenchFailed, setWorkbenchFailed] = useState(false)
-  const [projectFiles, setProjectFiles] = useState(readShaderProject)
+  const [projectFiles, setProjectFiles] = useState<ShaderProject>(() => initialProject ?? defaultShaderProject())
   const currentProject = useRef(projectFiles)
+  const projectLoaded = useRef(initialProject !== undefined)
+  const persistedProject = useRef(projectFiles)
   const [vim, setVim] = useState(readVim)
   const [insertion, setInsertion] = useState<{ id: number; fileId: string; text: string }>()
   const sequence = useRef(0)
@@ -415,43 +691,157 @@ function ShaderWorkspace({ assets, onReady }: WorkspaceProps) {
   const [readyPreviews, setReadyPreviews] = useState<ReadonlySet<string>>(() => new Set())
   const [layoutReady, setLayoutReady] = useState(false)
   const [fallbackReady, setFallbackReady] = useState(false)
+  const [analyzerEnabled, setAnalyzerEnabled] = useState(false)
+  const [analyzerReady, setAnalyzerReady] = useState(false)
+  const onAnalyzerReady = useCallback(() => setAnalyzerReady(true), [])
   const [shaderRuns, setShaderRuns] = useState<Record<string, SceneRun>>({})
   const [sceneDiagnostics, setSceneDiagnostics] = useState<Record<string, WgslDiagnostic[]>>({})
+  const prewarmParking = useRef<HTMLDivElement>(null)
+  const prewarmedHosts = useRef(new Map<string, HTMLElement>())
+  const [initialPreview] = useState(() => {
+    startStartupSpan('monaco')
+    return initialPreviewFileId(projectFiles.files, projectFiles.activeFileId)
+  })
+
+  // Pre-mount the initial preview canvas into an offscreen parking container
+  // immediately so SurfaceRenderer, SolarScene, and the first WGSL score run in
+  // parallel with Monaco workbench initialization, then move seamlessly into
+  // the Monaco preview pane once it mounts.
+  useLayoutEffect(() => {
+    const parking = prewarmParking.current
+    if (!initialPreview || !parking) return
+    const host = document.createElement('div')
+    host.className = 'sky-preview-host'
+    parking.append(host)
+    const map = prewarmedHosts.current
+    map.set(initialPreview, host)
+    setHosts(previous => (previous.has(initialPreview) ? previous : new Map(previous).set(initialPreview, host)))
+    setOpenPreviews(previous => (previous.includes(initialPreview) ? previous : [...previous, initialPreview]))
+    setStartedPreviews(previous => (previous.has(initialPreview) ? previous : new Set([...previous, initialPreview])))
+    return () => {
+      if (map.get(initialPreview) === host) {
+        map.delete(initialPreview)
+        host.remove()
+      }
+    }
+  }, [initialPreview])
+
+  const takePrewarmedHost = useCallback((fileId: string) => {
+    const host = prewarmedHosts.current.get(fileId)
+    if (host) prewarmedHosts.current.delete(fileId)
+    return host
+  }, [])
 
   const shaderFiles = useMemo(() => resolveShaderFiles(projectFiles, DEFAULT_SCORE_SHADER), [projectFiles])
   const diagnostics = useMemo(() => Object.values(sceneDiagnostics).flat(), [sceneDiagnostics])
-  const sampleFile = projectFiles.files.find(file => file.id === 'score')!
   const activeFile = projectFiles.activeFileId
   const onVisiblePreviews = useCallback((ids: readonly string[]) => {
     setVisiblePreviews(ids)
     setStartedPreviews(previous => new Set([...previous, ...ids]))
   }, [])
   const onPreviewReady = useCallback((id: string) => {
-    setReadyPreviews(previous => previous.has(id) ? previous : new Set([...previous, id]))
+    setReadyPreviews(previous => (previous.has(id) ? previous : new Set([...previous, id])))
   }, [])
-  const onLayoutReady = useCallback(() => setLayoutReady(true), [])
+  const onLayoutReady = useCallback(() => {
+    // Discard any prewarmed preview host that the restored layout didn't claim.
+    if (prewarmedHosts.current.size) {
+      const unclaimed = [...prewarmedHosts.current.entries()]
+      prewarmedHosts.current.clear()
+      for (const [, host] of unclaimed) host.remove()
+      const ids = new Set(unclaimed.map(([id]) => id))
+      setHosts(previous => {
+        const next = new Map(previous)
+        for (const id of ids) next.delete(id)
+        return next
+      })
+      setOpenPreviews(previous => previous.filter(id => !ids.has(id)))
+    }
+    endStartupSpan('monaco')
+    setLayoutReady(true)
+  }, [])
   const onFallbackReady = useCallback(() => setFallbackReady(true), [])
   useEffect(() => {
     if (workbenchFailed ? fallbackReady : layoutReady && visiblePreviews.every(id => readyPreviews.has(id))) {
       onReady()
+      let frame2 = 0
+      const frame1 = requestAnimationFrame(() => {
+        frame2 = requestAnimationFrame(() => setAnalyzerEnabled(true))
+      })
+      return () => {
+        cancelAnimationFrame(frame1)
+        cancelAnimationFrame(frame2)
+      }
     }
   }, [workbenchFailed, fallbackReady, layoutReady, visiblePreviews, readyPreviews, onReady])
-  useEffect(() => { saveShaderProject(projectFiles) }, [projectFiles])
   useEffect(() => {
-    try { localStorage.setItem(vimPreference, String(vim)) } catch { /* Storage may be unavailable. */ }
+    if (!analyzerReady) return
+    const controller = new AbortController()
+    const { signal } = controller
+    const priority = new Set<string>([activeFile, ...openPreviews])
+    const ordered = [
+      ...shaderFiles.filter(file => priority.has(file.id)),
+      ...shaderFiles.filter(file => !file.closed && !priority.has(file.id)),
+    ]
+    void import('./planetaryShaderAnalysis.ts')
+      .then(async ({ analyzePlanetaryShader, mentionsPlanetaryName }) => {
+        for (const file of ordered) {
+          if (signal.aborted) return
+          const assembled = assembleShaderProject(selectShaderModule(shaderFiles, file.id)).source
+          if (mentionsPlanetaryName(assembled) < 0) continue
+          try {
+            const calls = await analyzePlanetaryShader(assembled, signal)
+            if (signal.aborted) return
+            if (calls.length) resources.prefetchPoints(calls)
+          } catch {
+            // Ignore incomplete edits or analysis errors during background prefetch.
+          }
+        }
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [shaderFiles, activeFile, openPreviews, analyzerReady, resources])
+  useEffect(() => {
+    if (projectLoaded.current) return
+    let cancelled = false
+    void readShaderProject().then(loaded => {
+      if (cancelled || projectLoaded.current) return
+      projectLoaded.current = true
+      persistedProject.current = loaded
+      currentProject.current = loaded
+      setProjectFiles(loaded)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  useEffect(() => {
+    if (!projectLoaded.current || projectFiles === persistedProject.current) return
+    persistedProject.current = projectFiles
+    void saveShaderProject(projectFiles)
+  }, [projectFiles])
+  useEffect(() => {
+    try {
+      localStorage.setItem(vimPreference, String(vim))
+    } catch {
+      /* Storage may be unavailable. */
+    }
   }, [vim])
 
   function updateProject(next: ShaderProject) {
+    projectLoaded.current = true
     currentProject.current = next
     setProjectFiles(next)
   }
 
   function changeShader(id: string, source: string) {
     const project = currentProject.current
-    const usesDefault = project.files.find(file => file.id === id)?.kind !== 'shader' && shaderModuleId(id, project.files) === id && source === defaultShaderSource(id, DEFAULT_SCORE_SHADER)
+    const usesDefault =
+      project.files.find(file => file.id === id)?.kind !== 'shader' &&
+      shaderModuleId(id, project.files) === id &&
+      source === defaultShaderSource(id, DEFAULT_SCORE_SHADER)
     updateProject({
       ...project,
-      files: project.files.map(file => file.id === id ? { ...file, source: usesDefault ? null : source } : file),
+      files: project.files.map(file => (file.id === id ? { ...file, source: usesDefault ? null : source } : file)),
     })
   }
 
@@ -461,7 +851,7 @@ function ShaderWorkspace({ assets, onReady }: WorkspaceProps) {
     if (!file || (id === project.activeFileId && !file.closed)) return
     updateProject({
       activeFileId: id,
-      files: project.files.map(file => file.id === id && file.closed ? { ...file, closed: false } : file),
+      files: project.files.map(file => (file.id === id && file.closed ? { ...file, closed: false } : file)),
     })
   }
 
@@ -482,14 +872,14 @@ function ShaderWorkspace({ assets, onReady }: WorkspaceProps) {
     const replacement = visible[index + 1] ?? visible[index - 1]
     updateProject({
       activeFileId: project.activeFileId === id && replacement ? replacement.id : project.activeFileId,
-      files: project.files.map(file => file.id === id ? { ...file, closed: true } : file),
+      files: project.files.map(file => (file.id === id ? { ...file, closed: true } : file)),
     })
     return true
   }
 
   function renameFile(id: string, name: string) {
     const project = currentProject.current
-    updateProject({ ...project, files: project.files.map(file => file.id === id ? { ...file, name } : file) })
+    updateProject({ ...project, files: project.files.map(file => (file.id === id ? { ...file, name } : file)) })
   }
 
   function previewShader(fileId: string, source: string) {
@@ -537,38 +927,81 @@ function ShaderWorkspace({ assets, onReady }: WorkspaceProps) {
   }, [])
 
   function renderPreview(fileId: string) {
-    const snapshotOnly = fileId === 'score' && sampleFile.source === null &&
-      selectShaderModule(shaderFiles, 'score').every(file => file.id === 'score' || !file.source.trim())
-    return <FilePreview key={fileId} assets={assets} file={fileId} onPreviewReady={workbenchFailed ? onFallbackReady : onPreviewReady} footer={!workbenchFailed} files={shaderFiles} snapshotOnly={snapshotOnly} resources={resources}
-      run={shaderRuns[fileId]}
-      onDiagnostics={updateDiagnostics} onInsert={insertPoint} />
+    return (
+      <FilePreview
+        key={fileId}
+        assets={assets}
+        file={fileId}
+        onPreviewReady={workbenchFailed ? onFallbackReady : onPreviewReady}
+        footer={!workbenchFailed}
+        files={shaderFiles}
+        resources={resources}
+        run={shaderRuns[fileId]}
+        onDiagnostics={updateDiagnostics}
+        onInsert={insertPoint}
+      />
+    )
   }
 
   return (
     <main className="shared-sky" data-with-editor="" data-workbench-failed={workbenchFailed ? '' : undefined}>
-      {WgslEditor && <section className="sky-workbench" aria-label="Earth score query">
-        <div className="sky-wgsl-panel">
-          <ShaderEditorBoundary onError={() => setWorkbenchFailed(true)}>
-            <Suspense fallback={null}>
-              <WgslEditor onPreviewHost={onPreviewHost} onPreviewOpenChange={setOpenPreviews} onVisiblePreviews={onVisiblePreviews}
-                onLayoutReady={onLayoutReady} onStartError={() => setWorkbenchFailed(true)}
-                files={shaderFiles} activeFileId={activeFile} onChange={changeShader} diagnostics={diagnostics}
-                onActiveFileChange={showFile} onCloseFile={closeFile}
-                onNewFile={addFile} onRenameFile={renameFile} onReopenFile={showFile}
-                onToggleVim={() => setVim(previous => !previous)}
-                prelude={SCORE_SHADER_PRELUDE} label="Earth score WGSL" vim={vim}
-                onRun={previewShader}
-                insertion={insertion}
-                onInserted={id => setInsertion(previous => previous?.id === id ? undefined : previous)} />
-            </Suspense>
-          </ShaderEditorBoundary>
-        </div>
-      </section>}
-      {workbenchFailed ? renderPreview(activeFile) : openPreviews.map(fileId => {
-        const host = hosts.get(fileId)
-        if (host && startedPreviews.has(fileId)) return createPortal(renderPreview(fileId), host, fileId)
-        return null
-      })}
+      <div
+        ref={prewarmParking}
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          width: '60vw',
+          height: '100vh',
+          visibility: 'hidden',
+          pointerEvents: 'none',
+          zIndex: -1,
+        }}
+      />
+      {WgslEditor && (
+        <section className="sky-workbench" aria-label="Earth score query">
+          <div className="sky-wgsl-panel">
+            <ShaderEditorBoundary onError={() => setWorkbenchFailed(true)}>
+              <Suspense fallback={null}>
+                <WgslEditor
+                  onPreviewHost={onPreviewHost}
+                  onPreviewOpenChange={setOpenPreviews}
+                  onVisiblePreviews={onVisiblePreviews}
+                  takePrewarmedHost={takePrewarmedHost}
+                  analyzerEnabled={analyzerEnabled}
+                  onAnalyzerReady={onAnalyzerReady}
+                  onLayoutReady={onLayoutReady}
+                  onStartError={() => setWorkbenchFailed(true)}
+                  files={shaderFiles}
+                  activeFileId={activeFile}
+                  onChange={changeShader}
+                  diagnostics={diagnostics}
+                  onActiveFileChange={showFile}
+                  onCloseFile={closeFile}
+                  onNewFile={addFile}
+                  onRenameFile={renameFile}
+                  onReopenFile={showFile}
+                  onToggleVim={() => setVim(previous => !previous)}
+                  prelude={SCORE_SHADER_PRELUDE}
+                  label="Earth score WGSL"
+                  vim={vim}
+                  onRun={previewShader}
+                  insertion={insertion}
+                  onInserted={id => setInsertion(previous => (previous?.id === id ? undefined : previous))}
+                />
+              </Suspense>
+            </ShaderEditorBoundary>
+          </div>
+        </section>
+      )}
+      {workbenchFailed
+        ? renderPreview(activeFile)
+        : openPreviews.map(fileId => {
+            const host = hosts.get(fileId)
+            if (host && startedPreviews.has(fileId)) return createPortal(renderPreview(fileId), host, fileId)
+            return null
+          })}
     </main>
   )
 }

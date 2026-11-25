@@ -2,7 +2,10 @@ import { getService, IContextKeyService, IEditorGroupsService, IQuickInputServic
 import { URI } from '@codingame/monaco-vscode-api/vscode/vs/base/common/uri'
 import { DisposableStore } from '@codingame/monaco-vscode-api/vscode/vs/base/common/lifecycle'
 import { MenuId, MenuRegistry } from '@codingame/monaco-vscode-api/vscode/vs/platform/actions/common/actions'
-import { CommandsRegistry, type ICommandHandler } from '@codingame/monaco-vscode-api/vscode/vs/platform/commands/common/commands'
+import {
+  CommandsRegistry,
+  type ICommandHandler,
+} from '@codingame/monaco-vscode-api/vscode/vs/platform/commands/common/commands'
 import { ContextKeyExpr } from '@codingame/monaco-vscode-api/vscode/vs/platform/contextkey/common/contextkey'
 import type { ShaderFile, ShaderFileKind } from './shaderProject'
 import { getPreviewFileId, shaderPreviewScheme } from './shaderPreviewEditor'
@@ -47,7 +50,14 @@ export async function registerShaderProjectActions(project: ProjectActions) {
   const closedFiles = context.createKey<boolean>(closedFilesKey, false)
   const store = new DisposableStore()
 
-  function register(id: string, title: string, order: number, run: ICommandHandler, when = editorIsWgsl, toggled?: ReturnType<typeof ContextKeyExpr.has>) {
+  function register(
+    id: string,
+    title: string,
+    order: number,
+    run: ICommandHandler,
+    when = editorIsWgsl,
+    toggled?: ReturnType<typeof ContextKeyExpr.has>,
+  ) {
     const command = { id: `earthWgsl.${id}`, title, toggled }
     store.add(CommandsRegistry.registerCommand(command.id, run))
     store.add(MenuRegistry.appendMenuItem(MenuId.EditorTitle, { command, when, group: '2_wgsl', order }))
@@ -57,8 +67,9 @@ export async function registerShaderProjectActions(project: ProjectActions) {
   register('newFile', 'New WGSL Shader', 1, () => project.onNewFile('shader'), editorIsProject)
   register('newHelper', 'New WGSL Helper', 2, () => project.onNewFile('helper'), editorIsProject)
   register('renameFile', 'Rename WGSL File…', 3, async (accessor, resource, commandContext) => {
-    const fileId = getFileId(resourceForAction(accessor.get(IEditorGroupsService), resource, commandContext))
-      ?? project.getActiveFileId()
+    const fileId =
+      getFileId(resourceForAction(accessor.get(IEditorGroupsService), resource, commandContext)) ??
+      project.getActiveFileId()
     const file = project.getFiles().find(file => file.id === fileId)
     if (!file) return
     const value = await quickInput.input({
@@ -76,25 +87,47 @@ export async function registerShaderProjectActions(project: ProjectActions) {
     })
     if (value !== undefined) project.onRenameFile(file.id, wgslFileName(value))
   })
-  register('reopenFile', 'Reopen WGSL File…', 4, async () => {
-    const files = project.getFiles().filter(file => file.closed).map(file => ({ label: file.name, id: file.id }))
-    const selected = await quickInput.pick(files, { title: 'Reopen WGSL File', placeHolder: 'Select a closed file' })
-    if (selected) project.onReopenFile(selected.id)
-  }, ContextKeyExpr.and(editorIsProject, ContextKeyExpr.has(closedFilesKey)))
+  register(
+    'reopenFile',
+    'Reopen WGSL File…',
+    4,
+    async () => {
+      const files = project
+        .getFiles()
+        .filter(file => file.closed)
+        .map(file => ({ label: file.name, id: file.id }))
+      const selected = await quickInput.pick(files, { title: 'Reopen WGSL File', placeHolder: 'Select a closed file' })
+      if (selected) project.onReopenFile(selected.id)
+    },
+    ContextKeyExpr.and(editorIsProject, ContextKeyExpr.has(closedFilesKey)),
+  )
   register('toggleVim', 'Vim Keybindings', 5, () => project.onToggleVim(), editorIsWgsl, ContextKeyExpr.has(vimKey))
   const showPreview = register('showPreview', 'Open Preview to the Side', 6, (accessor, resource, commandContext) => {
     const id = getFileId(resourceForAction(accessor.get(IEditorGroupsService), resource, commandContext))
     if (id) return project.onShowPreview(id)
   })
-  const revealSource = register('revealSource', 'Reveal Shader Source', 6, (accessor, resource, commandContext) => {
-    const id = getPreviewFileId(resourceForAction(accessor.get(IEditorGroupsService), resource, commandContext))
-    if (id) return project.onRevealSource(id)
-  }, editorIsPreview)
+  const revealSource = register(
+    'revealSource',
+    'Reveal Shader Source',
+    6,
+    (accessor, resource, commandContext) => {
+      const id = getPreviewFileId(resourceForAction(accessor.get(IEditorGroupsService), resource, commandContext))
+      if (id) return project.onRevealSource(id)
+    },
+    editorIsPreview,
+  )
   for (const menu of [MenuId.EditorTitleContext, MenuId.CommandPalette]) {
     store.add(MenuRegistry.appendMenuItem(menu, { command: showPreview, when: editorIsWgsl, group: '2_wgsl' }))
     store.add(MenuRegistry.appendMenuItem(menu, { command: revealSource, when: editorIsPreview, group: '2_wgsl' }))
   }
-  store.add(MenuRegistry.appendMenuItem(MenuId.EditorContext, { command: showPreview, when: editorIsWgsl, group: 'earthQuery', order: 4 }))
+  store.add(
+    MenuRegistry.appendMenuItem(MenuId.EditorContext, {
+      command: showPreview,
+      when: editorIsWgsl,
+      group: 'earthQuery',
+      order: 4,
+    }),
+  )
 
   return {
     update(vimEnabled: boolean, hasClosedFiles: boolean) {

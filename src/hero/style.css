@@ -1,25 +1,31 @@
 @font-face {
-  font-family: 'Instrument Serif';
-  src: url('./assets/instrument-serif.woff2') format('woff2');
+  font-family: "Instrument Serif";
+  src: url("./assets/instrument-serif.woff2") format("woff2");
   font-display: swap;
 }
 
 @font-face {
-  font-family: 'DM Sans';
-  src: url('../workspace/fonts/dm-sans.woff2') format('woff2');
+  font-family: "DM Sans";
+  src: url("../workspace/fonts/dm-sans.woff2") format("woff2");
   font-display: swap;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 :root {
   color-scheme: dark;
-  font: 15px 'DM Sans', sans-serif;
+  font:
+    15px "DM Sans",
+    sans-serif;
   color: #f2f1ef;
   background: #0b1323;
 }
 
-body { margin: 0; }
+body {
+  margin: 0;
+}
 
 .hero {
   position: relative;
@@ -45,8 +51,11 @@ body { margin: 0; }
 
 h1 {
   margin: 0 0 1.65rem;
-  font: 400 clamp(4rem, 8.2vw, 10rem)/.94 'Instrument Serif', Georgia, serif;
-  letter-spacing: -.045em;
+  font:
+    400 clamp(4rem, 8.2vw, 10rem) / 0.94 "Instrument Serif",
+    Georgia,
+    serif;
+  letter-spacing: -0.045em;
   color: #faf4e9;
 }
 
@@ -54,12 +63,12 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 1.2rem;
-  padding: .65rem .85rem;
+  padding: 0.65rem 0.85rem;
   color: #edf1fb;
   border: 1px solid #cad4ee5e;
   background: #111a2c3b;
   text-decoration: none;
-  font-size: .78rem;
+  font-size: 0.78rem;
 }
 
 .workspace-link:hover,
@@ -74,27 +83,36 @@ h1 {
   margin: 0;
   color: #c7cada;
   text-align: center;
-  font-size: .8rem;
+  font-size: 0.8rem;
 }
 
-.status[hidden] { display: none; }
+.status[hidden] {
+  display: none;
+}
 
 .scene-credit {
   position: absolute;
-  right: clamp(.85rem, 3vw, 2rem);
-  bottom: .8rem;
+  right: clamp(0.85rem, 3vw, 2rem);
+  bottom: 0.8rem;
   color: #e7ebf1;
-  font-size: .66rem;
+  font-size: 0.66rem;
   text-shadow: 0 1px 5px #080b12;
 }
 
 .scene-credit a {
   color: inherit;
-  text-underline-offset: .18rem;
+  text-underline-offset: 0.18rem;
 }
 
-@media (max-aspect-ratio: 1/1) {
-  .hero { height: max(33rem, 100svh); }
-  .hero-copy { margin: clamp(2.5rem, 10svh, 5.7rem) 0 0 clamp(1.35rem, 6vw, 3rem); }
-  h1 { margin-bottom: 1.15rem; font-size: clamp(3.65rem, 13.5vw, 6.5rem); }
+@media (max-aspect-ratio: 1 / 1) {
+  .hero {
+    height: max(33rem, 100svh);
+  }
+  .hero-copy {
+    margin: clamp(2.5rem, 10svh, 5.7rem) 0 0 clamp(1.35rem, 6vw, 3rem);
+  }
+  h1 {
+    margin-bottom: 1.15rem;
+    font-size: clamp(3.65rem, 13.5vw, 6.5rem);
+  }
 }

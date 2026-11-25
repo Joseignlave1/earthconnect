@@ -27,7 +27,12 @@ test('the Sun is on the terrestrial equator and near 135° E at the March 2024 e
 })
 
 test('the Moon stays synchronously oriented while the sub-Earth point librates', () => {
-  const longitudes = ['2024-04-08T18:17:00Z', '2024-04-15T18:17:00Z', '2024-04-22T18:17:00Z', '2024-04-29T18:17:00Z'].map(date => {
+  const longitudes = [
+    '2024-04-08T18:17:00Z',
+    '2024-04-15T18:17:00Z',
+    '2024-04-22T18:17:00Z',
+    '2024-04-29T18:17:00Z',
+  ].map(date => {
     const { earth, moon } = solarSystemAt(new Date(date))
     const direction = subtract(earth.center, moon.center)
     const earthFromMoon = worldToBody(moon.rotation, direction)

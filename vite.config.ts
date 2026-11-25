@@ -48,7 +48,6 @@ export default defineConfig(({ mode }) => ({
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         hero: fileURLToPath(new URL('./hero/index.html', import.meta.url)),
-        ...(mode !== 'pages' && { shaderTest: fileURLToPath(new URL('./shader-test/index.html', import.meta.url)) }),
       },
     },
   },

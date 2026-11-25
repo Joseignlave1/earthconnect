@@ -1,18 +1,35 @@
-import { WORKGROUP_SIZE, type FieldEncoding, type ScoreManifest } from './manifest.ts'
-import { SCORE_MAX, SCORE_MISSING, sourceCodeWGSL } from './scoring.ts'
+import type { FieldEncoding, ScoreManifest } from './manifest.ts'
 
 const scoreFields = new Set([
-  'annual_precip_mm', 'bare_fraction', 'coldest_month_air_c', 'dominant_lithology_code',
-  'elevation_median_m', 'permafrost_fraction', 'permanent_snow_ice_fraction',
-  'relief_21km_m', 'relief_5km_m', 'slope_mean_deg', 'surface_day_c', 'surface_high_c',
-  'surface_low_c', 'surface_mean_c', 'surface_night_c', 'surface_range_c', 'tpi_21km_m',
-  'tpi_5km_m', 'warmest_month_air_c',
+  'annual_precip_mm',
+  'bare_fraction',
+  'coldest_month_air_c',
+  'dominant_lithology_code',
+  'elevation_median_m',
+  'permafrost_fraction',
+  'permanent_snow_ice_fraction',
+  'relief_21km_m',
+  'relief_5km_m',
+  'slope_mean_deg',
+  'surface_day_c',
+  'surface_high_c',
+  'surface_low_c',
+  'surface_mean_c',
+  'surface_night_c',
+  'surface_range_c',
+  'tpi_21km_m',
+  'tpi_5km_m',
+  'warmest_month_air_c',
 ])
 const coverageFields = new Set([
-  'landcover_valid_fraction', 'permafrost_valid_fraction', 'terrain_valid_fraction',
-  'surface_day_valid_fraction', 'surface_night_valid_fraction', 'surface_paired_valid_fraction',
+  'landcover_valid_fraction',
+  'permafrost_valid_fraction',
+  'terrain_valid_fraction',
+  'surface_day_valid_fraction',
+  'surface_night_valid_fraction',
+  'surface_paired_valid_fraction',
 ])
-const minimumCoverage = .9
+const minimumCoverage = 0.9
 const firstCode = 1
 const lastCode = 65535
 const numericTerm = lastCode + 1
@@ -76,8 +93,11 @@ export function buildEarthQuery(criteria: readonly EarthQueryCriterion[]): Earth
       throw new Error(`${label}: tolerance must be at least 0.000001`)
     }
     term.soft = {
-      target: number(criterion.target), tolerance: categorical ? 1 : number(criterion.tolerance),
-      weight, categorical, group,
+      target: number(criterion.target),
+      tolerance: categorical ? 1 : number(criterion.tolerance),
+      weight,
+      categorical,
+      group,
     }
     const family = families.get(group) ?? { sum: 0, max: 0 }
     family.sum += weight
@@ -132,14 +152,20 @@ export function createQueryParameters(manifest: ScoreManifest, query: EarthQuery
     const index = fieldIndex(field)
     const encoding = manifest.encodings[index]
     const start = headerWords + termWords * i
-    words.set([index, min == null ? firstCode : codeBound(encoding, min),
-      max == null ? lastCode : codeBound(encoding, max, true) - 1, numericTerm], start)
+    words.set(
+      [
+        index,
+        min == null ? firstCode : codeBound(encoding, min),
+        max == null ? lastCode : codeBound(encoding, max, true) - 1,
+        numericTerm,
+      ],
+      start,
+    )
     if (!soft) continue
     const family = families.get(soft.group)!
     // Apply the square root of the normalized weight before squaring the loss.
     // This retains the effect of small weights on large distances in float32.
-    const factor = (Math.sqrt(soft.weight) / Math.sqrt(family.sum)) *
-      (Math.sqrt(family.max) / Math.sqrt(totalWeight))
+    const factor = (Math.sqrt(soft.weight) / Math.sqrt(family.sum)) * (Math.sqrt(family.max) / Math.sqrt(totalWeight))
     const { origin, denominator } = encoding
     if (soft.categorical) {
       const code = codeBound(encoding, soft.target)
@@ -178,32 +204,49 @@ export function createQueryShaderSource(manifest: ScoreManifest, query: EarthQue
   const terms = plan.terms.map((term, i) => {
     const start = headerWords + i * termWords
     return {
-      name: `code_${i + 1}`, term,
-      decode: code(words[start]), min: words[start + 1], max: words[start + 2], category: words[start + 3],
-      pivot: floats[start + 4], offset: floats[start + 5], factor: floats[start + 6],
+      name: `code_${i + 1}`,
+      term,
+      decode: code(words[start]),
+      min: words[start + 1],
+      max: words[start + 2],
+      category: words[start + 3],
+      pivot: floats[start + 4],
+      offset: floats[start + 5],
+      factor: floats[start + 6],
     }
   })
-  const required = terms.map(({ name, term, decode }) =>
-    `  // ${term.field}
+  const required = terms.map(
+    ({ name, term, decode }) =>
+      `  // ${term.field}
   let ${name} = ${decode};
-  if (${name} == 0u) { return NO_SCORE; }`)
+  if (${name} == 0u) { return NO_SCORE; }`,
+  )
   const limits = terms.flatMap(({ name, term, min, max }) => {
     if (term.min == null && term.max == null) return []
     const tests = [term.min != null && `${name} < ${min}u`, term.max != null && `${name} > ${max}u`].filter(Boolean)
-    const bounds = [term.min != null && `minimum ${term.min}`, term.max != null && `maximum ${term.max}`].filter(Boolean)
-    return [`  // ${term.field}: ${bounds.join(', ')} in physical units.
-  if (${tests.join(' || ')}) { return 0.0; }`]
+    const bounds = [term.min != null && `minimum ${term.min}`, term.max != null && `maximum ${term.max}`].filter(
+      Boolean,
+    )
+    return [
+      `  // ${term.field}: ${bounds.join(', ')} in physical units.
+  if (${tests.join(' || ')}) { return 0.0; }`,
+    ]
   })
   const termsCode = terms.flatMap(({ name, term, category, pivot, offset, factor }, i) => {
     const { soft, field } = term
     if (!soft || factor === 0) return []
     const distance = `distance_${i + 1}`
-    if (category !== numericTerm) return [`  // ${field}: class ${soft.target}, weight ${soft.weight}.
+    if (category !== numericTerm)
+      return [
+        `  // ${field}: class ${soft.target}, weight ${soft.weight}.
   let ${distance} = select(${literal(factor)}, 0.0, ${name} == ${category}u);
-  loss += ${distance} * ${distance};`]
-    return [`  // ${field}: target ${soft.target}, tolerance ${soft.tolerance}, weight ${soft.weight}.
+  loss += ${distance} * ${distance};`,
+      ]
+    return [
+      `  // ${field}: target ${soft.target}, tolerance ${soft.tolerance}, weight ${soft.weight}.
   let ${distance} = (f32(i32(${name}) - ${pivot}i) + ${literal(offset)}) * ${literal(factor)};
-  loss += ${distance} * ${distance};`]
+  loss += ${distance} * ${distance};`,
+    ]
   })
   return `// Sampled Earth analogue
 // Work in measurement codes so cutoffs and narrow tolerances retain source precision.
@@ -221,62 +264,3 @@ ${termsCode.join('\n')}
   return exp(-0.5 * min(1000.0, loss));
 }`
 }
-
-export const queryShader = /* wgsl */ `
-struct Term {
-  limits: vec4u, // field index, inclusive code bounds, categorical match code
-  scoring: vec4f, // pivot code, offset from target, distance multiplier
-}
-struct Query {
-  termCount: u32,
-  coverageCount: u32,
-  coverage: array<vec4u, ${coverageFields.size}>,
-  terms: array<Term>,
-}
-@group(0) @binding(0) var<storage, read> packedInput: array<u32>;
-@group(0) @binding(1) var<storage, read_write> scores: array<u32>;
-@group(0) @binding(2) var<storage, read> p: Query;
-${sourceCodeWGSL}
-@compute @workgroup_size(${WORKGROUP_SIZE})
-fn score(@builtin(global_invocation_id) id: vec3u) {
-  let row = id.x;
-  let rows = packedInput[2];
-  if (row >= rows) { return; }
-  for (var i = 0u; i < p.coverageCount; i++) {
-    let rule = p.coverage[i];
-    if (sourceCode(rows, rule.x, row) < rule.y) {
-      scores[row] = ${SCORE_MISSING}u;
-      return;
-    }
-  }
-
-  var rejected = false;
-  var loss = 0.0;
-  for (var i = 0u; i < p.termCount; i++) {
-    let term = p.terms[i];
-    let code = sourceCode(rows, term.limits.x, row);
-    if (code == 0u) {
-      scores[row] = ${SCORE_MISSING}u;
-      return;
-    }
-    rejected = rejected || code < term.limits.y || code > term.limits.z;
-    if (rejected || term.scoring.z == 0.0) { continue; }
-    var distance = 0.0;
-    if (term.limits.w == ${numericTerm}u) {
-      distance = ((f32(code) - term.scoring.x) + term.scoring.y) * term.scoring.z;
-    } else if (code != term.limits.w) {
-      distance = term.scoring.z;
-    }
-    loss += distance * distance;
-  }
-  if (rejected) {
-    scores[row] = 0u;
-    return;
-  }
-  let scaled = ${SCORE_MAX}.0 * clamp(exp(-0.5 * min(1000.0, loss)), 0.0, 1.0);
-  let whole = u32(floor(scaled));
-  let fraction = scaled - f32(whole);
-  let up = fraction > 0.5 || (fraction == 0.5 && (whole & 1u) != 0u);
-  scores[row] = whole + select(0u, 1u, up);
-}
-`

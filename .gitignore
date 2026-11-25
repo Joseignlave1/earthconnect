@@ -12,6 +12,8 @@ dist
 dist-pages
 dist-ssr
 exports/
+/output/
+/temp/
 *.local
 
 # Editor directories and files
@@ -27,10 +29,14 @@ exports/
 
 # Local copies of the pinned CDN release and terrain preparation output
 /compute-data/world/chunk-*.zst
-/public/data/surface-basins.bin
 /public/textures/earth-blue-marble.jpg
 /public/textures/earth-elevation.png
 /public/textures/earth-terrain.bin
+/public/textures/earth-tiles-*.bin
+/public/textures/mars-albedo.webp
 /public/textures/mars-terrain.bin
+/public/textures/mars-tiles-*.bin
+/public/textures/moon-albedo.webp
 /public/textures/moon-terrain.bin
+/public/textures/moon-tiles-*.bin
 /public/textures/nasa-deep-star-map.webp

@@ -2,9 +2,9 @@ import { TILE_SIZE, type ScoreManifest } from './manifest.ts'
 
 // MODIS sinusoidal grid used by the frozen Earth Index datasource.
 const radius = 6371007.181
-const span = Math.PI * radius / 18
+const span = (Math.PI * radius) / 18
 const left = -Math.PI * radius
-const top = Math.PI * radius / 2
+const top = (Math.PI * radius) / 2
 export const PIXELS_PER_SITE = TILE_SIZE ** 2
 export const GRID_WIDTH = 36 * TILE_SIZE
 export const GRID_HEIGHT = 18 * TILE_SIZE
@@ -15,10 +15,10 @@ function tileOrigin(siteKey: string) {
 }
 
 function gridRow(y: number) {
-  const latitude = (GRID_HEIGHT / 2 - y - .5) * (180 / GRID_HEIGHT)
+  const latitude = (GRID_HEIGHT / 2 - y - 0.5) * (180 / GRID_HEIGHT)
   const halfWidth = GRID_WIDTH / 2
   const longitudePerColumn = 180 / (halfWidth * Math.cos(latitude * radians))
-  const validHalfWidth = Math.floor(180 / longitudePerColumn + .5)
+  const validHalfWidth = Math.floor(180 / longitudePerColumn + 0.5)
   return { latitude, longitudePerColumn, validHalfWidth }
 }
 
@@ -57,11 +57,13 @@ export type ChunkLayout = Readonly<{ index: number; firstAddress: number; rows: 
 
 export function createLayout(manifest: ScoreManifest) {
   let offset = 0
-  const chunks: readonly ChunkLayout[] = Object.freeze(manifest.chunks.map(({ rows }, index) => {
-    const range = Object.freeze({ index, firstAddress: offset, rows })
-    offset += rows
-    return range
-  }))
+  const chunks: readonly ChunkLayout[] = Object.freeze(
+    manifest.chunks.map(({ rows }, index) => {
+      const range = Object.freeze({ index, firstAddress: offset, rows })
+      offset += rows
+      return range
+    }),
+  )
   const sites = new Map(manifest.sites.map((site, i) => [site, i]))
 
   function locate(address: number): ScoreAddress | null {
@@ -74,7 +76,7 @@ export function createLayout(manifest: ScoreManifest) {
     const y = Math.floor(pixel / TILE_SIZE)
     const origin = tileOrigin(siteKey)
     const { latitude, longitudePerColumn, validHalfWidth } = gridRow(origin.y + y)
-    const offset = origin.x + x + .5 - GRID_WIDTH / 2
+    const offset = origin.x + x + 0.5 - GRID_WIDTH / 2
     const center = Math.abs(offset) < validHalfWidth ? { latitude, longitude: offset * longitudePerColumn } : null
     return { address, chunk: chunk.index, row: address - chunk.firstAddress, siteKey, pixel, x, y, center }
   }
@@ -86,18 +88,31 @@ export function createLayout(manifest: ScoreManifest) {
   }
 
   function addressAt(longitude: number, latitude: number) {
-    if (!Number.isFinite(longitude) || !Number.isFinite(latitude) ||
-        Math.abs(longitude) > 180 || Math.abs(latitude) > 90) return null
+    if (
+      !Number.isFinite(longitude) ||
+      !Number.isFinite(latitude) ||
+      Math.abs(longitude) > 180 ||
+      Math.abs(latitude) > 90
+    )
+      return null
     const lat = latitude * radians
     const u = Math.min(36 - 1e-10, Math.max(0, (radius * longitude * radians * Math.cos(lat) - left) / span))
     const w = Math.min(18 - 1e-10, Math.max(0, (top - radius * lat) / span))
-    const h = Math.floor(u), v = Math.floor(w)
-    const x = Math.floor((u - h) * TILE_SIZE), y = Math.floor((w - v) * TILE_SIZE)
+    const h = Math.floor(u),
+      v = Math.floor(w)
+    const x = Math.floor((u - h) * TILE_SIZE),
+      y = Math.floor((w - v) * TILE_SIZE)
     return addressOf(`h${String(h).padStart(2, '0')}v${String(v).padStart(2, '0')}`, y * TILE_SIZE + x)
   }
 
   return Object.freeze({
-    rows: manifest.rows, tileSize: TILE_SIZE, sites: manifest.sites, chunks, locate, addressOf, addressAt,
+    rows: manifest.rows,
+    tileSize: TILE_SIZE,
+    sites: manifest.sites,
+    chunks,
+    locate,
+    addressOf,
+    addressAt,
   })
 }
 

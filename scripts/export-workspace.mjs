@@ -11,8 +11,10 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const args = process.argv.slice(2)
 const offline = args.includes('--offline')
 if (offline) await hydrateAssets()
-const destination = resolve(root, args.find(arg => arg !== '--offline') ||
-  `exports/earth-connect-workspace${offline ? '-offline' : ''}.html`)
+const destination = resolve(
+  root,
+  args.find(arg => arg !== '--offline') || `exports/earth-connect-workspace${offline ? '-offline' : ''}.html`,
+)
 const temporary = `${destination}.${process.pid}.tmp`
 const read = file => readFile(resolve(root, file), 'utf8')
 const world = 'compute-data/world/'
@@ -20,21 +22,27 @@ const terrain = 'textures/'
 const image = `${terrain}earth-blue-marble.jpg`
 const earth = `${terrain}earth-terrain.bin`
 const sky = `${terrain}nasa-deep-star-map.webp`
-const basins = 'data/surface-basins.bin'
 const textures = [image, earth, sky]
-const assets = [basins, ...textures, `${terrain}moon-terrain.bin`, `${terrain}mars-terrain.bin`]
-const virtualAsset = '\0workspace-asset:'
+const assets = [
+  ...textures,
+  `${terrain}moon-terrain.bin`,
+  `${terrain}mars-terrain.bin`,
+  `${terrain}moon-albedo.webp`,
+  `${terrain}mars-albedo.webp`,
+]
 
 const wasm = await readFile(resolve(root, 'src/earth-score/zstd.wasm'))
 const manifest = offline ? JSON.parse(await read(`${world}manifest.json`)) : undefined
 
-const credits = await Promise.all([
-  'public/textures/CREDITS.txt',
-  `${world}CREDITS.md`,
-  'src/workspace/fonts/DM-Sans-OFL.txt',
-  'tools/earth-score-decoder/ZSTD-LICENSE.txt',
-  'tools/earth-score-decoder/ZSTD-SYS-LICENSE.txt',
-].map(read))
+const credits = await Promise.all(
+  [
+    'public/textures/CREDITS.txt',
+    `${world}CREDITS.md`,
+    'src/workspace/fonts/DM-Sans-OFL.txt',
+    'tools/earth-score-decoder/ZSTD-LICENSE.txt',
+    'tools/earth-score-decoder/ZSTD-SYS-LICENSE.txt',
+  ].map(read),
+)
 
 function inlineDecoderWasm() {
   const id = '\0workspace-decoder-wasm'
@@ -42,8 +50,12 @@ function inlineDecoderWasm() {
   return {
     name: 'inline-workspace-decoder-wasm',
     enforce: 'pre',
-    resolveId(source) { if (source === './zstd.wasm?url&no-inline') return id },
-    load(source) { if (source === id) return `export default ${JSON.stringify(data)}` },
+    resolveId(source) {
+      if (source === './zstd.wasm?url&no-inline') return id
+    },
+    load(source) {
+      if (source === id) return `export default ${JSON.stringify(data)}`
+    },
   }
 }
 
@@ -57,31 +69,27 @@ const result = await build({
     WORKSPACE_OFFLINE: JSON.stringify(offline),
     'process.env.NODE_ENV': JSON.stringify('production'),
     'import.meta.env.VITE_WORKSPACE_STANDALONE': JSON.stringify(true),
-    ...(env.VITE_EARTH_INDEX_API_URL ? {
-      'import.meta.env.VITE_EARTH_INDEX_API_URL': JSON.stringify(env.VITE_EARTH_INDEX_API_URL),
-    } : {}),
+    ...(env.VITE_EARTH_INDEX_API_URL
+      ? {
+          'import.meta.env.VITE_EARTH_INDEX_API_URL': JSON.stringify(env.VITE_EARTH_INDEX_API_URL),
+        }
+      : {}),
   },
   plugins: [
     react(),
     inlineDecoderWasm(),
     {
-      name: 'omit-lab-render-assets',
-      enforce: 'pre',
-      resolveId(source) {
-        const path = source.slice(1, -4)
-        if (source.startsWith('/') && source.endsWith('?url') && assets.includes(path)) return virtualAsset + path
-      },
-      load(id) {
-        if (!id.startsWith(virtualAsset)) return
-        return 'export default ""'
-      },
-    },
-    {
-      name: 'use-embedded-decoder-worker',
+      name: 'use-embedded-workers',
       enforce: 'pre',
       resolveId(source, importer) {
         if (source === './decoder-worker.ts' && importer === resolve(root, 'src/earth-score/decoder-pool.ts')) {
           return resolve(root, 'src/workspace/embeddedDecoder.ts')
+        }
+        if (
+          source === './terrain-worker-factory.ts' &&
+          importer === resolve(root, 'src/shader-test/terrain-loader.ts')
+        ) {
+          return resolve(root, 'src/shader-test/embedded-terrain-worker.ts')
         }
       },
     },
@@ -99,11 +107,20 @@ const scripts = outputs.filter(item => item.type === 'chunk')
 const styles = outputs.filter(item => item.type === 'asset' && item.fileName.endsWith('.css'))
 const unexpected = outputs.filter(item => item.type === 'asset' && !item.fileName.endsWith('.css'))
 // Rolldown lists imports inlined into the current script as self-references.
-if (scripts.length !== 1 || scripts[0].imports.length ||
-    scripts[0].dynamicImports.some(file => file !== scripts[0].fileName) || unexpected.length) {
-  throw new Error(`Workspace export must have one script and no sidecars. Unexpected output: ${unexpected.map(item => item.fileName).join(', ')}`)
+if (
+  scripts.length !== 1 ||
+  scripts[0].imports.length ||
+  scripts[0].dynamicImports.some(file => file !== scripts[0].fileName) ||
+  unexpected.length
+) {
+  throw new Error(
+    `Workspace export must have one script and no sidecars. Unexpected output: ${unexpected.map(item => item.fileName).join(', ')}`,
+  )
 }
-const css = styles.map(item => item.source.toString()).join('\n').replace(/<\/style/gi, '<\\/style')
+const css = styles
+  .map(item => item.source.toString())
+  .join('\n')
+  .replace(/<\/style/gi, '<\\/style')
 const js = scripts[0].code.replace(/<\/script/gi, '<\\/script')
 
 // Base64 stays outside executable code, and is streamed to keep build memory
@@ -121,10 +138,12 @@ async function* html() {
 <body>
 <div id="root"></div>
 <noscript>Earth Connect requires JavaScript and WebGPU.</noscript>\n`
-  const files = manifest ? [
-    ...assets.map(path => [path, `public/${path}`]),
-    ...['manifest.json', ...manifest.chunks.map(chunk => chunk.file)].map(file => [world + file, world + file]),
-  ] : []
+  const files = manifest
+    ? [
+        ...assets.map(path => [path, `public/${path}`]),
+        ...['manifest.json', ...manifest.chunks.map(chunk => chunk.file)].map(file => [world + file, world + file]),
+      ]
+    : []
   for (const [key, path] of files) {
     for await (const chunk of createReadStream(resolve(root, path), { highWaterMark: 768 * 1024 })) {
       yield `<script type="application/octet-stream" data-workspace-asset="${key}">${chunk.toString('base64')}</script>\n`
@@ -142,4 +161,6 @@ try {
   throw error
 }
 const { size } = await stat(destination)
-console.log(`${destination}\n${(size / 1024 ** 2).toFixed(1)} MiB · ${offline ? 'data embedded for offline use' : 'data loaded from the Earth Connect CDN'}`)
+console.log(
+  `${destination}\n${(size / 1024 ** 2).toFixed(1)} MiB · ${offline ? 'data embedded for offline use' : 'data loaded from the Earth Connect CDN'}`,
+)

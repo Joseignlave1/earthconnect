@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState, type RefObject } from 'react'
-import { freezePlanetaryShaderPoint, type PlanetaryShaderData, type PlanetaryShaderSample } from '../earth-score/index.ts'
+import {
+  freezePlanetaryShaderPoint,
+  type PlanetaryShaderData,
+  type PlanetaryShaderSample,
+} from '../earth-score/index.ts'
 import { ScoreShaderError } from '../earth-score/custom-shader.ts'
-import { friendlyApiError, samplePoint } from '../earthIndexApi.ts'
+import { friendlyApiError } from '../earthIndexApi.ts'
 import type { BodyId } from '../explorerData.ts'
 import { SurfaceRenderer } from '../shader-test/renderer.ts'
+import { earthTilePath } from '../shader-test/earth-tiles.ts'
+import { planetTilePath, type PlanetTileBody } from './planetTiles.ts'
 import { scoreManifestUrl, type WorkspaceAssets } from './workspaceAssets.ts'
 import type { SolarFocus } from './solarCamera.ts'
 import { SolarScene } from './solarScene.ts'
-import { canonicalPoint, coordinatesValid, createPlanetaryPointCache, pointKey } from './planetaryPointCache.ts'
+import { canonicalPoint, coordinatesValid, pointKey } from './planetaryPointCache.ts'
 import { createEarthWorkspaceResources, type EarthWorkspaceResources } from './earthWorkspaceResources.ts'
 import type { PlanetaryCall } from './planetaryShaderAnalysis.ts'
+import { endStartupSpan, startStartupSpan } from './startupTiming.ts'
 
 type Reference = { body: BodyId; latitude: number; longitude: number }
 type Inspection = { latitude: number; longitude: number; score: number | null; elevation: number | null }
@@ -62,17 +69,18 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
-const analyzeShader = import.meta.env.VITE_WORKSPACE_STANDALONE ? undefined :
-  async (source: string, signal: AbortSignal) => {
-    const { analyzePlanetaryShader, PlanetaryAnalysisError } = await import('./planetaryShaderAnalysis.ts')
-    signal.throwIfAborted()
-    try {
-      return await analyzePlanetaryShader(source, signal)
-    } catch (error) {
-      if (error instanceof PlanetaryAnalysisError) throw new ScoreShaderError(error.diagnostics)
-      throw error
+const analyzeShader = import.meta.env.VITE_WORKSPACE_STANDALONE
+  ? undefined
+  : async (source: string, signal: AbortSignal) => {
+      const { analyzePlanetaryShader, PlanetaryAnalysisError } = await import('./planetaryShaderAnalysis.ts')
+      signal.throwIfAborted()
+      try {
+        return await analyzePlanetaryShader(source, signal)
+      } catch (error) {
+        if (error instanceof PlanetaryAnalysisError) throw new ScoreShaderError(error.diagnostics)
+        throw error
+      }
     }
-  }
 
 class PointFetchError extends ScoreShaderError {}
 const defaultInitialView = { latitude: 36, longitude: 95 }
@@ -93,24 +101,31 @@ export function useEarthWorkspace(
   const commands = useRef<Commands>(null)
   const place = useCallback<Commands['place']>(reference => commands.current?.place(reference), [])
   const pickSourceAt = useCallback<Commands['pickSourceAt']>((...args) => commands.current?.pickSourceAt(...args), [])
-  const freezePoint = useCallback<Commands['freezePoint']>((...args) => commands.current?.freezePoint(...args)
-    ?? Promise.reject(new Error('The point sampler is still starting.')), [])
+  const freezePoint = useCallback<Commands['freezePoint']>(
+    (...args) =>
+      commands.current?.freezePoint(...args) ?? Promise.reject(new Error('The point sampler is still starting.')),
+    [],
+  )
   const retry = useCallback(() => commands.current?.retry(), [])
-  const setProjection = useCallback<Commands['setProjection']>((projection) => commands.current?.setProjection(projection), [])
-  const focus = useCallback<Commands['focus']>((body) => commands.current?.focus(body), [])
-  const runShader = useCallback<Commands['runShader']>((source) => commands.current?.runShader(source), [])
+  const setProjection = useCallback<Commands['setProjection']>(
+    projection => commands.current?.setProjection(projection),
+    [],
+  )
+  const focus = useCallback<Commands['focus']>(body => commands.current?.focus(body), [])
+  const runShader = useCallback<Commands['runShader']>(source => commands.current?.runShader(source), [])
   const cancelShader = useCallback(() => commands.current?.cancelShader(), [])
-  const reportSourcePick = useEffectEvent((body: BodyId,point: Pick<Reference,'latitude' | 'longitude'>) => {
-    onSourcePick?.(body,point.latitude,point.longitude)
+  const reportSourcePick = useEffectEvent((body: BodyId, point: Pick<Reference, 'latitude' | 'longitude'>) => {
+    onSourcePick?.(body, point.latitude, point.longitude)
   })
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const lifecycle = new AbortController()
-    const shared = resources ?? createEarthWorkspaceResources()
+    const shared = resources ?? createEarthWorkspaceResources(undefined, lifecycle.signal)
     let renderer: SurfaceRenderer | undefined
     let creating = false
+    let surfaceFailed = false
     let world: World | undefined
     let current: { controller: AbortController; job: Job } | undefined
     let failed: Job | undefined
@@ -122,8 +137,8 @@ export function useEarthWorkspace(
     let displayedMap = ''
     let projection: 'globe' | 'plane' = 'globe'
     let focusBody: SolarFocus = 'earth'
-    const sourcePoints = new Map<BodyId,Reference>()
-    const readPoint = createPlanetaryPointCache(samplePoint, lifecycle.signal)
+    const sourcePoints = new Map<BodyId, Reference>()
+    const { readPoint } = shared
 
     function update(changes: Partial<WorkspaceState>) {
       if (!lifecycle.signal.aborted) setState(previous => ({ ...previous, ...changes }))
@@ -140,7 +155,10 @@ export function useEarthWorkspace(
       renderer?.setSourcePoint(body, reference)
     }
 
-    async function resolveShaderPoints(calls: readonly PlanetaryCall[], signal: AbortSignal): Promise<PlanetaryShaderData | undefined> {
+    async function resolveShaderPoints(
+      calls: readonly PlanetaryCall[],
+      signal: AbortSignal,
+    ): Promise<PlanetaryShaderData | undefined> {
       if (!calls.length) return
       const slots = new Map<string, number>()
       const unique: PlanetaryCall[] = []
@@ -151,31 +169,39 @@ export function useEarthWorkspace(
           unique.push(call)
         }
       }
-      update({ status: `Resolving ${unique.length === 1 ? '1 planetary point' : `${unique.length} planetary points`}…` })
+      update({
+        status: `Resolving ${unique.length === 1 ? '1 planetary point' : `${unique.length} planetary points`}…`,
+      })
       const batch = new AbortController()
       const batchSignal = AbortSignal.any([signal, batch.signal])
       const samples: PlanetaryShaderSample[] = []
       let next = 0
       try {
-        await Promise.all(Array.from({ length: Math.min(4, unique.length) }, async () => {
-          while (next < unique.length) {
-            batchSignal.throwIfAborted()
-            const index = next++
-            const call = unique[index]
-            const point = canonicalPoint(call)
-            try {
-              const sample = await readPoint(point, batchSignal)
-              samples[index] = { ...point, measurements: sample.measurements, partial: sample.partial }
-            } catch (error) {
+        await Promise.all(
+          Array.from({ length: Math.min(4, unique.length) }, async () => {
+            while (next < unique.length) {
               batchSignal.throwIfAborted()
-              throw new PointFetchError([pointDiagnostic(call, `${referenceName(point)}: ${friendlyApiError(error)}`)])
+              const index = next++
+              const call = unique[index]
+              const point = canonicalPoint(call)
+              try {
+                const sample = await readPoint(point, batchSignal)
+                samples[index] = { ...point, measurements: sample.measurements, partial: sample.partial }
+              } catch (error) {
+                batchSignal.throwIfAborted()
+                throw new PointFetchError([
+                  pointDiagnostic(call, `${referenceName(point)}: ${friendlyApiError(error)}`),
+                ])
+              }
             }
-          }
-        }))
+          }),
+        )
         return {
           samples,
           calls: calls.map(call => ({
-            body: call.body, offset: call.offset, length: call.endOffset - call.offset,
+            body: call.body,
+            offset: call.offset,
+            length: call.endOffset - call.offset,
             slot: slots.get(pointKey(canonicalPoint(call)))!,
           })),
         }
@@ -199,20 +225,22 @@ export function useEarthWorkspace(
       })
       world = entry
       update({ worldSettled: false, ...(!current && { status: 'Loading Earth data for live scoring…' }) })
-      void entry.loading.then(() => {
-        if (world === entry) update({ worldSettled: true, ...(!current && { status: '' }) })
-      }, error => {
-        if (world !== entry || lifecycle.signal.aborted) return
-        releaseWorld()
-        update({ worldSettled: true })
-        if (!current) reportFailure(`Could not load the Earth dataset. ${errorMessage(error)}`)
-      })
+      void entry.loading.then(
+        () => {
+          if (world === entry) update({ worldSettled: true, ...(!current && { status: '' }) })
+        },
+        error => {
+          if (world !== entry || lifecycle.signal.aborted) return
+          releaseWorld()
+          update({ worldSettled: true })
+          if (!current) reportFailure(`Could not load the Earth dataset. ${errorMessage(error)}`)
+        },
+      )
       return entry
     }
 
     function mapStatus() {
-      const name = canvas!.dataset.scoreName ?? ''
-      const mapName = name && canvas!.dataset.source === 'snapshot' ? `Snapshot · ${name}` : name
+      const mapName = canvas!.dataset.scoreName ?? ''
       if (displayedMap === mapName) return
       displayedMap = mapName
       update({ mapName })
@@ -231,20 +259,32 @@ export function useEarthWorkspace(
       const frame = `${source}/${size}`
       if (frame === completedFrame || frame === pendingFrame) return
       pendingFrame = frame
-      void device.queue.onSubmittedWorkDone().then(() => {
-        if (renderer?.computeDevice !== device || pendingFrame !== frame ||
-            canvas!.dataset.frameSource !== source || canvas!.dataset.renderSize !== size ||
-            canvas!.clientWidth !== clientWidth || canvas!.clientHeight !== clientHeight) return
-        completedFrame = frame
-        update({ frameSource: source })
-      }, error => {
-        if (renderer?.computeDevice === device) {
-          reportFailure(errorMessage(error))
-          update({ surfaceFailed: true })
-        }
-      }).finally(() => {
-        if (pendingFrame === frame) pendingFrame = undefined
-      })
+      void device.queue
+        .onSubmittedWorkDone()
+        .then(
+          () => {
+            if (
+              renderer?.computeDevice !== device ||
+              pendingFrame !== frame ||
+              canvas!.dataset.frameSource !== source ||
+              canvas!.dataset.renderSize !== size ||
+              canvas!.clientWidth !== clientWidth ||
+              canvas!.clientHeight !== clientHeight
+            )
+              return
+            completedFrame = frame
+            update({ frameSource: source })
+          },
+          error => {
+            if (renderer?.computeDevice === device) {
+              reportFailure(errorMessage(error))
+              update({ surfaceFailed: true })
+            }
+          },
+        )
+        .finally(() => {
+          if (pendingFrame === frame) pendingFrame = undefined
+        })
     }
 
     function deviceChanged() {
@@ -258,7 +298,16 @@ export function useEarthWorkspace(
         wasRendered = false
         completedFrame = pendingFrame = undefined
         displayedMap = ''
-        update({ ready: false, frameSource: undefined, surfaceFailed: false, worldSettled: false, mapName: '', busy: Boolean(resume), status: 'Recovering the Earth surface…', error: '' })
+        update({
+          ready: false,
+          frameSource: undefined,
+          surfaceFailed: false,
+          worldSettled: false,
+          mapName: '',
+          busy: Boolean(resume),
+          status: 'Recovering the Earth surface…',
+          error: '',
+        })
         return
       }
       if (preloadWorld) prepareWorld(device)
@@ -270,46 +319,62 @@ export function useEarthWorkspace(
       }
     }
 
-    function startSnapshot(instance: SurfaceRenderer) {
-      void assets.blob('data/surface-basins.bin', lifecycle.signal).then(snapshot => {
-        if (renderer === instance && canvas!.dataset.source !== 'computed') instance.loadSnapshot(snapshot)
-      }, error => {
-        if (lifecycle.signal.aborted || renderer !== instance) return
-        reportFailure(errorMessage(error))
-        update({ surfaceFailed: true })
-      })
-    }
-
     async function startRenderer() {
       if (creating) return
       creating = true
+      surfaceFailed = false
       try {
         renderer?.destroy()
         renderer = undefined
         delete canvas!.dataset.scoreName
         delete canvas!.dataset.source
         delete canvas!.dataset.frameSource
-        const instance = await SurfaceRenderer.create(canvas!, (selection, score) => {
-          const inspection = selection && {
-            latitude: selection.latitude,
-            longitude: selection.longitude,
-            elevation: selection.elevation ?? null,
-            score,
+        const loadTilePack = async (path: string, signal: AbortSignal) => {
+          try {
+            if (import.meta.env.DEV) {
+              const url = await assets.url(path, signal)
+              if (!url.startsWith('blob:')) return url
+            }
+            return await assets.blob(path, signal)
+          } catch {
+            return null
           }
-          update({ inspection })
-        }, error => {
-          reportFailure(error.message)
-          update({ surfaceFailed: true })
-          if (!renderer?.computeDevice) update({ busy: false })
-        }, mapStatus, {
-          signal: lifecycle.signal,
-          acquireDevice: shared.acquireDevice,
-          solar: { createScene: SolarScene.create, assetUrl: assets.url, onSourcePick: (body,point) => reportSourcePick(body,point) },
-          assets: assets.url,
-          snapshot: signal => assets.blob('data/surface-basins.bin', signal),
-          onDevice: preloadWorld ? prepareWorld : undefined,
-          initialView,
-        })
+        }
+        const instance = await SurfaceRenderer.create(
+          canvas!,
+          (selection, score) => {
+            const inspection = selection && {
+              latitude: selection.latitude,
+              longitude: selection.longitude,
+              elevation: selection.elevation ?? null,
+              score,
+            }
+            update({ inspection })
+          },
+          error => {
+            reportFailure(error.message)
+            update({ surfaceFailed: true })
+            if (!renderer?.computeDevice) update({ busy: false })
+          },
+          mapStatus,
+          {
+            signal: lifecycle.signal,
+            acquireDevice: shared.acquireDevice,
+            solar: {
+              createScene: SolarScene.create,
+              assetUrl: assets.url,
+              loadTerrain: shared.acquireTerrain,
+              loadPlanetTilePack: (body: PlanetTileBody, packId: number, signal: AbortSignal) =>
+                loadTilePack(planetTilePath(body, packId), signal),
+              onSourcePick: (body, point) => reportSourcePick(body, point),
+            },
+            assets: assets.url,
+            loadTerrain: shared.acquireTerrain,
+            loadEarthTilePack: (packId, signal) => loadTilePack(earthTilePath(packId), signal),
+            onDevice: preloadWorld ? prepareWorld : undefined,
+            initialView,
+          },
+        )
         if (lifecycle.signal.aborted) {
           instance.destroy()
           return
@@ -317,11 +382,13 @@ export function useEarthWorkspace(
         renderer = instance
         instance.focusSolarBody(focusBody)
         instance.setProjection(projection)
-        for (const [body,point] of sourcePoints) instance.setSourcePoint(body,point)
+        for (const [body, point] of sourcePoints) instance.setSourcePoint(body, point)
         deviceChanged()
       } catch (error) {
         releaseWorld()
         if (!lifecycle.signal.aborted) {
+          surfaceFailed = true
+          console.error('Could not initialize WebGPU surface:', error)
           reportFailure(errorMessage(error))
           update({ busy: false, surfaceFailed: true })
         }
@@ -340,7 +407,7 @@ export function useEarthWorkspace(
       update({ shaderSource: job.source, shaderDiagnostics: [] })
       if (!instance || !device) {
         resume = job
-        update({ busy: true, error: '', status: 'Waiting for WebGPU…' })
+        if (!surfaceFailed) update({ busy: true, error: '', status: 'Waiting for WebGPU…' })
         return
       }
       resume = undefined
@@ -349,30 +416,43 @@ export function useEarthWorkspace(
       update({ busy: true, error: '' })
       const entry = prepareWorld(device)
       try {
-        const calls = await analyzeShader?.(job.source, signal) ?? []
+        const calls = (await analyzeShader?.(job.source, signal)) ?? []
         signal.throwIfAborted()
         const points = await resolveShaderPoints(calls, signal)
         signal.throwIfAborted()
-        const earth = await entry.loading.catch(error => { throw new Error(`Could not load the Earth dataset. ${errorMessage(error)}`) })
+        const earth = await entry.loading.catch(error => {
+          throw new Error(`Could not load the Earth dataset. ${errorMessage(error)}`)
+        })
         signal.throwIfAborted()
         await entry.publish(async () => {
           signal.throwIfAborted()
+          startStartupSpan('first-score')
           update({ status: 'Scoring the Earth grid…' })
           await earth.dispatchShader(job.source, signal, points)
           signal.throwIfAborted()
-          await instance.setComputedScores(earth, {
-            name: 'WGSL score map',
-            description: 'Earth cells scored with the WGSL query.',
-          }, signal)
+          await instance.setComputedScores(
+            earth,
+            {
+              name: 'WGSL score map',
+              description: 'Earth cells scored with the WGSL query.',
+            },
+            signal,
+          )
           signal.throwIfAborted()
+          endStartupSpan('first-score')
           shownJob = job
-          update({ shaderActive: true, shaderPartial: Boolean(points?.samples.some(point => point.partial)), status: '' })
+          update({
+            shaderActive: true,
+            shaderPartial: Boolean(points?.samples.some(point => point.partial)),
+            status: '',
+          })
         })
       } catch (error) {
         if (!signal.aborted) {
-          const shaderDiagnostics: ScoreShaderError['diagnostics'] = error instanceof ScoreShaderError
-            ? error.diagnostics
-            : [{ line: 0, column: 0, length: 0, severity: 'error', message: errorMessage(error) }]
+          const shaderDiagnostics: ScoreShaderError['diagnostics'] =
+            error instanceof ScoreShaderError
+              ? error.diagnostics
+              : [{ line: 0, column: 0, length: 0, severity: 'error', message: errorMessage(error) }]
           if (error instanceof PointFetchError) {
             failed = job
             reportFailure('Could not resolve a planetary point in the query.')
@@ -397,7 +477,11 @@ export function useEarthWorkspace(
         })
         signal.throwIfAborted()
         return {
-          code: freezePlanetaryShaderPoint({ ...canonicalPoint(reference), measurements: sample.measurements, partial: sample.partial }),
+          code: freezePlanetaryShaderPoint({
+            ...canonicalPoint(reference),
+            measurements: sample.measurements,
+            partial: sample.partial,
+          }),
           partial: sample.partial,
         }
       },
@@ -434,13 +518,20 @@ export function useEarthWorkspace(
           resume ??= failed ?? shownJob
           wasRendered = false
           completedFrame = pendingFrame = undefined
-          update({ ready: false, frameSource: undefined, surfaceFailed: false, worldSettled: false, mapName: '', error: '', status: 'Preparing the Earth surface…' })
+          update({
+            ready: false,
+            frameSource: undefined,
+            surfaceFailed: false,
+            worldSettled: false,
+            mapName: '',
+            error: '',
+            status: 'Preparing the Earth surface…',
+          })
           void startRenderer()
         } else if (failed) {
           void run(failed)
         } else {
           update({ error: '' })
-          if (!canvas.dataset.scoreName) startSnapshot(renderer)
           renderer.retrySolarTerrain()
           if (preloadWorld) prepareWorld(renderer.computeDevice)
         }

@@ -15,21 +15,29 @@ const worldPaths = world.chunks.map(chunk => {
   }
   return path
 })
-const renderPaths = Object.keys(release.assets).filter(path => !path.startsWith(worldDirectory))
+const ignoredPaths = new Set(['data/surface-basins.bin'])
+const tilePathPattern = /^textures\/(?:earth|moon|mars)-tiles-\d+\.bin$/
+const tilePaths = Object.keys(release.assets).filter(path => tilePathPattern.test(path))
+const renderPaths = Object.keys(release.assets).filter(
+  path => !path.startsWith(worldDirectory) && !ignoredPaths.has(path) && !tilePathPattern.test(path),
+)
 const groups = {
-  all: [...renderPaths, ...worldPaths],
+  all: [...renderPaths, ...worldPaths, ...tilePaths],
   render: renderPaths,
   world: worldPaths,
+  tiles: tilePaths,
 }
 
 async function hydrate(path) {
   const asset = release.assets[path]
   const local = new URL(path.startsWith(worldDirectory) ? path : 'public/' + path, root)
-  const verify = bytes => bytes.length === asset.bytes &&
-    createHash('sha256').update(bytes).digest('hex') === asset.sha256
+  const verify = bytes =>
+    bytes.length === asset.bytes && createHash('sha256').update(bytes).digest('hex') === asset.sha256
   function verifyLocal(bytes) {
     if (!verify(bytes)) {
-      throw new Error(`Integrity check failed for local ${path}. Move the file aside before downloading the pinned copy.`)
+      throw new Error(
+        `Integrity check failed for local ${path}. Move the file aside before downloading the pinned copy.`,
+      )
     }
   }
   const existing = await readFile(local).catch(error => {
@@ -57,7 +65,7 @@ async function hydrate(path) {
 }
 
 export async function hydrateAssets(group = 'all') {
-  if (!Object.hasOwn(groups, group)) throw new Error('Usage: npm run fetch:assets -- [all|render|world]')
+  if (!Object.hasOwn(groups, group)) throw new Error('Usage: npm run fetch:assets -- [all|render|world|tiles]')
   const files = groups[group]
   for (let i = 0; i < files.length; i += 4) {
     await Promise.all(files.slice(i, i + 4).map(hydrate))

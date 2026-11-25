@@ -28,9 +28,9 @@ const FIELD_DEFAULTS: Record<string, [string, number]> = {
   coldest_month_air_c: ['Coldest-month air temperature', 20],
   warmest_month_air_c: ['Warmest-month air temperature', 20],
   annual_precip_mm: ['Annual precipitation', 500],
-  bare_fraction: ['Bare ground', .25],
-  permanent_snow_ice_fraction: ['Permanent snow / ice', .25],
-  permafrost_fraction: ['Permafrost', .25],
+  bare_fraction: ['Bare ground', 0.25],
+  permanent_snow_ice_fraction: ['Permanent snow / ice', 0.25],
+  permafrost_fraction: ['Permafrost', 0.25],
   dominant_lithology_code: ['Lithology code', 1],
   surface_day_c: ['Mean daytime ground temperature', 30],
   surface_night_c: ['Mean nighttime ground temperature', 30],
@@ -55,14 +55,17 @@ export function friendlyApiError(error: unknown) {
 export async function loadDatasource(signal: AbortSignal) {
   const response = await api.metadata({}, { signal, timeoutMs: 120000 })
   const datasources = response.datasources
-    .filter((item) => item.body.toLowerCase() === 'earth')
-    .sort((a, b) => b.coverage.length - a.coverage.length || cellColumnCount(b) - cellColumnCount(a) || a.id.localeCompare(b.id))
+    .filter(item => item.body.toLowerCase() === 'earth')
+    .sort(
+      (a, b) =>
+        b.coverage.length - a.coverage.length || cellColumnCount(b) - cellColumnCount(a) || a.id.localeCompare(b.id),
+    )
   if (!datasources.length) throw new Error('The API did not return an Earth datasource.')
   return datasources[0]
 }
 
 function cellColumnCount(datasource: Datasource) {
-  return datasource.relations.find((relation) => relation.name === 'cells')?.columns.length ?? 0
+  return datasource.relations.find(relation => relation.name === 'cells')?.columns.length ?? 0
 }
 
 function qualityColumn(key: string) {
@@ -73,17 +76,17 @@ function qualityColumn(key: string) {
 }
 
 export function criteriaFor(datasource: Datasource, previous: Criterion[] = []): Criterion[] {
-  return criteriaForColumns(datasource.relations.find((relation) => relation.name === 'cells')?.columns ?? [], previous)
+  return criteriaForColumns(datasource.relations.find(relation => relation.name === 'cells')?.columns ?? [], previous)
 }
 
 type CriteriaColumn = Pick<Datasource['relations'][number]['columns'][number], 'name' | 'unit' | 'description'>
 
 function criteriaForColumns(columns: readonly CriteriaColumn[], previous: Criterion[] = []): Criterion[] {
-  const names = new Set(columns.map((column) => column.name))
+  const names = new Set(columns.map(column => column.name))
   return columns
-    .filter((column) => column.unit && !column.name.endsWith('_valid_fraction'))
-    .map((column) => {
-      const prior = previous.find((item) => item.key === column.name)
+    .filter(column => column.unit && !column.name.endsWith('_valid_fraction'))
+    .map(column => {
+      const prior = previous.find(item => item.key === column.name)
       const quality = qualityColumn(column.name)
       return {
         ...prior,
@@ -91,7 +94,13 @@ function criteriaForColumns(columns: readonly CriteriaColumn[], previous: Criter
         label: FIELD_DEFAULTS[column.name]?.[0] ?? column.name.replaceAll('_', ' '),
         unit: column.unit,
         description: column.description,
-        group: column.name.startsWith('surface_') ? 'thermal' : column.name.startsWith('relief_') ? 'relief' : column.name.startsWith('tpi_') ? 'position' : column.name,
+        group: column.name.startsWith('surface_')
+          ? 'thermal'
+          : column.name.startsWith('relief_')
+            ? 'relief'
+            : column.name.startsWith('tpi_')
+              ? 'position'
+              : column.name,
         enabled: prior?.enabled ?? false,
         target: prior?.target ?? null,
         tolerance: prior?.tolerance ?? FIELD_DEFAULTS[column.name]?.[1] ?? 1,
@@ -104,21 +113,40 @@ function criteriaForColumns(columns: readonly CriteriaColumn[], previous: Criter
     })
 }
 
-export async function samplePoint(body: BodyId, latitude: number, longitude: number, signal: AbortSignal): Promise<SampleResult> {
-  const response = await api.samplePoint({
-    body: body === 'moon' ? PlanetaryBody.MOON : PlanetaryBody.MARS,
-    latitude,
-    longitude,
-  }, { signal, timeoutMs: 60000 })
+export async function samplePoint(
+  body: BodyId,
+  latitude: number,
+  longitude: number,
+  signal: AbortSignal,
+): Promise<SampleResult> {
+  const response = await api.samplePoint(
+    {
+      body: body === 'moon' ? PlanetaryBody.MOON : PlanetaryBody.MARS,
+      latitude,
+      longitude,
+    },
+    { signal, timeoutMs: 60000 },
+  )
   return {
-    measurements: response.measurements.map((measurement) => ({ ...measurement, decoded: decodeValue(measurement.value) })),
+    measurements: response.measurements.map(measurement => ({
+      ...measurement,
+      decoded: decodeValue(measurement.value),
+    })),
     partial: response.partial,
     cached: response.cached,
   }
 }
 
 function numericMeasurement(measurements: SampleMeasurement[], id: string, unit: string) {
-  const measurement = measurements.find((item) => item.variableId === id && item.status === MeasurementStatus.AVAILABLE && item.unit === unit && !item.qualityFlags.includes('semantic_review_required') && typeof item.decoded === 'number' && Number.isFinite(item.decoded))
+  const measurement = measurements.find(
+    item =>
+      item.variableId === id &&
+      item.status === MeasurementStatus.AVAILABLE &&
+      item.unit === unit &&
+      !item.qualityFlags.includes('semantic_review_required') &&
+      typeof item.decoded === 'number' &&
+      Number.isFinite(item.decoded),
+  )
   return typeof measurement?.decoded === 'number' ? measurement.decoded : null
 }
 
@@ -131,17 +159,17 @@ function temperature(measurements: SampleMeasurement[], body: BodyId, id: string
 }
 
 export function applySample(criteria: Criterion[], body: BodyId, sample: SampleResult): Criterion[] {
-  const next = criteria.map((item) => ({ ...item }))
+  const next = criteria.map(item => ({ ...item }))
   let measured = 0
   const mappings: [string, string, string, number, number][] = [
-    ['slope_mean_deg', 'slope_1km', 'degree', 2, .35],
-    ['relief_5km_m', 'relief_5km', 'm', 50, .35],
-    ['relief_21km_m', 'relief_21km', 'm', 150, .35],
-    ['tpi_5km_m', 'tpi_5km', 'm', 25, .5],
-    ['tpi_21km_m', 'tpi_21km', 'm', 75, .5],
+    ['slope_mean_deg', 'slope_1km', 'degree', 2, 0.35],
+    ['relief_5km_m', 'relief_5km', 'm', 50, 0.35],
+    ['relief_21km_m', 'relief_21km', 'm', 150, 0.35],
+    ['tpi_5km_m', 'tpi_5km', 'm', 25, 0.5],
+    ['tpi_21km_m', 'tpi_21km', 'm', 75, 0.5],
   ]
   for (const [key, id, unit, floor, fraction] of mappings) {
-    const criterion = next.find((item) => item.key === key)
+    const criterion = next.find(item => item.key === key)
     if (!criterion) continue
     criterion.target = numericMeasurement(sample.measurements, `${body}.${id}`, unit)
     criterion.kind = 'measured'
@@ -150,17 +178,18 @@ export function applySample(criteria: Criterion[], body: BodyId, sample: SampleR
     if (!criterion.toleranceTouched) criterion.tolerance = Math.max(floor, Math.abs(criterion.target ?? 0) * fraction)
     if (criterion.enabled) measured++
   }
-  const elevation = next.find((item) => item.key === 'elevation_median_m')
+  const elevation = next.find(item => item.key === 'elevation_median_m')
   if (elevation) {
     elevation.target = numericMeasurement(sample.measurements, `${body}.elevation`, 'm')
-    elevation.enabled = elevation.selectionTouched === true && elevation.selectedByUser === true && elevation.target != null
+    elevation.enabled =
+      elevation.selectionTouched === true && elevation.selectedByUser === true && elevation.target != null
     elevation.kind = 'manual'
     elevation.origin = 'Moon, Mars and Earth use different elevation datums. Enable this field manually.'
   }
-  const bare = next.find((item) => item.key === 'bare_fraction')
+  const bare = next.find(item => item.key === 'bare_fraction')
   if (bare) {
     if (!bare.targetTouched) bare.target = 1
-    if (!bare.toleranceTouched) bare.tolerance = .2
+    if (!bare.toleranceTouched) bare.tolerance = 0.2
     bare.enabled = bare.selectionTouched ? bare.selectedByUser === true : measured > 0
     bare.kind = 'preference'
     bare.origin = 'Earth-only preference for bare land.'
@@ -173,13 +202,13 @@ export function applySample(criteria: Criterion[], body: BodyId, sample: SampleR
     ['surface_night_c', 'surface_midnight'],
   ]
   for (const [key, id] of thermal) {
-    const criterion = next.find((item) => item.key === key)
+    const criterion = next.find(item => item.key === key)
     if (!criterion) continue
     criterion.target = temperature(sample.measurements, body, id)
     if (key === 'surface_mean_c' && body !== 'mars') criterion.target = null
     criterion.enabled = criterion.target != null && (!criterion.selectionTouched || criterion.selectedByUser === true)
     if (!criterion.toleranceTouched) criterion.tolerance = 30
-    if (!criterion.weightTouched) criterion.weight = .5
+    if (!criterion.weightTouched) criterion.weight = 0.5
     criterion.kind = 'approximate'
     criterion.origin = 'Approximate surface-temperature comparison.'
   }
@@ -190,11 +219,22 @@ function decodeValue(value: Value | undefined): DecodedValue {
   const kind = value?.kind
   if (!kind) return null
   switch (kind.case) {
-    case 'nullValue': return null
-    case 'integerValue': return kind.value >= BigInt(Number.MIN_SAFE_INTEGER) && kind.value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(kind.value) : kind.value.toString()
-    case 'numberValue': case 'boolValue': case 'stringValue': case 'bytesValue': return kind.value
-    case 'listValue': return kind.value.values.map(decodeValue)
-    case 'objectValue': return Object.fromEntries(Object.entries(kind.value.fields).map(([key, item]) => [key, decodeValue(item)]))
-    default: return null
+    case 'nullValue':
+      return null
+    case 'integerValue':
+      return kind.value >= BigInt(Number.MIN_SAFE_INTEGER) && kind.value <= BigInt(Number.MAX_SAFE_INTEGER)
+        ? Number(kind.value)
+        : kind.value.toString()
+    case 'numberValue':
+    case 'boolValue':
+    case 'stringValue':
+    case 'bytesValue':
+      return kind.value
+    case 'listValue':
+      return kind.value.values.map(decodeValue)
+    case 'objectValue':
+      return Object.fromEntries(Object.entries(kind.value.fields).map(([key, item]) => [key, decodeValue(item)]))
+    default:
+      return null
   }
 }

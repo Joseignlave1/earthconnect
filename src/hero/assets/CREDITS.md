@@ -11,7 +11,6 @@ The stereo DTM and both matched RED orthophotos are from [Layers in a Scarp on O
 - `olympus-ctx.webp` comes from the [Murray Lab Global CTX Mosaic of Mars v1](https://murray-lab.caltech.edu/CTX/) by Jay Dickson and the Bruce Murray Laboratory for Planetary Visualization at Caltech, using NASA's Mars Reconnaissance Orbiter Context Camera imagery. It is resampled from the published Google Mars tile overlay to the local rectangle from −65 to 55 km east and −66 to 39 km south of the HiRISE origin.
 - `earth-blue-marble.jpg` is a reduced copy of NASA's [Blue Marble: Next Generation](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography/) texture, credited to Reto Stöckli (NASA Goddard Space Flight Center). Earth's apparent size and placement were chosen for the composition.
 
-
 To rebuild the baked lighting with NumPy and Pillow installed, run:
 
 ```sh

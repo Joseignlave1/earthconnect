@@ -2,8 +2,14 @@ import { ExtensionHostKind, registerExtension } from '@codingame/monaco-vscode-a
 
 export const wgslLanguageId = 'earth-wgsl'
 export const wgslThemeName = 'Earth GitHub OLED'
-export const wgslKeywords = 'alias break case const const_assert continue continuing default diagnostic discard else enable false fn for if let loop override requires return struct switch true var while'.split(' ')
-export const wgslTypes = 'array atomic bool f16 f32 i32 mat2x2f mat3x3f mat4x4f ptr sampler u32 vec2 vec3 vec4 vec2f vec3f vec4f vec2i vec3i vec4i vec2u vec3u vec4u'.split(' ')
+export const wgslKeywords =
+  'alias break case const const_assert continue continuing default diagnostic discard else enable false fn for if let loop override requires return struct switch true var while'.split(
+    ' ',
+  )
+export const wgslTypes =
+  'array atomic bool f16 f32 i32 mat2x2f mat3x3f mat4x4f ptr sampler u32 vec2 vec3 vec4 vec2f vec3f vec4f vec2i vec3i vec4i vec2u vec3u vec4u'.split(
+    ' ',
+  )
 
 const theme = {
   type: 'dark',
@@ -78,7 +84,7 @@ const theme = {
     'input.foreground': '#c9d1d9',
     'input.border': '#343434',
     'input.placeholderForeground': '#929292',
-    'focusBorder': '#58a6ff',
+    focusBorder: '#58a6ff',
     'scrollbarSlider.background': '#80808045',
     'scrollbarSlider.hoverBackground': '#8080807a',
     'scrollbarSlider.activeBackground': '#9292929c',
@@ -88,8 +94,16 @@ const theme = {
 
 const configuration = {
   comments: { lineComment: '//', blockComment: ['/*', '*/'] },
-  brackets: [['{', '}'], ['[', ']'], ['(', ')']],
-  autoClosingPairs: [{ open: '{', close: '}' }, { open: '[', close: ']' }, { open: '(', close: ')' }],
+  brackets: [
+    ['{', '}'],
+    ['[', ']'],
+    ['(', ')'],
+  ],
+  autoClosingPairs: [
+    { open: '{', close: '}' },
+    { open: '[', close: ']' },
+    { open: '(', close: ')' },
+  ],
 }
 
 const grammar = {
@@ -136,19 +150,28 @@ let ready: Promise<void> | undefined
 
 export function registerWgslTheme() {
   if (ready) return ready
-  const extension = registerExtension({
-    name: 'wgsl-editor',
-    publisher: 'earth-connect',
-    version: '1.0.0',
-    engines: { vscode: '*' },
-    contributes: {
-      languages: [{
-        id: wgslLanguageId, extensions: ['.wgsl'], aliases: ['WGSL'], configuration: './language-configuration.json',
-      }],
-      themes: [{ id: wgslThemeName, label: wgslThemeName, uiTheme: 'vs-dark', path: './theme.json' }],
-      grammars: [{ language: wgslLanguageId, scopeName: grammar.scopeName, path: './grammar.json' }],
+  const extension = registerExtension(
+    {
+      name: 'wgsl-editor',
+      publisher: 'earth-connect',
+      version: '1.0.0',
+      engines: { vscode: '*' },
+      contributes: {
+        languages: [
+          {
+            id: wgslLanguageId,
+            extensions: ['.wgsl'],
+            aliases: ['WGSL'],
+            configuration: './language-configuration.json',
+          },
+        ],
+        themes: [{ id: wgslThemeName, label: wgslThemeName, uiTheme: 'vs-dark', path: './theme.json' }],
+        grammars: [{ language: wgslLanguageId, scopeName: grammar.scopeName, path: './grammar.json' }],
+      },
     },
-  }, ExtensionHostKind.LocalWebWorker, { system: true })
+    ExtensionHostKind.LocalWebWorker,
+    { system: true },
+  )
   const assets = {
     'theme.json': theme,
     'grammar.json': grammar,
