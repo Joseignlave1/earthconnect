@@ -10,8 +10,13 @@ import type { WorkspaceAssets } from './workspaceAssets.ts'
 import { startWorkspacePrewarm, type WorkspacePrewarm } from './workspacePrewarm.ts'
 import type { loadWorkspaceRelease } from './workspaceRelease.ts'
 
-// Reuse the workspace module fetch started in pagesBootstrap.
-const workspaceModule = import('./SharedSkyWorkspace.tsx')
+// Lazily loaded when entering /find so the landing page (/) never pays for Monaco/WGSL analyzer
+// or a hidden duplicate WebGPU SurfaceRenderer upfront.
+let workspaceModulePromise: Promise<typeof import('./SharedSkyWorkspace.tsx')> | null = null
+function loadWorkspaceModule() {
+  workspaceModulePromise ??= import('./SharedSkyWorkspace.tsx')
+  return workspaceModulePromise
+}
 
 type AppRoute = 'hero' | 'workspace'
 
@@ -24,34 +29,67 @@ type SharedSkyWorkspaceComponent = typeof import('./SharedSkyWorkspace.tsx')['de
 
 // eslint-disable-next-line react-refresh/only-export-components
 function EarthConnectShell({
-  WorkspaceComponent,
+  initialWorkspaceComponent,
   assets,
   resources,
   initialProject,
-  onReady,
+  onReadyChange,
 }: {
-  WorkspaceComponent: SharedSkyWorkspaceComponent
+  initialWorkspaceComponent: SharedSkyWorkspaceComponent | null
   assets: WorkspaceAssets
   resources: EarthWorkspaceResources
-  initialProject: ShaderProject
-  onReady: () => void
+  initialProject: ShaderProject | null
+  onReadyChange: (ready: boolean) => void
 }) {
   const [initialRoute] = useState<AppRoute>(routeFromLocation)
   const [route, setRoute] = useState<AppRoute>(initialRoute)
+  const [workspaceComponent, setWorkspaceComponent] = useState<SharedSkyWorkspaceComponent | null>(
+    () => initialWorkspaceComponent,
+  )
+  const [project, setProject] = useState<ShaderProject | null>(() => initialProject)
   const [heroMounted, setHeroMounted] = useState(initialRoute === 'hero')
   const [heroLeaving, setHeroLeaving] = useState(false)
   const [workspaceReady, setWorkspaceReady] = useState(false)
-  const [heroReady, setHeroReady] = useState(initialRoute !== 'hero')
-  const reportedReady = useRef(false)
+  const [heroReady, setHeroReady] = useState(false)
+  const lastReportedReady = useRef<boolean | null>(null)
   const leaveTimer = useRef<number | undefined>(undefined)
-
+  const routeRef = useRef(route)
+  const heroMountedRef = useRef(heroMounted)
+  const workspaceReadyRef = useRef(workspaceReady)
   useEffect(() => {
-    if (reportedReady.current) return
-    if (workspaceReady && heroReady) {
-      reportedReady.current = true
-      onReady()
+    routeRef.current = route
+    heroMountedRef.current = heroMounted
+    workspaceReadyRef.current = workspaceReady
+  }, [route, heroMounted, workspaceReady])
+
+  useEffect(() => () => window.clearTimeout(leaveTimer.current), [])
+
+  // Keep the loading screen up whenever the active view hasn't finished rendering its first complete frame
+  // (except when leaving the already-live hero into /find, where the hero itself stays on top until workspaceReady).
+  const activeRouteReady = route === 'hero' ? heroReady : workspaceReady || (heroMounted && heroReady)
+  useEffect(() => {
+    if (lastReportedReady.current === null && !activeRouteReady) return
+    if (lastReportedReady.current === activeRouteReady) return
+    lastReportedReady.current = activeRouteReady
+    onReadyChange(activeRouteReady)
+  }, [activeRouteReady, onReadyChange])
+
+  // Load workspace bundle + saved WGSL project on demand when navigating into /find.
+  useEffect(() => {
+    if (route !== 'workspace' || (workspaceComponent && project)) return
+    let cancelled = false
+    void Promise.all([
+      workspaceComponent ? Promise.resolve({ default: workspaceComponent }) : loadWorkspaceModule(),
+      project ? Promise.resolve(project) : readShaderProject(),
+    ]).then(([mod, loadedProject]) => {
+      if (cancelled) return
+      setWorkspaceComponent(() => mod.default)
+      setProject(loadedProject)
+    })
+    return () => {
+      cancelled = true
     }
-  }, [workspaceReady, heroReady, onReady])
+  }, [route, workspaceComponent, project])
 
   const leaveHero = useCallback(() => {
     window.clearTimeout(leaveTimer.current)
@@ -59,21 +97,23 @@ function EarthConnectShell({
     if (reduced) {
       setHeroLeaving(false)
       setHeroMounted(false)
+      setHeroReady(false)
       return
     }
     setHeroLeaving(true)
     leaveTimer.current = window.setTimeout(() => {
       setHeroLeaving(false)
       setHeroMounted(false)
+      setHeroReady(false)
     }, 340)
   }, [])
 
   const openWorkspace = useCallback(() => {
     if (route === 'workspace') return
     if (routeFromLocation() !== 'workspace') window.history.pushState(null, '', '/find')
+    setWorkspaceReady(false)
     setRoute('workspace')
-    leaveHero()
-  }, [route, leaveHero])
+  }, [route])
 
   useEffect(() => {
     const onPopState = () => {
@@ -81,32 +121,46 @@ function EarthConnectShell({
       window.clearTimeout(leaveTimer.current)
       setRoute(next)
       if (next === 'hero') {
+        setWorkspaceReady(false)
         setHeroLeaving(false)
-        setHeroMounted(true)
+        if (!heroMountedRef.current) {
+          // Cover synchronously in the same React render batch as remounting BridgeHero
+          // so zero unloaded frames leak before effects run.
+          lastReportedReady.current = false
+          onReadyChange(false)
+          setHeroReady(false)
+          setHeroMounted(true)
+        }
       } else {
-        leaveHero()
+        setWorkspaceReady(false)
+        if (!heroMountedRef.current) {
+          lastReportedReady.current = false
+          onReadyChange(false)
+        } else if (workspaceReadyRef.current) {
+          leaveHero()
+        }
       }
     }
     window.addEventListener('popstate', onPopState)
-    return () => {
-      window.removeEventListener('popstate', onPopState)
-      window.clearTimeout(leaveTimer.current)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [leaveHero, onReadyChange])
+
+  const handleWorkspaceReady = useCallback(() => {
+    setWorkspaceReady(true)
+    if (routeRef.current === 'workspace' && heroMountedRef.current) {
+      leaveHero()
     }
   }, [leaveHero])
-
-  const handleWorkspaceReady = useCallback(() => setWorkspaceReady(true), [])
   const handleHeroReady = useCallback(() => setHeroReady(true), [])
 
+  const Workspace = workspaceComponent
   return (
     <>
-      <div inert={route === 'hero'}>
-        <WorkspaceComponent
-          assets={assets}
-          resources={resources}
-          initialProject={initialProject}
-          onReady={handleWorkspaceReady}
-        />
-      </div>
+      {route === 'workspace' && Workspace && project && (
+        <div>
+          <Workspace assets={assets} resources={resources} initialProject={project} onReady={handleWorkspaceReady} />
+        </div>
+      )}
       {heroMounted && (
         <BridgeHero
           assets={assets}
@@ -125,7 +179,7 @@ function createOpener(
   releaseUnclaimedDevice?: () => void,
   getPrewarm?: () => Promise<WorkspacePrewarm> | undefined,
 ) {
-  return async function open(assets: WorkspaceAssets, onReady: () => void, signal: AbortSignal) {
+  return async function open(assets: WorkspaceAssets, onReady: (ready?: boolean) => void, signal: AbortSignal) {
     const existing = await getPrewarm?.()
     signal.throwIfAborted()
     let prewarm: WorkspacePrewarm
@@ -137,19 +191,30 @@ function createOpener(
       releaseUnclaimedDevice?.()
     }
     signal.addEventListener('abort', prewarm.dispose, { once: true })
-    const [{ default: SharedSkyWorkspace }, initialProject] = await Promise.all([workspaceModule, readShaderProject()])
-    signal.throwIfAborted()
-    const handleReady = () => {
-      prewarm.handoff()
-      onReady()
+
+    let initialWorkspaceComponent: SharedSkyWorkspaceComponent | null = null
+    let initialProject: ShaderProject | null = null
+    if (routeFromLocation() === 'workspace') {
+      const [{ default: SharedSkyWorkspace }, loadedProject] = await Promise.all([
+        loadWorkspaceModule(),
+        readShaderProject(),
+      ])
+      signal.throwIfAborted()
+      initialWorkspaceComponent = SharedSkyWorkspace
+      initialProject = loadedProject
+    }
+
+    const handleReadyChange = (ready: boolean) => {
+      if (ready) prewarm.handoff()
+      onReady(ready)
     }
     return (
       <EarthConnectShell
-        WorkspaceComponent={SharedSkyWorkspace}
+        initialWorkspaceComponent={initialWorkspaceComponent}
         assets={assets}
         resources={prewarm.resources}
         initialProject={initialProject}
-        onReady={handleReady}
+        onReadyChange={handleReadyChange}
       />
     )
   }
@@ -164,7 +229,7 @@ export function mount(
   const open = createOpener(devicePool, releaseUnclaimedDevice, getPrewarm)
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <WorkspaceStartup open={open} loadInitialRelease={loadInitialRelease} />
+      <WorkspaceStartup open={open} loadInitialRelease={loadInitialRelease} devicePool={devicePool} />
     </StrictMode>,
   )
 }

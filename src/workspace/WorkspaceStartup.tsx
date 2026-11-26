@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { loadWorkspaceRelease, type DownloadProgress } from './workspaceRelease.ts'
-import type { WorkspaceAssets } from './workspaceAssets.ts'
+import { ConstellationLogo } from '../hero/ConstellationLogo.tsx'
+import { type createSurfaceDevicePool, WEBGPU_UNAVAILABLE_MESSAGE } from '../shader-test/surface-device.ts'
 import { markStartup, reportStartupTiming } from './startupTiming.ts'
-import { WEBGPU_UNAVAILABLE_MESSAGE } from '../shader-test/surface-device.ts'
+import type { WorkspaceAssets } from './workspaceAssets.ts'
+import { type DownloadProgress, loadWorkspaceRelease } from './workspaceRelease.ts'
 import './WorkspaceStartup.css'
 
 const decimal = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -12,10 +13,12 @@ export function WorkspaceStartup({
   open,
   embedded,
   loadInitialRelease,
+  devicePool,
 }: {
-  open(assets: WorkspaceAssets, onReady: () => void, signal: AbortSignal): Promise<ReactNode>
+  open(assets: WorkspaceAssets, onReady: (ready?: boolean) => void, signal: AbortSignal): Promise<ReactNode>
   embedded?: () => WorkspaceAssets
   loadInitialRelease?: typeof loadWorkspaceRelease
+  devicePool?: ReturnType<typeof createSurfaceDevicePool>
 }) {
   const [attempt, setAttempt] = useState(0)
   const [progress, setProgress] = useState<DownloadProgress>()
@@ -25,28 +28,45 @@ export function WorkspaceStartup({
   const [error, setError] = useState('')
   const [workspace, setWorkspace] = useState<{ id: number; view: ReactNode }>()
   const [ready, setReady] = useState(false)
+  const [transitioning, setTransitioning] = useState(false)
+  const [logoCycle, setLogoCycle] = useState(0)
+  const [logoReady, setLogoReady] = useState(false)
+  const [logoDismissed, setLogoDismissed] = useState(false)
   const [slow, setSlow] = useState(false)
   const nextView = useRef(0)
+  const readyToken = useRef(0)
   const openView = useCallback(
     async (assets: WorkspaceAssets, signal: AbortSignal) => {
       const id = ++nextView.current
       const isCurrent = () => id === nextView.current && !signal.aborted
       setReady(false)
+      setTransitioning(false)
       setWorkspace(undefined)
       setError('')
-      let reported = false
-      const onReady = () => {
-        if (reported) return
-        reported = true
+      let initialReported = false
+      const onReady = (isReady = true) => {
+        if (!isCurrent()) return
+        const token = ++readyToken.current
+        if (!isReady) {
+          setTransitioning(true)
+          setReady(false)
+          setLogoReady(false)
+          setLogoDismissed(false)
+          setLogoCycle(value => value + 1)
+          return
+        }
         // Leave a full paint opportunity for Monaco, the preview controls and
         // the already completed WebGPU canvas before removing the overlay.
         requestAnimationFrame(() =>
           requestAnimationFrame(() => {
-            if (isCurrent()) {
+            if (!isCurrent() || token !== readyToken.current) return
+            if (!initialReported) {
+              initialReported = true
               markStartup('revealed')
               reportStartupTiming()
-              setReady(true)
             }
+            setTransitioning(false)
+            setReady(true)
           }),
         )
       }
@@ -62,6 +82,21 @@ export function WorkspaceStartup({
 
   const revealed = authorized && ready && !error
   const finalizing = !!progress?.total && progress.downloaded === progress.total
+  // Keep the WebGPU logo alive through the 220ms fade-out so it never snaps back to blank,
+  // then tear down its GPU resources & stop rAF completely once hidden.
+  const handleLogoReady = useCallback(() => setLogoReady(true), [])
+  useEffect(() => {
+    if (logoReady || revealed || error) return
+    const safety = window.setTimeout(() => setLogoReady(true), 2000)
+    return () => window.clearTimeout(safety)
+  }, [logoReady, revealed, error])
+  useEffect(() => {
+    if (!revealed) return
+    const timer = window.setTimeout(() => setLogoDismissed(true), 280)
+    return () => window.clearTimeout(timer)
+  }, [revealed])
+  const logoMounted = !revealed || !logoDismissed
+  const startupContentVisible = logoReady || Boolean(error)
 
   useEffect(() => {
     if ((!opening && !finalizing) || revealed || error || unsaved) return
@@ -99,18 +134,39 @@ export function WorkspaceStartup({
         return
       }
       const load = attempt === 0 && loadInitialRelease ? loadInitialRelease : loadWorkspaceRelease
-      const release = await load(
-        signal,
-        state => {
-          if (!signal.aborted) setProgress(state)
+      let lastProgressFlush = 0
+      let pendingProgress: DownloadProgress | undefined
+      let progressTimer: number | undefined
+      const flushProgress = (state: DownloadProgress) => {
+        pendingProgress = undefined
+        lastProgressFlush = performance.now()
+        if (!signal.aborted) setProgress(state)
+      }
+      const onProgress = (state: DownloadProgress) => {
+        if (signal.aborted) return
+        const now = performance.now()
+        const isEdge = state.downloaded === 0 || (state.total > 0 && state.downloaded >= state.total) || state.fallback
+        if (isEdge || now - lastProgressFlush >= 50) {
+          window.clearTimeout(progressTimer)
+          progressTimer = undefined
+          flushProgress(state)
+        } else {
+          pendingProgress = state
+          if (progressTimer === undefined) {
+            progressTimer = window.setTimeout(() => {
+              progressTimer = undefined
+              if (pendingProgress) flushProgress(pendingProgress)
+            }, 50)
+          }
+        }
+      }
+      signal.addEventListener('abort', () => window.clearTimeout(progressTimer), { once: true })
+      const release = await load(signal, onProgress, {
+        refresh,
+        onAssets: assets => {
+          if (!signal.aborted) void openView(assets, signal)
         },
-        {
-          refresh,
-          onAssets: assets => {
-            if (!signal.aborted) void openView(assets, signal)
-          },
-        },
-      )
+      })
       signal.throwIfAborted()
       if (release.saved) {
         setOpening(true)
@@ -130,8 +186,13 @@ export function WorkspaceStartup({
 
   function retry() {
     nextView.current++
+    readyToken.current++
     setWorkspace(undefined)
     setReady(false)
+    setTransitioning(false)
+    setLogoReady(false)
+    setLogoDismissed(false)
+    setLogoCycle(value => value + 1)
     setSlow(false)
     setError('')
     setProgress(undefined)
@@ -146,6 +207,7 @@ export function WorkspaceStartup({
   let status = 'Checking Earth data…'
   if (error) status = 'Could not open Earth Connect.'
   else if (slow) status = 'Earth Connect is taking longer to open.'
+  else if (transitioning) status = 'Opening Earth Connect…'
   else if (opening)
     status = embedded
       ? 'Opening embedded data…'
@@ -171,13 +233,8 @@ export function WorkspaceStartup({
         data-revealed={revealed || undefined}
         data-offline={offline || undefined}
       >
-        <div className="workspace-startup-content">
-          <div className="brand" aria-label="Earth Connect">
-            <span className="brand-symbol" aria-hidden="true">
-              <i />
-            </span>
-            <span>EARTH</span> CONNECT
-          </div>
+        <div className="workspace-startup-content" data-ready={startupContentVisible || undefined}>
+          {logoMounted && <ConstellationLogo key={logoCycle} devicePool={devicePool} onReady={handleLogoReady} />}
           {!error && (!unsaved || opening) && (
             <progress
               aria-label="Earth data download"

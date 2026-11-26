@@ -7,14 +7,14 @@ import { endStartupSpan, markStartup, startStartupSpan } from './startupTiming.t
 markStartup('bootstrap')
 
 if (!navigator.gpu) {
+  const initial = document.querySelector<HTMLElement>('#initial')
   const status = document.querySelector<HTMLElement>('#initial-status')
   if (status) {
     status.setAttribute('role', 'alert')
     status.style.color = '#f7f9ff'
     status.textContent = WEBGPU_UNAVAILABLE_MESSAGE
-    const box = status.parentElement
-    if (box) box.style.width = 'min(100%, 420px)'
   }
+  initial?.setAttribute('data-visible', 'true')
 } else {
   // Start WebGPU adapter/device acquisition immediately in parallel with IDB and JS loading.
   const devicePool = createSurfaceDevicePool()
@@ -91,12 +91,16 @@ if (!navigator.gpu) {
     }
   }
 
-  // Start fetching the workspace & Monaco bundles in parallel with pagesApp.
-  startStartupSpan('workspace-js')
-  void import('./SharedSkyWorkspace.tsx').then(
-    () => endStartupSpan('workspace-js'),
-    () => undefined,
-  )
+  // Only eager-fetch the heavy Monaco / WGSL workspace bundle when landing directly on /find.
+  // On the landing page (/), defer it until the user opens the workspace so startup stays lean.
+  const path = location.pathname.replace(/\/+$/, '') || '/'
+  if (path === '/find' || path.startsWith('/find/')) {
+    startStartupSpan('workspace-js')
+    void import('./SharedSkyWorkspace.tsx').then(
+      () => endStartupSpan('workspace-js'),
+      () => undefined,
+    )
+  }
   startStartupSpan('app-bundle')
   void import('./pagesApp.tsx')
     .then(({ mount }) => {
@@ -105,6 +109,7 @@ if (!navigator.gpu) {
     })
     .catch(() => {
       releaseUnclaimedDevice()
+      document.querySelector('#initial')?.setAttribute('data-visible', 'true')
       document.querySelector('#initial-status')!.textContent = 'Could not open Earth Connect. Reload to retry.'
     })
 }

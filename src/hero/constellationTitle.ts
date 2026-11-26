@@ -41,10 +41,26 @@ type TitlePipelines = {
   renderLayout: GPUBindGroupLayout
 }
 
-const pipelineCache = new WeakMap<GPUDevice, Promise<TitlePipelines>>()
+export type TitlePipelineTarget = {
+  format?: GPUTextureFormat
+  sampleCount?: 1 | 4
+  hasDepth?: boolean
+}
 
-function getTitlePipelines(device: GPUDevice): Promise<TitlePipelines> {
-  let pending = pipelineCache.get(device)
+const pipelineCache = new WeakMap<GPUDevice, Map<string, Promise<TitlePipelines>>>()
+
+function getTitlePipelines(device: GPUDevice, target: TitlePipelineTarget = {}): Promise<TitlePipelines> {
+  const format = target.format ?? 'rgba16float'
+  const sampleCount = target.sampleCount ?? 4
+  const hasDepth = target.hasDepth ?? true
+  const key = `${format}:${sampleCount}:${hasDepth ? 'd' : 'nd'}`
+
+  let byKey = pipelineCache.get(device)
+  if (!byKey) {
+    byKey = new Map()
+    pipelineCache.set(device, byKey)
+  }
+  let pending = byKey.get(key)
   if (!pending) {
     pending = (async () => {
       const module = await shaderModule(device, 'Hero constellation title shader', titleWgsl)
@@ -105,11 +121,13 @@ function getTitlePipelines(device: GPUDevice): Promise<TitlePipelines> {
         color: { srcFactor: 'one', dstFactor: 'one' },
         alpha: { srcFactor: 'zero', dstFactor: 'one' },
       }
-      const depthStencil: GPUDepthStencilState = {
-        format: 'depth32float',
-        depthWriteEnabled: false,
-        depthCompare: 'always',
-      }
+      const depthStencil: GPUDepthStencilState | undefined = hasDepth
+        ? {
+            format: 'depth32float',
+            depthWriteEnabled: false,
+            depthCompare: 'always',
+          }
+        : undefined
       const renderPipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [renderLayout] })
 
       const [velCompute, dustCompute, dustRender, edgeRender, starRender] = await Promise.all([
@@ -126,12 +144,12 @@ function getTitlePipelines(device: GPUDevice): Promise<TitlePipelines> {
         device.createRenderPipelineAsync({
           label: 'Hero title stardust particle render',
           layout: renderPipelineLayout,
-          multisample: { count: 4 },
+          multisample: { count: sampleCount },
           vertex: { module, entryPoint: 'dustVertex' },
           fragment: {
             module,
             entryPoint: 'dustFragment',
-            targets: [{ format: 'rgba16float', blend: additive }],
+            targets: [{ format, blend: additive }],
           },
           primitive: { topology: 'triangle-list', cullMode: 'none' },
           depthStencil,
@@ -139,12 +157,12 @@ function getTitlePipelines(device: GPUDevice): Promise<TitlePipelines> {
         device.createRenderPipelineAsync({
           label: 'Hero title constellation edges render',
           layout: renderPipelineLayout,
-          multisample: { count: 4 },
+          multisample: { count: sampleCount },
           vertex: { module, entryPoint: 'edgeVertex' },
           fragment: {
             module,
             entryPoint: 'edgeFragment',
-            targets: [{ format: 'rgba16float', blend: additive }],
+            targets: [{ format, blend: additive }],
           },
           primitive: { topology: 'triangle-list', cullMode: 'none' },
           depthStencil,
@@ -152,12 +170,12 @@ function getTitlePipelines(device: GPUDevice): Promise<TitlePipelines> {
         device.createRenderPipelineAsync({
           label: 'Hero title HDR stars render',
           layout: renderPipelineLayout,
-          multisample: { count: 4 },
+          multisample: { count: sampleCount },
           vertex: { module, entryPoint: 'starVertex' },
           fragment: {
             module,
             entryPoint: 'starFragment',
-            targets: [{ format: 'rgba16float', blend: additive }],
+            targets: [{ format, blend: additive }],
           },
           primitive: { topology: 'triangle-list', cullMode: 'none' },
           depthStencil,
@@ -175,9 +193,9 @@ function getTitlePipelines(device: GPUDevice): Promise<TitlePipelines> {
         renderLayout,
       }
     })()
-    pipelineCache.set(device, pending)
+    byKey.set(key, pending)
     void pending.catch(() => {
-      if (pipelineCache.get(device) === pending) pipelineCache.delete(device)
+      if (byKey?.get(key) === pending) byKey.delete(key)
     })
   }
   return pending
@@ -537,6 +555,24 @@ async function buildDustAssets(): Promise<{
   return { dustCount, dustHomeData, dustInitState }
 }
 
+export type TitleDustAssets = {
+  dustCount: number
+  dustHomeData: Float32Array
+  dustInitState: Float32Array
+}
+
+let cachedTitleDustAssets: Promise<TitleDustAssets> | undefined
+
+export function getTitleDustAssets(): Promise<TitleDustAssets> {
+  if (!cachedTitleDustAssets) {
+    cachedTitleDustAssets = buildDustAssets().catch(err => {
+      cachedTitleDustAssets = undefined
+      throw err
+    })
+  }
+  return cachedTitleDustAssets
+}
+
 const TOTAL_STARS = CONSTELLATION_LETTERS.reduce((sum, letter) => sum + letter.stars.length, 0) + COMPANION_STARS.length
 const MAX_EDGES = CONSTELLATION_LETTERS.reduce((sum, letter) => sum + letter.edges.length, 0) + CROSS_SIGHTLINES.length
 const EDGE_FLOATS = 8
@@ -728,8 +764,13 @@ export class ConstellationTitleOverlay {
     ]
   }
 
-  static async create(device: GPUDevice) {
-    const [pipelines, assets] = await Promise.all([getTitlePipelines(device), buildDustAssets()])
+  static async fromAssets(device: GPUDevice, assets: TitleDustAssets, target?: TitlePipelineTarget) {
+    const pipelines = await getTitlePipelines(device, target)
+    return new ConstellationTitleOverlay(device, pipelines, assets)
+  }
+
+  static async create(device: GPUDevice, target?: TitlePipelineTarget) {
+    const [pipelines, assets] = await Promise.all([getTitlePipelines(device, target), getTitleDustAssets()])
     return new ConstellationTitleOverlay(device, pipelines, assets)
   }
 

@@ -28,18 +28,39 @@ struct Vertex {
   @location(0) local: vec3f,
 }
 
-fn computePlanetVertex(position: vec3f) -> Vertex {
-  let smallPad = u.tiles.z;
-  let reliefFade = u.tiles.w;
-  let rSurf = u.terrain.x * .001;
-  let refPos = normalize(position) * rSurf;
-  let basePos = mix(refPos, position, reliefFade);
-  let pos = select(basePos, refPos * (1. + smallPad), smallPad > 0.);
-  return Vertex(u.camera * vec4f(pos, 1.), pos);
+fn cubeFaceDir(face: u32, fx: f32, fy: f32) -> vec3f {
+  let qpi = 0.7853981633974483;
+  let tx = tan(fx * qpi);
+  let ty = tan(fy * qpi);
+  switch face {
+    case 0u: { return normalize(vec3f(1., ty, -tx)); }
+    case 1u: { return normalize(vec3f(-1., ty, tx)); }
+    case 2u: { return normalize(vec3f(tx, 1., -ty)); }
+    case 3u: { return normalize(vec3f(tx, -1., ty)); }
+    case 4u: { return normalize(vec3f(tx, ty, 1.)); }
+    default: { return normalize(vec3f(-tx, ty, -1.)); }
+  }
 }
 
-@vertex fn vertexMain(@location(0) position: vec3f) -> Vertex {
-  return computePlanetVertex(position);
+@vertex fn vertexMain(
+  @location(0) local: vec3f,
+  @location(1) patchRect: vec4f,
+  @location(2) patchMeta: vec4f,
+) -> Vertex {
+  let fx = patchRect.x + local.x * patchRect.z;
+  let fy = patchRect.y + local.y * patchRect.w;
+  let dir = cubeFaceDir(u32(round(patchMeta.x)), fx, fy);
+  let uv = dirToUv(dir);
+  let maxLod = max(0., f32(textureNumLevels(heights)) - 1.);
+  let demMip = clamp(patchMeta.y, 0., maxLod);
+  let elevM = decode(textureSampleLevel(heights, gridSampler, uv, demMip));
+  let rSurf = u.terrain.x * .001;
+  let reliefFade = u.tiles.w;
+  let smallPad = u.tiles.z;
+  let skirt = local.z * patchMeta.z;
+  let dispR = rSurf + (elevM * u.terrain.y * .001) * reliefFade - skirt;
+  let pos = select(dir * dispR, dir * rSurf * (1. + smallPad), smallPad > 0.);
+  return Vertex(u.camera * vec4f(pos, 1.), pos);
 }
 
 struct SmallVertex {

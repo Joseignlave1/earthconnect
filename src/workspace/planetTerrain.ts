@@ -8,6 +8,12 @@ import {
   uploadBuffer,
   writeTextureChunkedAsync,
 } from '../shader-test/gpu.ts'
+import {
+  createPatchMesh,
+  INSTANCE_FLOATS,
+  MAX_PATCH_INSTANCES,
+  PlanetCubeQuadtree,
+} from '../shader-test/quadtreeLod.ts'
 import colorWgsl from '../shader-test/shaders/color.wgsl?raw'
 import contoursWgsl from '../shader-test/shaders/contours.wgsl?raw'
 import { elevationPyramid, packRg8Levels, type Terrain } from '../shader-test/terrain.ts'
@@ -28,11 +34,13 @@ export { buildPlanetTerrain, type PlanetTerrain, type TerrainBody }
 
 const surfaceShader = joinWgsl(colorWgsl, contoursWgsl, planetTerrainWgsl)
 const annotationShader = planetAnnotationWgsl
+const sharedPatchMesh = createPatchMesh()
 
 type SharedBodyTerrain = {
   mesh: PlanetTerrain
-  vertices: GPUBuffer
-  indices: GPUBuffer
+  quadtree: PlanetCubeQuadtree
+  patchVertices: GPUBuffer
+  patchIndices: GPUBuffer
   heights: GPUTexture
   sampler: GPUSampler
 }
@@ -52,6 +60,10 @@ type GpuTerrain = {
   smallAnnotationParameters: Float32Array<ArrayBuffer>
   smallAnnotationUniform: GPUBuffer
   smallAnnotationBindGroup: GPUBindGroup
+  patchInstances: Float32Array<ArrayBuffer>
+  patchInstanceBuffer: GPUBuffer
+  loupePatchInstances: Float32Array<ArrayBuffer>
+  loupePatchInstanceBuffer: GPUBuffer
 }
 
 type PlanetPipelines = {
@@ -68,7 +80,8 @@ type PlanetPipelines = {
 type DevicePlanetCache = {
   controller: AbortController
   pipelines?: Promise<PlanetPipelines>
-  indices?: GPUBuffer
+  patchVertices?: GPUBuffer
+  patchIndices?: GPUBuffer
   albedoSampler?: GPUSampler
   fallbackAlbedo?: GPUTexture
   planetTiles?: PlanetTileCache
@@ -90,11 +103,11 @@ function getPlanetCache(device: GPUDevice): DevicePlanetCache {
     planetCache.set(device, entry)
     void device.lost.then(() => {
       controller.abort()
-      entry!.indices?.destroy()
+      entry!.patchVertices?.destroy()
+      entry!.patchIndices?.destroy()
       entry!.fallbackAlbedo?.destroy()
       entry!.planetTiles?.destroy()
       for (const item of created) {
-        item.vertices.destroy()
         item.heights.destroy()
       }
       for (const texture of createdAlbedos) texture.destroy()
@@ -110,14 +123,23 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
   const cache = getPlanetCache(device)
   if (!cache.pipelines) {
     const vertexBuffers: GPUVertexBufferLayout[] = [
-      { arrayStride: 12, attributes: [{ shaderLocation: 0, format: 'float32x3', offset: 0 }] },
+      { arrayStride: 12, stepMode: 'vertex', attributes: [{ shaderLocation: 0, format: 'float32x3', offset: 0 }] },
+      {
+        arrayStride: INSTANCE_FLOATS * 4,
+        stepMode: 'instance',
+        attributes: [
+          { shaderLocation: 1, format: 'float32x4', offset: 0 },
+          { shaderLocation: 2, format: 'float32x4', offset: 16 },
+        ],
+      },
     ]
+    const vf = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT
     const bindLayout = device.createBindGroupLayout({
       label: 'Planetary DEM resources',
       entries: [
-        { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+        { binding: 0, visibility: vf, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: vf, texture: { sampleType: 'float' } },
+        { binding: 2, visibility: vf, sampler: { type: 'filtering' } },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 4, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
         { binding: 5, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'uint' } },
@@ -190,6 +212,8 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
           label: 'Planetary DEM annotation resources',
           entries: [
             { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+            { binding: 1, visibility: GPUShaderStage.VERTEX, texture: { sampleType: 'float' } },
+            { binding: 2, visibility: GPUShaderStage.VERTEX, sampler: { type: 'filtering' } },
           ],
         })
         const annotationPipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [annotationLayout] })
@@ -261,11 +285,18 @@ async function buildBodyAlbedo(
   cache: DevicePlanetCache,
   body: TerrainBody,
   url: string,
+  maxWidth?: number,
 ): Promise<GPUTexture> {
   const { signal } = cache.controller
   const response = await fetch(url, { signal })
   if (!response.ok) throw new Error(`${body} albedo download failed (${response.status}).`)
-  const bitmap = await createImageBitmap(await response.blob(), { colorSpaceConversion: 'none' })
+  const blob = await response.blob()
+  const bitmap = await createImageBitmap(
+    blob,
+    maxWidth
+      ? { colorSpaceConversion: 'none', resizeWidth: maxWidth, resizeHeight: maxWidth >> 1, resizeQuality: 'high' }
+      : { colorSpaceConversion: 'none' },
+  )
   let texture: GPUTexture | undefined
   try {
     signal.throwIfAborted()
@@ -294,15 +325,17 @@ function loadSharedBodyAlbedo(
   body: TerrainBody,
   url: string,
   signal: AbortSignal,
+  maxWidth?: number,
 ): Promise<GPUTexture> {
   signal.throwIfAborted()
   const cache = getPlanetCache(device)
-  let pending = cache.albedos.get(url)
+  const key = maxWidth ? `${url}@${maxWidth}` : url
+  let pending = cache.albedos.get(key)
   if (!pending) {
-    pending = buildBodyAlbedo(device, cache, body, url)
-    cache.albedos.set(url, pending)
+    pending = buildBodyAlbedo(device, cache, body, url, maxWidth)
+    cache.albedos.set(key, pending)
     void pending.catch(() => {
-      if (cache.albedos.get(url) === pending) cache.albedos.delete(url)
+      if (cache.albedos.get(key) === pending) cache.albedos.delete(key)
     })
   }
   return raceAbort(pending, signal)
@@ -322,6 +355,7 @@ async function getSharedBodyTerrain(
       const { terrain } = prepared
       const levels = prepared.levels ?? packRg8Levels(elevationPyramid(terrain, true))
       const mesh = buildPlanetTerrain(body, terrain, false)
+      const quadtree = PlanetCubeQuadtree.fromTerrain(terrain, mesh.radius)
       const heights = device.createTexture({
         label: `${body} numeric terrain grid`,
         size: [terrain.width, terrain.height],
@@ -346,11 +380,16 @@ async function getSharedBodyTerrain(
         heights.destroy()
         throw error
       }
-      const vertices = uploadBuffer(device, `${body} displaced terrain vertices`, mesh.positions, GPUBufferUsage.VERTEX)
-      const indices = (cache.indices ??= uploadBuffer(
+      const patchVertices = (cache.patchVertices ??= uploadBuffer(
         device,
-        'Planetary displaced terrain indices',
-        mesh.indices,
+        'Planetary quadtree patch vertices',
+        sharedPatchMesh.vertices,
+        GPUBufferUsage.VERTEX,
+      ))
+      const patchIndices = (cache.patchIndices ??= uploadBuffer(
+        device,
+        'Planetary quadtree patch indices',
+        sharedPatchMesh.indices,
         GPUBufferUsage.INDEX,
       ))
       const sampler = device.createSampler({
@@ -359,7 +398,7 @@ async function getSharedBodyTerrain(
         minFilter: 'linear',
         mipmapFilter: 'linear',
       })
-      const shared: SharedBodyTerrain = { mesh, heights, vertices, indices, sampler }
+      const shared: SharedBodyTerrain = { mesh, quadtree, heights, patchVertices, patchIndices, sampler }
       cache.created.push(shared)
       // Mip levels and raw CPU elevation bytes are no longer needed once resident on the GPU.
       // Keeping the terrain object itself as the WeakMap key avoids re-uploading on the same device.
@@ -422,6 +461,7 @@ export class PlanetTerrainRenderer {
     loadTerrain?: TerrainLoader,
     onTileUpdate?: () => void,
     loadPlanetTilePack?: PlanetTilePackLoader,
+    albedoMaxWidths?: Partial<Record<TerrainBody, number>>,
   ) {
     const bodies: TerrainBody[] = ['moon', 'mars']
     const pipelines = await getPlanetPipelines(device)
@@ -446,7 +486,7 @@ export class PlanetTerrainRenderer {
         let albedo: GPUTexture
         try {
           const url = await assetUrl(`textures/${body}-albedo.webp`, signal)
-          albedo = await loadSharedBodyAlbedo(device, body, url, signal)
+          albedo = await loadSharedBodyAlbedo(device, body, url, signal, albedoMaxWidths?.[body])
         } catch {
           if (signal.aborted) throw signal.reason
           albedo = getFallbackAlbedo(device)
@@ -541,7 +581,11 @@ export class PlanetTerrainRenderer {
     })
     const annotationBindGroup = device.createBindGroup({
       layout: this.annotationLayout,
-      entries: [{ binding: 0, resource: { buffer: annotationUniform } }],
+      entries: [
+        { binding: 0, resource: { buffer: annotationUniform } },
+        { binding: 1, resource: shared.heights.createView() },
+        { binding: 2, resource: shared.sampler },
+      ],
     })
     const smallAnnotationParameters = new Float32Array(parameters)
     const smallAnnotationUniform = device.createBuffer({
@@ -556,6 +600,18 @@ export class PlanetTerrainRenderer {
       albedo,
       albedoSampler,
     )
+    const patchInstances = new Float32Array(MAX_PATCH_INSTANCES * INSTANCE_FLOATS)
+    const patchInstanceBuffer = device.createBuffer({
+      label: `${body} quadtree patch instances`,
+      size: patchInstances.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    })
+    const loupePatchInstances = new Float32Array(MAX_PATCH_INSTANCES * INSTANCE_FLOATS)
+    const loupePatchInstanceBuffer = device.createBuffer({
+      label: `${body} loupe quadtree patch instances`,
+      size: loupePatchInstances.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    })
     this.bodies.set(body, {
       shared,
       albedo,
@@ -571,6 +627,10 @@ export class PlanetTerrainRenderer {
       smallAnnotationParameters,
       smallAnnotationUniform,
       smallAnnotationBindGroup,
+      patchInstances,
+      patchInstanceBuffer,
+      loupePatchInstances,
+      loupePatchInstanceBuffer,
     })
   }
 
@@ -619,6 +679,8 @@ export class PlanetTerrainRenderer {
     matrix: Float32Array,
     reliefFade = 1,
     includeCoverage = false,
+    viewportWidth = 1024,
+    viewportHeight = 1024,
     smallPad = 0,
     smallView?: Float32Array,
     eye?: readonly [number, number, number],
@@ -640,21 +702,37 @@ export class PlanetTerrainRenderer {
       return
     }
     const {
-      shared: { mesh, vertices, indices },
+      shared: { mesh, quadtree, patchVertices, patchIndices },
       annotationUniform,
       annotationBindGroup,
+      patchInstances,
+      patchInstanceBuffer,
     } = data
+    const relief = settings[body].relief
+    const eyeKm = eye ?? [0, 0, mesh.radius * 4]
+    const patchCount = quadtree.selectPatches(
+      patchInstances,
+      matrix,
+      eyeKm,
+      viewportWidth,
+      viewportHeight,
+      relief,
+      reliefFade,
+    )
+    if (patchCount === 0) return
+    this.device.queue.writeBuffer(patchInstanceBuffer, 0, patchInstances, 0, patchCount * INSTANCE_FLOATS)
     this.annotationScratch.set(matrix, 0)
     this.annotationScratch[16] = body === 'moon' ? 2 : 4
     this.annotationScratch[17] = reliefFade
     this.annotationScratch[18] = mesh.radius
-    this.annotationScratch[19] = 0
+    this.annotationScratch[19] = relief
     this.device.queue.writeBuffer(annotationUniform, 0, this.annotationScratch)
     pass.setPipeline(includeCoverage ? this.annotationCoveragePipeline : this.annotationPipeline)
     pass.setBindGroup(0, annotationBindGroup)
-    pass.setVertexBuffer(0, vertices)
-    pass.setIndexBuffer(indices, 'uint32')
-    pass.drawIndexed(mesh.indices.length)
+    pass.setVertexBuffer(0, patchVertices)
+    pass.setVertexBuffer(1, patchInstanceBuffer)
+    pass.setIndexBuffer(patchIndices, 'uint16')
+    pass.drawIndexed(sharedPatchMesh.indexCount, patchCount)
   }
 
   draw(
@@ -666,6 +744,8 @@ export class PlanetTerrainRenderer {
     metresPerPixel: number,
     hdr: boolean,
     pixelRatio: number,
+    viewportWidth: number,
+    viewportHeight: number,
     smallPad = 0,
     reliefFade = 1,
     smallView?: Float32Array,
@@ -673,10 +753,12 @@ export class PlanetTerrainRenderer {
     const data = this.bodies.get(body)
     if (!data) return
     const {
-      shared: { mesh, vertices, indices },
+      shared: { quadtree, patchVertices, patchIndices },
       parameters,
       uniform,
       bindGroup,
+      patchInstances,
+      patchInstanceBuffer,
     } = data
     const [minor, fine] = contourDetail(metresPerPixel)
     parameters.set(matrix, 0)
@@ -698,11 +780,23 @@ export class PlanetTerrainRenderer {
       pass.setBindGroup(0, bindGroup)
       pass.draw(6)
     } else {
+      const patchCount = quadtree.selectPatches(
+        patchInstances,
+        matrix,
+        eye,
+        viewportWidth,
+        viewportHeight,
+        settings[body].relief,
+        reliefFade,
+      )
+      if (patchCount === 0) return
+      this.device.queue.writeBuffer(patchInstanceBuffer, 0, patchInstances, 0, patchCount * INSTANCE_FLOATS)
       pass.setPipeline(this.pipeline)
       pass.setBindGroup(0, bindGroup)
-      pass.setVertexBuffer(0, vertices)
-      pass.setIndexBuffer(indices, 'uint32')
-      pass.drawIndexed(mesh.indices.length)
+      pass.setVertexBuffer(0, patchVertices)
+      pass.setVertexBuffer(1, patchInstanceBuffer)
+      pass.setIndexBuffer(patchIndices, 'uint16')
+      pass.drawIndexed(sharedPatchMesh.indexCount, patchCount)
     }
   }
 
@@ -715,15 +809,28 @@ export class PlanetTerrainRenderer {
     metresPerPixel: number,
     hdr: boolean,
     pixelRatio: number,
+    loupeSize: number,
   ) {
     const data = this.bodies.get(body)
     if (!data) return
     const {
-      shared: { mesh, vertices, indices },
+      shared: { quadtree, patchVertices, patchIndices },
       loupeParameters,
       loupeUniform,
       loupeBindGroup,
+      loupePatchInstances,
+      loupePatchInstanceBuffer,
     } = data
+    const patchCount = quadtree.selectPatches(
+      loupePatchInstances,
+      matrix,
+      eye,
+      loupeSize,
+      loupeSize,
+      settings[body].relief,
+      1,
+    )
+    if (patchCount === 0) return
     const [minor, fine] = contourDetail(metresPerPixel)
     loupeParameters.set(matrix, 0)
     loupeParameters.set(sunlight, 16)
@@ -738,20 +845,31 @@ export class PlanetTerrainRenderer {
     loupeParameters.set(eye, 36)
     loupeParameters[39] = body === 'mars' ? 1 : 0
     this.device.queue.writeBuffer(loupeUniform, 0, loupeParameters)
+    this.device.queue.writeBuffer(loupePatchInstanceBuffer, 0, loupePatchInstances, 0, patchCount * INSTANCE_FLOATS)
     pass.setPipeline(this.pipeline)
     pass.setBindGroup(0, loupeBindGroup)
-    pass.setVertexBuffer(0, vertices)
-    pass.setIndexBuffer(indices, 'uint32')
-    pass.drawIndexed(mesh.indices.length)
+    pass.setVertexBuffer(0, patchVertices)
+    pass.setVertexBuffer(1, loupePatchInstanceBuffer)
+    pass.setIndexBuffer(patchIndices, 'uint16')
+    pass.drawIndexed(sharedPatchMesh.indexCount, patchCount)
   }
 
   destroy() {
     this.unsubscribeTiles()
-    for (const { uniform, loupeUniform, annotationUniform, smallAnnotationUniform } of this.bodies.values()) {
+    for (const {
+      uniform,
+      loupeUniform,
+      annotationUniform,
+      smallAnnotationUniform,
+      patchInstanceBuffer,
+      loupePatchInstanceBuffer,
+    } of this.bodies.values()) {
       uniform.destroy()
       loupeUniform.destroy()
       annotationUniform.destroy()
       smallAnnotationUniform.destroy()
+      patchInstanceBuffer.destroy()
+      loupePatchInstanceBuffer.destroy()
     }
     this.bodies.clear()
   }

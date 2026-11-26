@@ -1,12 +1,4 @@
 @font-face {
-  font-family: "Cinzel Decorative";
-  src: url("./assets/cinzel-decorative.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
   font-family: "DM Sans";
   src: url("../workspace/fonts/dm-sans.woff2") format("woff2");
   font-display: swap;
@@ -34,8 +26,8 @@
 
 .bridge-hero-scroll-track {
   position: relative;
-  height: 240svh;
-  min-height: 60rem;
+  height: 320svh;
+  min-height: 80rem;
 }
 
 .bridge-hero-sticky {
@@ -47,7 +39,7 @@
   min-height: 29rem;
   overflow: hidden;
   --hero-bayer-opacity: 1;
-  --hero-scroll-shift: 0px;
+  --hero-scroll-cue-opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -71,7 +63,6 @@
   justify-self: start;
   max-width: min(44rem, calc(100vw - 3rem));
   margin: clamp(3.4rem, 9.2svh, 7rem) 0 0 clamp(2rem, 5vw, 6.8rem);
-  transform: translate3d(0, var(--hero-scroll-shift), 0);
 }
 
 /* ---------- Constellation Wordmark (WebGPU HDR + invisible accessible text overlay) ---------- */
@@ -148,12 +139,68 @@
   color: transparent;
   text-decoration: none;
   cursor: pointer;
-  transform: translate3d(0, var(--hero-scroll-shift), 0);
 }
 
 .bridge-hero-cta:focus-visible {
   outline: 1px solid rgba(255, 224, 178, 0.55);
   outline-offset: 8px;
+}
+
+.bridge-hero-scroll-cue {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: clamp(6px, 1.1svh, 14px);
+  display: grid;
+  place-items: center;
+  padding: 6px 14px;
+  border: 0;
+  background: transparent;
+  color: rgba(242, 238, 232, 0.56);
+  cursor: pointer;
+  opacity: var(--hero-scroll-cue-opacity);
+  transform: translateX(-50%);
+  transition:
+    color 220ms ease-out,
+    opacity 220ms ease-out;
+}
+
+.bridge-hero-scroll-cue svg {
+  display: block;
+  animation: scroll-cue-drift 3.4s ease-in-out infinite;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.bridge-hero-scroll-cue:hover,
+.bridge-hero-scroll-cue:focus-visible {
+  color: rgba(255, 250, 244, 0.94);
+}
+
+.bridge-hero-scroll-cue:hover svg,
+.bridge-hero-scroll-cue:focus-visible svg {
+  transform: translateY(2.5px);
+}
+
+.bridge-hero-scroll-cue:focus-visible {
+  outline: 1px solid rgba(255, 224, 178, 0.55);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+@keyframes scroll-cue-drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(2.5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bridge-hero-scroll-cue svg {
+    animation: none;
+  }
 }
 
 .bridge-hero-cta-a11y {

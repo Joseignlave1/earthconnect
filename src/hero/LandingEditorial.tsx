@@ -388,7 +388,10 @@ export function LandingEditorial({
   const [crewIndex, setCrewIndex] = useState<number>(() => Math.floor(Math.random() * TEAM_MEMBERS.length))
   const [peak, setPeak] = useState<{ latitude: number; longitude: number } | null>(null)
   const [mapReady, setMapReady] = useState(false)
+  const [atlasActivated, setAtlasActivated] = useState(() => typeof IntersectionObserver === 'undefined')
+  const [crewActivated, setCrewActivated] = useState(() => typeof IntersectionObserver === 'undefined')
 
+  const atlasSectionRef = useRef<HTMLElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<SurfaceRenderer | null>(null)
   const worldRef = useRef<ReturnType<EarthWorkspaceResources['acquireWorld']> | null>(null)
@@ -407,8 +410,35 @@ export function LandingEditorial({
     shaderRef.current = activeShader
   }, [activeShader])
 
-  // Mount one shared-device, transparent Equal Earth WebGPU preview (no stars, non-draggable, hover loupe).
+  // Defer mounting below-the-horizon WebGPU canvases until the user scrolls near them,
+  // keeping initial hero RAM/VRAM and cold-load time lean.
   useEffect(() => {
+    const atlasEl = atlasSectionRef.current
+    const crewEl = crewSectionRef.current
+    if (typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          if (entry.target === atlasEl) {
+            if (entry.isIntersecting) setAtlasActivated(true)
+            rendererRef.current?.setPaused(!entry.isIntersecting)
+          } else if (entry.target === crewEl) {
+            if (entry.isIntersecting) setCrewActivated(true)
+            crewStageRef.current?.setActive(entry.isIntersecting)
+          }
+        }
+      },
+      { root: scrollerRef.current, rootMargin: '20px 0px', threshold: 0.01 },
+    )
+    if (atlasEl) io.observe(atlasEl)
+    if (crewEl) io.observe(crewEl)
+    return () => io.disconnect()
+  }, [scrollerRef])
+
+  // Mount one shared-device, transparent Equal Earth WebGPU preview (no stars, non-draggable, hover loupe)
+  // only once the user scrolls near the editorial section.
+  useEffect(() => {
+    if (!atlasActivated) return
     const canvas = canvasRef.current
     if (!canvas) return
     const controller = new AbortController()
@@ -493,7 +523,7 @@ export function LandingEditorial({
       world?.release()
       renderer?.destroy()
     }
-  }, [assets, resources])
+  }, [atlasActivated, assets, resources])
 
   // Re-dispatch live WGSL whenever the user switches sites or toggles a criterion.
   useEffect(() => {
@@ -534,26 +564,13 @@ export function LandingEditorial({
     activeMemberIdRef.current = activeMember.id
   }, [activeMember.id])
 
-  // Mount the shared-device 3D spaghettified crew astronaut canvas; pause whenever off-screen.
+  // Mount the shared-device 3D spaghettified crew astronaut canvas lazily once scrolled near the footer.
   useEffect(() => {
+    if (!crewActivated) return
     const canvas = crewCanvasRef.current
-    const section = crewSectionRef.current
     if (!canvas) return
     const controller = new AbortController()
     let stage: CrewAstronautStage | null = null
-    let inView = false
-
-    const io =
-      section && typeof IntersectionObserver !== 'undefined'
-        ? new IntersectionObserver(
-            entries => {
-              inView = entries.some(e => e.isIntersecting)
-              stage?.setActive(inView)
-            },
-            { root: scrollerRef.current, rootMargin: '220px 0px', threshold: 0.01 },
-          )
-        : null
-    if (section && io) io.observe(section)
 
     void (async () => {
       try {
@@ -570,7 +587,7 @@ export function LandingEditorial({
         }
         stage = created
         crewStageRef.current = created
-        created.setActive(io ? inView : true)
+        created.setActive(true)
       } catch (err) {
         if (!controller.signal.aborted) console.error('Could not initialize crew astronaut stage:', err)
       }
@@ -578,11 +595,10 @@ export function LandingEditorial({
 
     return () => {
       controller.abort()
-      io?.disconnect()
       crewStageRef.current = null
       stage?.destroy()
     }
-  }, [resources, scrollerRef])
+  }, [crewActivated, resources])
 
   useEffect(() => {
     crewStageRef.current?.setMember(activeMember.id)
@@ -613,7 +629,7 @@ export function LandingEditorial({
       </section>
 
       {/* Live Equal Earth Comparison */}
-      <section className="atlas-section" aria-label="Live planetary analogue map">
+      <section ref={atlasSectionRef} className="atlas-section" aria-label="Live planetary analogue map">
         <header className="atlas-header">
           <div className="atlas-site-nav" role="tablist" aria-label="Planetary comparison sites">
             {SITES.map(site => {

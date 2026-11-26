@@ -33,12 +33,12 @@ struct SurfaceUniforms {
 
 const PI: f32 = 3.141592653589793;
 
-fn elevation(uv: vec2f) -> f32 {
-  if (uv.y == 0.) { return u.poles.x; }
-  if (uv.y == 1.) { return u.poles.y; }
-  // Sample mip 2 (~40 km footprint) to match the 512x256 mesh spacing so vertices form smooth
-  // mountain ridges instead of snagging on single 10 km spikes at the limb.
-  return terrainLevel(vec2f(uv.x, 1. - clamp(uv.y, 0., 1.)), 2.).r;
+fn elevation(uv: vec2f, demMip: f32) -> f32 {
+  if (uv.y <= 0.) { return u.poles.x; }
+  if (uv.y >= 1.) { return u.poles.y; }
+  if (u.status.x < .5) { return 0.; }
+  let maxLod = max(0., f32(textureNumLevels(terrain)) - 1.);
+  return terrainLevel(vec2f(uv.x, 1. - clamp(uv.y, 0., 1.)), clamp(demMip, 0., maxLod)).r;
 }
 
 struct SurfaceVertex {
@@ -48,18 +48,20 @@ struct SurfaceVertex {
   @location(2) worldPos: vec3f,
 }
 
-fn computeSurfaceVertex(uv: vec2f) -> SurfaceVertex {
+fn computeSurfaceVertex(local: vec3f, patchRect: vec4f, patchMeta: vec4f) -> SurfaceVertex {
+  let uv = patchRect.xy + local.xy * patchRect.zw;
   let lon = (uv.x - .5) * 2. * PI;
   let lat = (uv.y - .5) * PI;
   let smallPad = u.poles.w;
-  let height = select(max(0., elevation(uv)) / 6378137. * u.poles.z, 0., smallPad > 0.);
+  let skirt = local.z * patchMeta.y;
+  let height = select(max(0., elevation(uv, patchMeta.x)) / 6378137. * u.poles.z, 0., smallPad > 0.);
   let e2 = .0066943799901413165;
   let n = inverseSqrt(1. - e2 * sin(lat) * sin(lat));
   var normal = vec3f(cos(lat) * sin(lon), sin(lat), cos(lat) * cos(lon));
-  if (uv.y == 0. || uv.y == 1.) { normal = vec3f(0., sign(lat), 0.); }
+  if (uv.y <= 0. || uv.y >= 1.) { normal = vec3f(0., sign(lat), 0.); }
   let baseSphere = vec3f(n * normal.x, n * (1. - e2) * normal.y, n * normal.z);
-  let sphere = select(baseSphere + normal * height, baseSphere * (1. + smallPad), smallPad > 0.);
-  let plane = vec3f(equalEarth(lon, lat), height);
+  let sphere = select(baseSphere + normal * (height - skirt), baseSphere * (1. + smallPad), smallPad > 0.);
+  let plane = vec3f(equalEarth(lon, lat), height - skirt);
   let position = vec4f(mix(plane, sphere, u.view.x), 1.);
   var clip = u.camera * position;
   // The standalone lab uses OpenGL depth. The solar scene uses native reverse-Z.
@@ -67,8 +69,12 @@ fn computeSurfaceVertex(uv: vec2f) -> SurfaceVertex {
   return SurfaceVertex(clip, uv, normal, position.xyz);
 }
 
-@vertex fn surfaceVertex(@location(0) uv: vec2f) -> SurfaceVertex {
-  return computeSurfaceVertex(uv);
+@vertex fn surfaceVertex(
+  @location(0) local: vec3f,
+  @location(1) patchRect: vec4f,
+  @location(2) patchMeta: vec4f,
+) -> SurfaceVertex {
+  return computeSurfaceVertex(local, patchRect, patchMeta);
 }
 
 struct AnnotationVertex {
@@ -77,8 +83,12 @@ struct AnnotationVertex {
   @location(1) @interpolate(perspective, sample) geodetic: vec3f,
 }
 
-@vertex fn annotationVertex(@location(0) uv: vec2f) -> AnnotationVertex {
-  let v = computeSurfaceVertex(uv);
+@vertex fn annotationVertex(
+  @location(0) local: vec3f,
+  @location(1) patchRect: vec4f,
+  @location(2) patchMeta: vec4f,
+) -> AnnotationVertex {
+  let v = computeSurfaceVertex(local, patchRect, patchMeta);
   return AnnotationVertex(v.position, v.uv, v.geodetic);
 }
 

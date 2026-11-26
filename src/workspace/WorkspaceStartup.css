@@ -1,44 +1,77 @@
-.brand {
-  display: inline-flex;
-  align-items: center;
-  justify-self: start;
-  gap: 7px;
-  color: var(--ink, #f7f9ff);
-  font:
-    500 13px / 1 "DM Sans",
-    system-ui,
-    sans-serif;
-  letter-spacing: 0.2em;
-  text-decoration: none;
-}
-.brand > span:not(.brand-symbol) {
-  font-weight: 600;
-}
-.brand-symbol {
+.startup-constellation-wrap {
   position: relative;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  margin-right: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: 50%;
+  width: 100%;
+  margin: 0 auto;
 }
-.brand-symbol::after {
-  content: "";
+
+.startup-constellation-canvas {
   position: absolute;
-  width: 37px;
-  height: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 50%;
-  transform: rotate(-24deg);
+  inset: -56px;
+  width: calc(100% + 112px);
+  height: calc(100% + 112px);
+  display: block;
+  pointer-events: none;
+  opacity: 0;
 }
-.brand-symbol i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--nasa-red, #fc3d21);
-  box-shadow: 0 0 10px rgba(252, 61, 33, 0.55);
+
+.startup-constellation-canvas[data-live] {
+  opacity: 1;
+}
+
+.startup-constellation-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 616 / 246;
+}
+
+.startup-constellation-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  font-family: "Cinzel Decorative", Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(2rem, 8.5vw, 3.3rem);
+  line-height: 1.05;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: left;
+  color: rgba(242, 232, 214, 0.72);
+  user-select: none;
+}
+
+.startup-constellation-row {
+  display: block;
+}
+
+.startup-constellation-row-2 {
+  padding-left: 6%;
+}
+
+.startup-constellation-bayer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+}
+
+.startup-constellation-bayer[data-live] {
+  opacity: 1;
+}
+
+.startup-bayer-label {
+  font:
+    400 10px / 1 Georgia,
+    serif;
+  font-style: italic;
+  fill: rgba(245, 228, 202, 0.56);
+  letter-spacing: 0.04em;
 }
 
 .workspace-content {
@@ -59,6 +92,7 @@
     14px / 1.5 system-ui,
     sans-serif;
   text-align: center;
+  overflow: hidden;
 }
 
 .workspace-startup[data-revealed] {
@@ -71,21 +105,31 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .workspace-startup[data-revealed] {
+  .workspace-startup[data-revealed],
+  .workspace-startup-content {
     transition: none;
   }
 }
 
 .workspace-startup-content {
-  width: min(100%, 300px);
+  position: relative;
+  width: min(100%, 440px);
+  opacity: 0;
+  transition: opacity 360ms ease-out;
+}
+
+.workspace-startup-content[data-ready] {
+  opacity: 1;
 }
 
 .workspace-startup progress {
+  position: relative;
+  z-index: 1;
   display: block;
   appearance: none;
-  width: 100%;
+  width: min(100%, 300px);
   height: 2px;
-  margin: 30px 0 12px;
+  margin: 28px auto 12px;
   border: 0;
   border-radius: 2px;
   overflow: hidden;
@@ -103,6 +147,8 @@
   background: #f7f9ff;
 }
 .workspace-startup p {
+  position: relative;
+  z-index: 1;
   margin: 0;
   color: #bbb;
   font-variant-numeric: tabular-nums;
@@ -116,6 +162,8 @@
   overflow-wrap: anywhere;
 }
 .workspace-startup button {
+  position: relative;
+  z-index: 1;
   margin-top: 18px;
   padding: 6px 16px;
   border: 1px solid #666;

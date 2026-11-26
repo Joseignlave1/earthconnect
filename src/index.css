@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Cinzel Decorative";
+  src: url("./hero/assets/cinzel-decorative.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #f7f9ff;

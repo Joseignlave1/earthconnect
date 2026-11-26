@@ -58,6 +58,13 @@ export type EarthScoreOptions = Readonly<{
 const workerCount = Math.min(6, Math.max(3, Math.floor((globalThis.navigator?.hardwareConcurrency || 4) * 0.6)))
 const jobSlots = workerCount + 4
 const shaderChunksPerFence = 4
+const uploadMainThreadBudgetMs = 6
+
+function yieldToMain(): Promise<void> {
+  const sched = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler
+  if (typeof sched?.yield === 'function') return sched.yield()
+  return new Promise(resolve => setTimeout(resolve, 0))
+}
 
 // A caller can cancel while the shared queue is waiting on unrelated GPU work.
 function waitForLoad<T>(work: Promise<T>, signal: AbortSignal) {
@@ -177,6 +184,7 @@ export async function loadEarthScore(
       for (let i = 0; i < jobSlots; i++) launch()
       const checks: Promise<unknown>[] = []
       let uploaded = 0
+      let sliceStart = performance.now()
       while (jobs.size) {
         const ready = await Promise.race(jobs.values())
         loading.throwIfAborted()
@@ -230,6 +238,13 @@ export async function loadEarthScore(
         // Flush pending unmap copies every 4 chunks without stalling on a CPU/GPU fence
         // so Dawn reclaims staging memory incrementally at full decode speed.
         if ((++uploaded & 3) === 0) queue.submit([])
+        // Yield briefly only when continuous main-thread copy time exceeds ~6 ms so pointer
+        // events stay responsive while Zstd decoder workers continue in parallel.
+        if (jobs.size && performance.now() - sliceStart >= uploadMainThreadBudgetMs) {
+          await yieldToMain()
+          loading.throwIfAborted()
+          sliceStart = performance.now()
+        }
       }
       if (uploaded & 3) queue.submit([])
       const completed = await waitForLoad(Promise.all(checks), loading)

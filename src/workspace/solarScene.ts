@@ -323,6 +323,7 @@ export class SolarScene {
   private terrain?: PlanetTerrainRenderer
   private loadingTerrain = false
   skySettled = false
+  terrainSettled = false
   private readonly controller = new AbortController()
   private readonly viewBuffer: GPUBuffer
   private readonly annotationViewBuffer: GPUBuffer
@@ -379,7 +380,11 @@ export class SolarScene {
     assetUrl: WorkspaceAssets['url'],
     terrainLoader?: TerrainLoader,
     loadPlanetTilePack?: PlanetTilePackLoader,
-    options?: { bodies?: SolarBodies; eagerTerrain?: boolean },
+    options?: {
+      bodies?: SolarBodies
+      eagerTerrain?: boolean
+      albedoMaxWidths?: Partial<Record<'moon' | 'mars', number>>
+    },
   ) {
     const {
       skyPipeline,
@@ -441,8 +446,13 @@ export class SolarScene {
     private readonly assetUrl: WorkspaceAssets['url'],
     private readonly terrainLoader?: TerrainLoader,
     private readonly loadPlanetTilePack?: PlanetTilePackLoader,
-    options?: { bodies?: SolarBodies; eagerTerrain?: boolean },
+    private readonly sceneOptions?: {
+      bodies?: SolarBodies
+      eagerTerrain?: boolean
+      albedoMaxWidths?: Partial<Record<'moon' | 'mars', number>>
+    },
   ) {
+    const options = sceneOptions
     this.bodies = options?.bodies ?? solarSystemAt(date)
     this.orbits = options?.bodies
       ? []
@@ -645,6 +655,7 @@ export class SolarScene {
       this.terrainLoader,
       this.invalidate,
       this.loadPlanetTilePack,
+      this.sceneOptions?.albedoMaxWidths,
     )
       .then(
         terrain => {
@@ -661,6 +672,10 @@ export class SolarScene {
       )
       .finally(() => {
         this.loadingTerrain = false
+        if (!signal.aborted) {
+          this.terrainSettled = true
+          this.invalidate()
+        }
       })
   }
 
@@ -903,6 +918,8 @@ export class SolarScene {
           metresPerPixel,
           hdr,
           pixelRatio,
+          width,
+          height,
           smallPad,
           reliefFade,
           smallPad > 0 ? this.bodySmallView(frame, id, width, height) : undefined,
@@ -1164,9 +1181,11 @@ export class SolarScene {
           bodyMatrix(frame, this.bodies[body], 1),
           this.bodyReliefFade(frame, body, clientHeight),
           includeCoverage,
+          width,
+          height,
           smallPad,
           smallPad > 0 ? this.bodySmallView(frame, body, width, height) : undefined,
-          smallPad > 0 ? this.sourceEye(frame, body) : undefined,
+          this.sourceEye(frame, body),
         )
       }
     }
@@ -1269,6 +1288,7 @@ export class SolarScene {
         metresPerPixel,
         hdr,
         pixelRatio,
+        LOUPE_TEXTURE_SIZE,
       )
     }
   }

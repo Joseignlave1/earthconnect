@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { earthTilePath } from '../shader-test/earth-tiles.ts'
 import { SurfaceRenderer } from '../shader-test/renderer.ts'
 import type { EarthWorkspaceResources } from '../workspace/earthWorkspaceResources.ts'
-import { planetTilePath, type PlanetTileBody } from '../workspace/planetTiles.ts'
 import type { SolarBodies } from '../workspace/solarCamera.ts'
 import { SolarScene } from '../workspace/solarScene.ts'
 import { scoreManifestUrl, type WorkspaceAssets } from '../workspace/workspaceAssets.ts'
@@ -14,6 +12,7 @@ import {
   buildBridgeFrame,
   HERO_BRIDGE_SCORE_SHADER,
   HERO_MARS_SITE,
+  projectSkyBox,
 } from './bridgeScene.ts'
 import { ConstellationTitleOverlay, StardustCtaOverlay } from './constellationTitle.ts'
 import { HeroTitle } from './HeroTitle.tsx'
@@ -21,6 +20,9 @@ import { LandingEditorial } from './LandingEditorial.tsx'
 import './style.css'
 
 type Coordinates = { latitude: number; longitude: number }
+
+const HERO_RUNWAY_VH = 2.2
+const HERO_SCROLL_CUE_MS = 1950
 
 export function BridgeHero({
   assets,
@@ -41,6 +43,8 @@ export function BridgeHero({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const titleStageRef = useRef<HTMLDivElement>(null)
   const ctaStageRef = useRef<HTMLAnchorElement>(null)
+  const scrollCueRef = useRef<HTMLButtonElement>(null)
+  const scrollAnimRef = useRef<number | null>(null)
   const rendererRef = useRef<SurfaceRenderer | null>(null)
   const ctaOverlayRef = useRef<StardustCtaOverlay | null>(null)
   const scrollProgressRef = useRef(0)
@@ -67,8 +71,8 @@ export function BridgeHero({
     const syncScroll = () => {
       const vh = Math.max(1, scroller.clientHeight)
       const vw = Math.max(1, scroller.clientWidth)
-      // Scroll runway: 1.4x viewport height drives the black hole from off-screen distortion to full pitch black.
-      const runway = Math.max(1, vh * 1.4)
+      // Scroll runway: 2.2x viewport height drives the black hole from peeking crest to full pitch black.
+      const runway = Math.max(1, vh * HERO_RUNWAY_VH)
       const progress = Math.max(0, Math.min(1, scroller.scrollTop / runway))
       scrollProgressRef.current = progress
 
@@ -101,7 +105,11 @@ export function BridgeHero({
       // (Bayer Greek letters) early so they don't float unwarped over the rising photon ring.
       const domLabelOpacity = Math.max(0, Math.min(1, 1 - (progress - 0.06) / 0.18))
       sticky.style.setProperty('--hero-bayer-opacity', domLabelOpacity.toFixed(3))
-      sticky.style.setProperty('--hero-scroll-shift', `${(-progress * 90).toFixed(1)}px`)
+      const scrollCueOpacity = Math.max(0, Math.min(1, 1 - progress / 0.1))
+      sticky.style.setProperty('--hero-scroll-cue-opacity', scrollCueOpacity.toFixed(3))
+      if (scrollCueRef.current) {
+        scrollCueRef.current.style.pointerEvents = progress > 0.06 ? 'none' : 'auto'
+      }
       if (ctaStageRef.current) {
         ctaStageRef.current.style.pointerEvents = progress > 0.36 ? 'none' : 'auto'
       }
@@ -118,6 +126,10 @@ export function BridgeHero({
     scroller.addEventListener('scroll', syncScroll, { passive: true })
     window.addEventListener('resize', syncScroll, { passive: true })
     return () => {
+      if (scrollAnimRef.current !== null) {
+        cancelAnimationFrame(scrollAnimRef.current)
+        scrollAnimRef.current = null
+      }
       scroller.removeEventListener('scroll', syncScroll)
       window.removeEventListener('resize', syncScroll)
     }
@@ -168,21 +180,44 @@ export function BridgeHero({
     window.addEventListener('pointermove', onPointerMove, { passive: true, signal })
     window.addEventListener('pointerleave', onPointerLeave, { signal })
 
-    const loadTilePack = async (path: string, packSignal: AbortSignal) => {
-      try {
-        if (import.meta.env.DEV) {
-          const url = await assets.url(path, packSignal)
-          if (!url.startsWith('blob:')) return url
-        }
-        return await assets.blob(path, packSignal)
-      } catch {
-        return null
+    const layoutOffsetInSticky = (el: HTMLElement | null, root: HTMLElement | null) => {
+      if (!el || !root) return null
+      let left = 0
+      let top = 0
+      let node: HTMLElement | null = el
+      while (node && node !== root) {
+        left += node.offsetLeft
+        top += node.offsetTop
+        node = node.offsetParent as HTMLElement | null
       }
+      return { left, top, width: el.offsetWidth, height: el.offsetHeight }
     }
+
+    let restTitleBox = layoutOffsetInSticky(titleStageRef.current, stickyRef.current)
+    let restCtaBox = layoutOffsetInSticky(ctaStageRef.current, stickyRef.current)
+    let cachedCanvasRect = canvas.getBoundingClientRect()
+    const syncRestLayout = () => {
+      restTitleBox = layoutOffsetInSticky(titleStageRef.current, stickyRef.current)
+      restCtaBox = layoutOffsetInSticky(ctaStageRef.current, stickyRef.current)
+      cachedCanvasRect = canvas.getBoundingClientRect()
+    }
+    const layoutObserver = new ResizeObserver(syncRestLayout)
+    if (stickyRef.current) layoutObserver.observe(stickyRef.current)
+    if (titleStageRef.current) layoutObserver.observe(titleStageRef.current)
+    if (ctaStageRef.current) layoutObserver.observe(ctaStageRef.current)
+    window.addEventListener('resize', syncRestLayout, { passive: true, signal })
 
     const onRenderStatus = () => {
       if (notifiedReady || signal.aborted || !renderer) return
-      if (canvas.dataset.frameSource !== 'computed' || !scoreReady) return
+      const solar = renderer.solarScene
+      if (
+        canvas.dataset.frameSource !== 'computed' ||
+        canvas.dataset.terrainReady !== 'true' ||
+        !scoreReady ||
+        (solar && (!solar.skySettled || !solar.terrainSettled))
+      ) {
+        return
+      }
       const device = renderer.computeDevice
       if (!device) return
       void device.queue.onSubmittedWorkDone().then(
@@ -213,13 +248,10 @@ export function BridgeHero({
             acquireDevice: resources.acquireDevice,
             assets: assets.url,
             loadTerrain: resources.acquireTerrain,
-            loadEarthTilePack: (packId, packSignal) => loadTilePack(earthTilePath(packId), packSignal),
             solar: {
               createScene: SolarScene.create,
               assetUrl: assets.url,
               loadTerrain: resources.acquireTerrain,
-              loadPlanetTilePack: (body: PlanetTileBody, packId: number, packSignal: AbortSignal) =>
-                loadTilePack(planetTilePath(body, packId), packSignal),
               onSourcePick: () => undefined,
             },
             hero: {
@@ -254,22 +286,25 @@ export function BridgeHero({
                   scrollProgressRef.current,
                 )
               },
-              prepareOverlay: (encoder, width, height, ratio, timeSeconds) => {
-                const canvasRect = canvas.getBoundingClientRect()
+              prepareOverlay: (encoder, frame, width, height, ratio, timeSeconds) => {
+                const canvasRect = cachedCanvasRect
                 if (canvasRect.width <= 1 || canvasRect.height <= 1) return
                 const scaleX = width / canvasRect.width
                 const scaleY = height / canvasRect.height
                 const bhGeom = computeBlackHoleGeometry(scrollProgressRef.current, width / Math.max(1, height))
-                if (titleOverlay && titleStageRef.current) {
-                  const stageBox = titleStageRef.current.getBoundingClientRect()
-                  if (stageBox.width > 1 && stageBox.height > 1) {
+                if (titleOverlay && restTitleBox) {
+                  const skyBox = projectSkyBox(restTitleBox, canvasRect.width, canvasRect.height, frame)
+                  if (skyBox) {
+                    if (titleStageRef.current) {
+                      titleStageRef.current.style.transform = `translate3d(${skyBox.dx.toFixed(2)}px, ${skyBox.dy.toFixed(2)}px, 0)`
+                    }
                     titleOverlay.prepare(
                       encoder,
                       {
-                        leftPx: (stageBox.left - canvasRect.left) * scaleX,
-                        topPx: (stageBox.top - canvasRect.top) * scaleY,
-                        widthPx: stageBox.width * scaleX,
-                        heightPx: stageBox.height * scaleY,
+                        leftPx: skyBox.left * scaleX,
+                        topPx: skyBox.top * scaleY,
+                        widthPx: skyBox.width * scaleX,
+                        heightPx: skyBox.height * scaleY,
                       },
                       canvasRect,
                       width,
@@ -282,16 +317,19 @@ export function BridgeHero({
                     )
                   }
                 }
-                if (ctaOverlay && ctaStageRef.current) {
-                  const ctaBox = ctaStageRef.current.getBoundingClientRect()
-                  if (ctaBox.width > 1 && ctaBox.height > 1) {
+                if (ctaOverlay && restCtaBox) {
+                  const skyBox = projectSkyBox(restCtaBox, canvasRect.width, canvasRect.height, frame)
+                  if (skyBox) {
+                    if (ctaStageRef.current) {
+                      ctaStageRef.current.style.transform = `translate3d(${skyBox.dx.toFixed(2)}px, ${skyBox.dy.toFixed(2)}px, 0)`
+                    }
                     ctaOverlay.prepare(
                       encoder,
                       {
-                        leftPx: (ctaBox.left - canvasRect.left) * scaleX,
-                        topPx: (ctaBox.top - canvasRect.top) * scaleY,
-                        widthPx: ctaBox.width * scaleX,
-                        heightPx: ctaBox.height * scaleY,
+                        leftPx: skyBox.left * scaleX,
+                        topPx: skyBox.top * scaleY,
+                        widthPx: skyBox.width * scaleX,
+                        heightPx: skyBox.height * scaleY,
                       },
                       canvasRect,
                       width,
@@ -370,6 +408,12 @@ export function BridgeHero({
           )
         })
         signal.throwIfAborted()
+        // Scores are now baked into SurfaceRenderer's Native scores textures; release the ~530 MB
+        // EarthScore input/output compute buffers while on the hero (re-acquired on demand in /find).
+        await device.queue.onSubmittedWorkDone()
+        signal.throwIfAborted()
+        world.release()
+        world = undefined
 
         const best = instance.bestScoreLocation
         if (best) {
@@ -390,6 +434,7 @@ export function BridgeHero({
 
     return () => {
       controller.abort()
+      layoutObserver.disconnect()
       rendererRef.current = null
       ctaOverlayRef.current = null
       blackHoleLens?.destroy()
@@ -425,6 +470,62 @@ export function BridgeHero({
             onCtaPressChange={pressed => ctaOverlayRef.current?.setPressed(pressed)}
             onOpenWorkspace={onOpenWorkspace}
           />
+          <button
+            ref={scrollCueRef}
+            type="button"
+            className="bridge-hero-scroll-cue"
+            aria-label="Scroll down into Earth Connect"
+            onClick={() => {
+              const scroller = scrollerRef.current
+              if (!scroller) return
+              const targetTop = Math.round(scroller.clientHeight * HERO_RUNWAY_VH)
+              const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+              if (reduced) {
+                scroller.scrollTop = targetTop
+                return
+              }
+              if (scrollAnimRef.current !== null) cancelAnimationFrame(scrollAnimRef.current)
+              const startTop = scroller.scrollTop
+              const delta = targetTop - startTop
+              if (Math.abs(delta) < 1) return
+              const startMs = performance.now()
+              const cancel = () => {
+                if (scrollAnimRef.current !== null) {
+                  cancelAnimationFrame(scrollAnimRef.current)
+                  scrollAnimRef.current = null
+                }
+                scroller.removeEventListener('wheel', cancel)
+                scroller.removeEventListener('touchstart', cancel)
+                window.removeEventListener('keydown', cancel)
+              }
+              scroller.addEventListener('wheel', cancel, { passive: true, once: true })
+              scroller.addEventListener('touchstart', cancel, { passive: true, once: true })
+              window.addEventListener('keydown', cancel, { once: true })
+              const step = (now: number) => {
+                const t = Math.min(1, (now - startMs) / HERO_SCROLL_CUE_MS)
+                // Smooth cubic ease-in-out so the black hole swells gently, sweeps cleanly across the planets, and settles softly.
+                const eased = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
+                scroller.scrollTop = startTop + delta * eased
+                if (t < 1) {
+                  scrollAnimRef.current = requestAnimationFrame(step)
+                } else {
+                  cancel()
+                }
+              }
+              scrollAnimRef.current = requestAnimationFrame(step)
+            }}
+          >
+            <svg viewBox="0 0 28 14" width="28" height="14" aria-hidden="true">
+              <path
+                d="M4.5 3.5L14 11L23.5 3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.35"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
           {error && (
             <p className="bridge-hero-error" role="alert">
               {error}

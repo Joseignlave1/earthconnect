@@ -11,16 +11,14 @@
     html{background:#000;color:#f7f9ff}
     #initial{position:fixed;inset:0;display:grid;place-items:center;padding:24px;background:#000;font:14px/1.5 system-ui,sans-serif;text-align:center}
     #root:not(:empty)+#initial{display:none}
-    #initial div{width:min(100%,300px)}
-    #initial b{display:block;text-align:left;letter-spacing:.2em;font-size:13px;height:30px;line-height:30px}
-    #initial b::before{content:"";display:inline-block;vertical-align:middle;width:28px;height:28px;border:1px solid #b8b8b8;border-radius:50%;margin-right:13px;background:radial-gradient(circle,#fc3d21 3px,transparent 4px)}
-    #initial hr{height:2px;margin:30px 0 12px;border:0;background:#292929}
-    #initial p{margin:0;color:#bbb}
+    #initial div{width:min(100%,420px);opacity:0;transition:opacity 260ms ease-out}
+    #initial[data-visible] div{opacity:1}
+    #initial p{margin:0;color:#f7f9ff}
   </style>
 </head>
 <body>
   <div id="root"></div>
-  <main id="initial"><div><b>EARTH CONNECT</b><hr><p id="initial-status" role="status">Checking Earth data…</p></div></main>
+  <main id="initial"><div><p id="initial-status" role="status"></p></div></main>
   <script type="module" src="/src/workspace/pagesBootstrap.ts"></script>
 </body>
 </html>

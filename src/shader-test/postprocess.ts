@@ -23,6 +23,16 @@ const presentationShader = joinWgsl(
   presentationWgsl,
 )
 const loupeShader = joinWgsl(colorWgsl, loupeWgsl)
+const backdropBlitShader = joinWgsl(
+  fullscreenWgsl,
+  `
+@group(0) @binding(0) var backdropTex: texture_2d<f32>;
+
+@fragment fn backdropBlitFragment(@builtin(position) pos: vec4f) -> @location(0) vec4f {
+  return textureLoad(backdropTex, vec2i(pos.xy), 0);
+}
+`,
+)
 
 type PostPipelines = {
   bloom: GPURenderPipeline
@@ -32,6 +42,7 @@ type PostPipelines = {
   loupe: GPURenderPipeline
   motion?: GPURenderPipeline
   staticResolve?: GPURenderPipeline
+  backdropBlit?: GPURenderPipeline
 }
 
 const postPipelines = new WeakMap<GPUDevice, Map<string, Promise<PostPipelines>>>()
@@ -46,20 +57,21 @@ function getPostPipelines(device: GPUDevice, format: GPUTextureFormat, reverseDe
   let pending = byKey.get(key)
   if (!pending) {
     pending = (async () => {
-      const [bloom, composition, presentation, cursor, loupe, motion] = await Promise.all([
+      const [bloom, composition, presentation, cursor, loupe, motion, backdropBlit] = await Promise.all([
         shaderModule(device, 'Bloom WGSL', bloomShader),
         shaderModule(device, 'Composition WGSL', compositionShader),
         shaderModule(device, 'Presentation WGSL', presentationShader),
         shaderModule(device, 'Cursor WGSL', cursorWgsl),
         shaderModule(device, 'Optical loupe WGSL', loupeShader),
         reverseDepth ? shaderModule(device, 'Camera motion blur WGSL', motionBlurShader) : undefined,
+        reverseDepth ? shaderModule(device, 'Hero backdrop blit WGSL', backdropBlitShader) : undefined,
       ])
       const vertex = (module: GPUShaderModule, entryPoint = 'screenVertex') => ({ module, entryPoint })
       const alphaBlend: GPUBlendState = {
         color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
         alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
       }
-      const [bp, cp, pp, sp, lp, mp, srp] = await Promise.all([
+      const [bp, cp, pp, sp, lp, mp, srp, bbp] = await Promise.all([
         device.createRenderPipelineAsync({
           label: 'HDR bloom',
           layout: 'auto',
@@ -106,8 +118,31 @@ function getPostPipelines(device: GPUDevice, format: GPUTextureFormat, reverseDe
               fragment: { module: motion, entryPoint: 'staticResolveFragment', targets: [{ format: 'rgba16float' }] },
             })
           : undefined,
+        backdropBlit
+          ? device.createRenderPipelineAsync({
+              label: 'Hero cached backdrop blit',
+              layout: 'auto',
+              vertex: vertex(backdropBlit),
+              fragment: {
+                module: backdropBlit,
+                entryPoint: 'backdropBlitFragment',
+                targets: [{ format: 'rgba16float' }],
+              },
+              multisample: { count: 4 },
+              depthStencil: { format: 'depth32float', depthWriteEnabled: false, depthCompare: 'always' },
+            })
+          : undefined,
       ])
-      return { bloom: bp, composition: cp, presentation: pp, cursor: sp, loupe: lp, motion: mp, staticResolve: srp }
+      return {
+        bloom: bp,
+        composition: cp,
+        presentation: pp,
+        cursor: sp,
+        loupe: lp,
+        motion: mp,
+        staticResolve: srp,
+        backdropBlit: bbp,
+      }
     })()
     byKey.set(key, pending)
     void pending.catch(() => {
@@ -224,9 +259,13 @@ type RenderBank = {
   multisampleView: GPUTextureView
   depth: GPUTexture
   depthOnlyView: GPUTextureView
-  geography: GPUTexture
+  geography: GPUTexture | null
   geographyView: GPUTextureView
-  annotationDepth: GPUTexture
+  annotationDepth: GPUTexture | null
+  backdropScene?: GPUTexture
+  backdropSceneView?: GPUTextureView
+  backdropBlitGroup?: GPUBindGroup
+  backdropValid: boolean
   stableCoverage: GPUTexture | null
   coverageMsaa: GPUTexture | null
   boundCoverage: GPUTexture
@@ -254,6 +293,8 @@ export class PostProcess {
   private readonly emptyCoverage: GPUTexture
   private readonly emptyOrbitMsaa: GPUTexture
   private readonly emptyOrbitMsaaView: GPUTextureView
+  private readonly emptyGeographyMsaa: GPUTexture
+  private readonly emptyGeographyMsaaView: GPUTextureView
   private high!: RenderBank
   private low: RenderBank | null = null
   private activeBank!: RenderBank
@@ -269,6 +310,7 @@ export class PostProcess {
   private lastStaticMarkers = new Float32Array(12)
   private motionPipeline?: GPURenderPipeline
   private staticResolvePipeline?: GPURenderPipeline
+  private backdropBlitPipeline?: GPURenderPipeline
   private motionUniform?: GPUBuffer
   private bloomPipeline!: GPURenderPipeline
   private compositionPipeline!: GPURenderPipeline
@@ -311,6 +353,14 @@ export class PostProcess {
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
     this.emptyOrbitMsaaView = this.emptyOrbitMsaa.createView()
+    this.emptyGeographyMsaa = device.createTexture({
+      label: 'Unused 4x MSAA geography binding',
+      size: [1, 1],
+      format: 'rgba16float',
+      sampleCount: 4,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    })
+    this.emptyGeographyMsaaView = this.emptyGeographyMsaa.createView()
     const uniform = (label: string, size: number) =>
       device.createBuffer({ label, size, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
     this.bloomUniforms = [0, 1, 2].map(i => uniform(`Bloom parameters ${i}`, 16))
@@ -321,13 +371,11 @@ export class PostProcess {
 
   async initialize() {
     const device = this.device
-    const { bloom, composition, presentation, cursor, loupe, motion, staticResolve } = await getPostPipelines(
-      device,
-      this.format,
-      this.reverseDepth,
-    )
+    const { bloom, composition, presentation, cursor, loupe, motion, staticResolve, backdropBlit } =
+      await getPostPipelines(device, this.format, this.reverseDepth)
     this.motionPipeline = motion
     this.staticResolvePipeline = staticResolve
+    this.backdropBlitPipeline = backdropBlit
     if (motion)
       this.motionUniform = device.createBuffer({
         label: 'Camera motion parameters',
@@ -375,9 +423,7 @@ export class PostProcess {
       Boolean(this.motionPipeline),
     )
     const depthOnlyView = depth.createView({ aspect: 'depth-only' })
-    const geography = this.target(`${label} 4x MSAA Geographic coordinates`, width, height, 'rgba16float', 4, true)
-    const geographyView = geography.createView()
-    const annotationDepth = this.target(`${label} 4x MSAA Annotation depth`, width, height, depthFormat, 4, false)
+    const geographyView = this.emptyGeographyMsaaView
     const scale = Math.min(0.5, 1024 / Math.max(width, height))
     const bloom = [0, 1].map(i =>
       this.target(`${label} Bloom ${i}`, Math.max(1, Math.ceil(width * scale)), Math.max(1, Math.ceil(height * scale))),
@@ -393,17 +439,7 @@ export class PostProcess {
       }),
     )
     const compositionGroup = this.compositionBinding(scene, bloom[0], this.emptyCoverage)
-    const presentationGroup = this.device.createBindGroup({
-      layout: this.presentationPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.compositeUniform } },
-        { binding: 1, resource: this.display.createView() },
-        { binding: 2, resource: this.sampler },
-        { binding: 3, resource: geographyView },
-        { binding: 4, resource: multisampleView },
-        { binding: 5, resource: bloom[0].createView() },
-      ],
-    })
+    const presentationGroup = this.presentationBinding(geographyView, multisampleView, bloom[0])
     return {
       label,
       width,
@@ -414,9 +450,10 @@ export class PostProcess {
       multisampleView,
       depth,
       depthOnlyView,
-      geography,
+      geography: null,
       geographyView,
-      annotationDepth,
+      annotationDepth: null,
+      backdropValid: false,
       stableCoverage: null,
       coverageMsaa: null,
       boundCoverage: this.emptyCoverage,
@@ -433,13 +470,53 @@ export class PostProcess {
     }
   }
 
+  private presentationBinding(geographyView: GPUTextureView, multisampleView: GPUTextureView, bloom0: GPUTexture) {
+    return this.device.createBindGroup({
+      layout: this.presentationPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.compositeUniform } },
+        { binding: 1, resource: this.display.createView() },
+        { binding: 2, resource: this.sampler },
+        { binding: 3, resource: geographyView },
+        { binding: 4, resource: multisampleView },
+        { binding: 5, resource: bloom0.createView() },
+      ],
+    })
+  }
+
+  private ensureAnnotationTargets(bank: RenderBank) {
+    if (bank.geography && bank.annotationDepth) return
+    const depthFormat = this.reverseDepth ? 'depth32float' : 'depth24plus'
+    bank.geography = this.target(
+      `${bank.label} 4x MSAA Geographic coordinates`,
+      bank.width,
+      bank.height,
+      'rgba16float',
+      4,
+      true,
+    )
+    bank.geographyView = bank.geography.createView()
+    bank.annotationDepth = this.target(
+      `${bank.label} 4x MSAA Annotation depth`,
+      bank.width,
+      bank.height,
+      depthFormat,
+      4,
+      false,
+    )
+    bank.presentationGroup = this.presentationBinding(bank.geographyView, bank.multisampleView, bank.bloom[0])
+    bank.staticResolveGroup = undefined
+    bank.motionGroup = undefined
+  }
+
   private destroyBank(bank: RenderBank | null | undefined) {
     if (!bank) return
     bank.scene.destroy()
     bank.multisample.destroy()
     bank.depth.destroy()
-    bank.geography.destroy()
-    bank.annotationDepth.destroy()
+    bank.geography?.destroy()
+    bank.annotationDepth?.destroy()
+    bank.backdropScene?.destroy()
     bank.stableCoverage?.destroy()
     bank.coverageMsaa?.destroy()
     bank.bloom.forEach(texture => texture.destroy())
@@ -577,6 +654,7 @@ export class PostProcess {
 
   beginAnnotations(encoder: GPUCommandEncoder, includeCoverage: boolean, lowRes = false) {
     const bank = lowRes ? this.ensureLowBank() : this.high
+    this.ensureAnnotationTargets(bank)
     const colorAttachments: GPURenderPassColorAttachment[] = [
       { view: bank.geographyView, clearValue: [0, 0, -1, 0], loadOp: 'clear', storeOp: 'store' },
     ]
@@ -610,7 +688,7 @@ export class PostProcess {
       label: 'Geographic annotations',
       colorAttachments,
       depthStencilAttachment: {
-        view: bank.annotationDepth.createView(),
+        view: bank.annotationDepth!.createView(),
         depthClearValue: this.reverseDepth ? 0 : 1,
         depthLoadOp: 'clear',
         depthStoreOp: 'discard',
@@ -666,6 +744,79 @@ export class PostProcess {
   get depthView() {
     return this.activeBank.depthOnlyView
   }
+  get hasValidHeroBackdrop() {
+    return Boolean(this.high?.backdropValid && this.high.backdropBlitGroup && this.backdropBlitPipeline)
+  }
+
+  /**
+   * Render the slow-changing hero planet backdrop (Mars, Earth, Moon, Sky, Atmospheres) into
+   * 4x MSAA, resolving to a cached 1x HDR backdrop while preserving 4x MSAA color + depth
+   * for the immediately following live overlay pass.
+   */
+  beginHeroBackdrop(encoder: GPUCommandEncoder, hdr: boolean) {
+    const bank = this.high
+    if (!bank.backdropScene && this.backdropBlitPipeline) {
+      bank.backdropScene = this.target('Hero cached HDR backdrop', bank.width, bank.height)
+      bank.backdropSceneView = bank.backdropScene.createView()
+      bank.backdropBlitGroup = this.device.createBindGroup({
+        layout: this.backdropBlitPipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: bank.backdropSceneView }],
+      })
+    }
+    bank.hasMultisample = false
+    bank.backdropValid = Boolean(bank.backdropSceneView)
+    return encoder.beginRenderPass({
+      label: '4x MSAA Earth surface',
+      colorAttachments: [
+        {
+          view: bank.multisampleView,
+          resolveTarget: bank.backdropSceneView,
+          clearValue: hdr ? [0.018 / 12.92, 0.026 / 12.92, 0.039 / 12.92, 1] : [0.018, 0.026, 0.039, 1],
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
+      depthStencilAttachment: {
+        view: bank.depthOnlyView,
+        depthClearValue: this.reverseDepth ? 0 : 1,
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+      },
+    })
+  }
+
+  /**
+   * Draw live 60 FPS hero overlays (Bridge arc + Stardust Title/CTA) onto the 4x MSAA target
+   * while reusing the exact 4x MSAA planet depth buffer. When `fromCache` is true, blits the
+   * cached HDR backdrop in 1 fullscreen triangle instead of re-rendering all planets.
+   */
+  beginHeroOverlay(encoder: GPUCommandEncoder, fromCache: boolean) {
+    const bank = this.high
+    bank.hasMultisample = false
+    const pass = encoder.beginRenderPass({
+      label: fromCache ? 'Hero cached backdrop and overlays' : 'Hero live overlays',
+      colorAttachments: [
+        {
+          view: bank.multisampleView,
+          resolveTarget: bank.sceneView,
+          clearValue: [0, 0, 0, 1],
+          loadOp: fromCache ? 'clear' : 'load',
+          storeOp: 'discard',
+        },
+      ],
+      depthStencilAttachment: {
+        view: bank.depthOnlyView,
+        depthLoadOp: 'load',
+        depthStoreOp: 'store',
+      },
+    })
+    if (fromCache && this.backdropBlitPipeline && bank.backdropBlitGroup) {
+      pass.setPipeline(this.backdropBlitPipeline)
+      pass.setBindGroup(0, bank.backdropBlitGroup)
+      pass.draw(3)
+    }
+    return pass
+  }
 
   begin(
     encoder: GPUCommandEncoder,
@@ -693,7 +844,7 @@ export class PostProcess {
               ? [0.018 / 12.92, 0.026 / 12.92, 0.039 / 12.92, 1]
               : [0.018, 0.026, 0.039, 1],
           loadOp: firstTile ? 'clear' : 'load',
-          storeOp: 'store',
+          storeOp: bank.hasMultisample || !lastTile ? 'store' : 'discard',
         },
       ],
       depthStencilAttachment: {
@@ -932,6 +1083,7 @@ export class PostProcess {
     this.loupeGroup = undefined
     this.emptyCoverage.destroy()
     this.emptyOrbitMsaa.destroy()
+    this.emptyGeographyMsaa.destroy()
     this.motionUniform?.destroy()
     this.bloomUniforms.forEach(buffer => buffer.destroy())
     this.compositeUniform.destroy()

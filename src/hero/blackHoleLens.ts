@@ -88,27 +88,27 @@ export function computeBlackHoleGeometry(scrollRaw: number, aspectRaw: number): 
   const scroll = clamp01(scrollRaw)
   const aspect = Math.max(0.45, Math.min(3.0, aspectRaw))
 
-  // At scroll = 0: massive unseen black hole centered horizontally just below the bottom fold.
-  // Event horizon top sits at y = 1.035 (off-screen), while its outer gravitational lensing
-  // reaches up across the lower ~25% of the viewport to bend the Milky Way and Mars's limb.
+  // At scroll = 0: massive black hole centered horizontally just below the bottom fold,
+  // with its pitch-black event horizon and critical photon ring cresting ~5.4% above the
+  // bottom edge so visitors immediately see it is cut off below the fold.
   const rhStart = Math.max(1.12, aspect * 0.7)
   // At scroll = 1: horizon centered on screen with radius comfortably swallowing all 4 corners.
   const rhFull = Math.max(rhStart, Math.hypot(aspect * 0.5, 0.5) + 0.28)
 
   const rise = clamp01(scroll / 0.92)
   // Balanced linear-eased climb so the horizon sweeps steadily across the full scroll runway:
-  // s=0: off-screen below (1.03); s=0.25: ~20% up; s=0.50: ~55% up; s=0.88+: swallows all 4 corners.
+  // s=0: cresting ~5.4% above bottom; s=0.25: ~26% up; s=0.50: ~58% up; s=0.88+: swallows all 4 corners.
   const ease = rise * 0.65 + rise * rise * (3 - 2 * rise) * 0.35
 
   const rh = rhStart + (rhFull - rhStart) * (rise * rise)
-  const cyStart = rhStart + 1.035
+  const cyStart = rhStart + 0.946
   const cyEnd = 0.5
   const cy = cyStart + (cyEnd - cyStart) * ease
 
   // Subtle, eerie gravitational warp at rest; amplifies cleanly as the horizon climbs into frame.
   const lensStrength = 0.9 + smoothstep(0.02, 0.45, scroll) * 0.42
-  // Whisper-quiet warm glow at scroll=0; full incandescent Interstellar border once the rim crests.
-  const ringIntensity = 0.55 + smoothstep(0.01, 0.22, scroll) * 0.58
+  // Crisp Interstellar photon ring already legible on the peeking crest at scroll=0; full intensity on scroll.
+  const ringIntensity = 0.68 + smoothstep(0.01, 0.22, scroll) * 0.45
 
   return {
     cx: 0.5,
@@ -231,6 +231,7 @@ export class BlackHoleLensPass {
     geom: BlackHoleGeometry,
   ) {
     if (this.destroyed || width < 2 || height < 2) return
+    if (geom.scroll <= 0.0005 && geom.lensStrength <= 0.0005 && geom.ringIntensity <= 0.0005) return
     this.ensureScratch(width, height)
 
     // Snapshot resolved pre-bloom HDR scene into scratch, then write lensed HDR + photon ring back to sceneView.

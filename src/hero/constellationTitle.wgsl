@@ -436,8 +436,8 @@ struct DustVertex {
   let baseCore = dh.home.z * pxPerView;
   let scatterSize = mix(1.0, .70 + .36 * dh.home.w, loose);
   let depthSize = 1. + z * .22;
-  let corePx = max(.42, baseCore * scatterSize * depthSize);
-  let maxR = corePx * 2.35;
+  let corePx = max(.58, baseCore * scatterSize * depthSize);
+  let maxR = corePx * 2.45;
 
   let centerPx = u.stageRect.xy + (pos / u.viewMeta.xy) * u.stageRect.zw;
   let c = corners[vIdx];
@@ -528,7 +528,7 @@ struct EdgeVertex {
 
   let corner = corners[vIdx];
   let isEnd = corner.x > .5;
-  let halfW = max((ed.style.y + .75 * u.viewport.z) * 2.8, 3.6 * u.viewport.z);
+  let halfW = max((ed.style.y + .85 * u.viewport.z) * 3.2, 5.2);
   let posPx = select(pxA, pxB, isEnd) + perpPx * (corner.y * halfW);
   let ndc = vec2f((posPx.x / u.viewport.x) * 2. - 1., 1. - (posPx.y / u.viewport.y) * 2.);
 
@@ -547,9 +547,17 @@ struct EdgeVertex {
   let parted = smoothstep(.08, .72, sampleParting(input.viewPos));
   let highlight = select(parted, parted * .45, isSightline);
 
-  let sigma = (.36 + highlight * .26) * dpr;
-  let core = exp(-pow(distPx / sigma, 2.));
-  let halo = exp(-pow(distPx / (sigma * 2.8), 2.)) * (.08 + highlight * .18);
+  // Analytical Gaussian pixel pre-filter: convolve the thin line width with a ~0.78px reconstruction
+  // kernel so shallow diagonal hairlines stay whisper-thin via energy conservation with zero Nyquist
+  // staircasing/roping at 1x DPR when unfocused.
+  let lineSigma = (.38 + highlight * .24) * dpr;
+  let filterSigma = .78;
+  let sigma = sqrt(lineSigma * lineSigma + filterSigma * filterSigma);
+  let rawHaloSigma = lineSigma * 2.4;
+  let haloSigma = sqrt(rawHaloSigma * rawHaloSigma + filterSigma * filterSigma);
+  let energyPreserve = pow(lineSigma / sigma, .65);
+  let core = exp(-pow(distPx / sigma, 2.)) * energyPreserve;
+  let halo = exp(-pow(distPx / haloSigma, 2.)) * (.08 + highlight * .16) * (rawHaloSigma / haloSigma);
 
   let t = clamp(input.local.x / max(input.metrics.x, 1e-4), 0., 1.);
   let endLift = .74 + .36 * pow(abs(t * 2. - 1.), 1.6);
@@ -557,7 +565,7 @@ struct EdgeVertex {
   var dashMask = 1.;
   if (isSightline) {
     let phase = fract(input.local.x / 8.);
-    dashMask = smoothstep(.04, .14, phase) * (1. - smoothstep(.36, .46, phase));
+    dashMask = smoothstep(.02, .20, phase) * (1. - smoothstep(.32, .50, phase));
   }
 
   let baseOp = input.metrics.z;
@@ -658,13 +666,15 @@ struct StarVertex {
   let spikeVis = max(spiked * (.46 + focus * .44), focus * .74);
   if (spikeVis > .01) {
     let spikeLen = select(select(4.8, 7.2, mag < 2.5), 10.6, mag < 1.5) * pxPerView * (1. + focus * .28);
-    let spikeW = max(.28 * u.viewport.z, .28 * pxPerView);
+    let rawSpikeW = max(.28 * u.viewport.z, .28 * pxPerView);
+    let spikeW = sqrt(rawSpikeW * rawSpikeW + .66 * .66);
+    let spikeGain = rawSpikeW / spikeW;
     let ax = abs(input.localPx.x);
     let ay = abs(input.localPx.y);
     let hSpike = exp(-pow(ay / spikeW, 2.)) * exp(-ax / max(spikeLen * .34, 1.)) * smoothstep(spikeLen, 0., ax);
     let vSpike = exp(-pow(ax / spikeW, 2.)) * exp(-ay / max(spikeLen * .34, 1.)) * smoothstep(spikeLen, 0., ay);
     let spikeTint = mix(vec3f(1., .97, .92), input.color.rgb, .35);
-    color += spikeTint * ((hSpike + vSpike) * spikeVis * (.42 + focus * .44));
+    color += spikeTint * ((hSpike + vSpike) * spikeGain * spikeVis * (.52 + focus * .48));
   }
 
   return vec4f(color * scint * u.viewport.w, 0.);

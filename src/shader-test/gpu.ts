@@ -21,10 +21,11 @@ export async function shaderModule(device: GPUDevice, label: string, code: strin
 export function uploadBuffer(
   device: GPUDevice,
   label: string,
-  data: Float32Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+  data: Float32Array<ArrayBuffer> | Uint32Array<ArrayBuffer> | Uint16Array<ArrayBuffer>,
   usage: GPUBufferUsageFlags,
 ) {
-  const buffer = device.createBuffer({ label, size: data.byteLength, usage, mappedAtCreation: true })
+  const size = Math.ceil(data.byteLength / 4) * 4
+  const buffer = device.createBuffer({ label, size, usage, mappedAtCreation: true })
   new Uint8Array(buffer.getMappedRange()).set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength))
   buffer.unmap()
   return buffer

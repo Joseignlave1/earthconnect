@@ -50,9 +50,11 @@ fn cometPulse(t: f32, head: f32, leadSigma: f32, tailSigma: f32) -> f32 {
   let distPx = abs(input.uv.y) * input.halfWidthPx;
   let endFade = smoothstep(0., .028, t) * smoothstep(1., .972, t);
 
-  // Whisper-thin astronomical hairline core + subtle optical aura.
+  // Whisper-thin astronomical hairline core pre-filtered to avoid 1x DPR diagonal staircasing.
   let spanFocus = mix(.86, 1.06, pow(abs(t * 2. - 1.), 1.5));
-  let core = exp(-pow(distPx / (.58 * spanFocus), 2.));
+  let rawCore = .58 * spanFocus;
+  let coreSigma = sqrt(rawCore * rawCore + .62 * .62);
+  let core = exp(-pow(distPx / coreSigma, 2.)) * pow(rawCore / coreSigma, .65);
   let halo = exp(-pow(distPx / (2.5 * spanFocus), 2.)) * .17;
 
   // Smooth C1 traveling pulses gliding from Mars (t=0) to Earth (t=1) with no wrap discontinuity.
@@ -102,7 +104,7 @@ struct AnchorVertex {
   let core = exp(-pow(r / 1.35, 2.)) * 1.35;
   let glow = exp(-pow(r / 4.2, 2.)) * .24;
   let ringR = select(5.8, 4.8, input.kind > .5);
-  let ring = exp(-pow((r - ringR) / .58, 2.)) * .52;
+  let ring = exp(-pow((r - ringR) / .78, 2.)) * .46;
   let breath = select(.90 + .10 * sin(u.timing.y * 1.2 + input.kind * 2.1), 1., u.timing.z > .5);
   let color = tint * (core + glow + ring) * breath * u.timing.w;
   return vec4f(color, 0.);

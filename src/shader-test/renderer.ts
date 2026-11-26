@@ -32,6 +32,7 @@ import {
   type Selection,
   type Vec3,
 } from './geometry.ts'
+import { createPatchMesh, EarthQuadtree, INSTANCE_FLOATS, MAX_PATCH_INSTANCES } from './quadtreeLod.ts'
 import { contourDetail } from './contours.ts'
 import { MISSING, SIZE, worldTiles } from './world-grid.ts'
 import { elevationAt, elevationPyramid, packRg32FloatLevels, type Terrain } from './terrain.ts'
@@ -92,6 +93,7 @@ export type HeroStage = {
   frame: (aspect: number, timeSeconds: number) => SolarFrame
   prepareOverlay?: (
     encoder: GPUCommandEncoder,
+    frame: SolarFrame,
     width: number,
     height: number,
     ratio: number,
@@ -162,6 +164,16 @@ type DeviceSurfaceCache = {
 
 const tileCount = worldTiles().length
 const sharedMesh = createMesh()
+const sharedPatchMesh = createPatchMesh()
+const earthQuadtrees = new WeakMap<Terrain, EarthQuadtree>()
+function getEarthQuadtree(terrain: Terrain): EarthQuadtree {
+  let tree = earthQuadtrees.get(terrain)
+  if (!tree) {
+    tree = EarthQuadtree.fromTerrain(terrain)
+    earthQuadtrees.set(terrain, tree)
+  }
+  return tree
+}
 const surfaceCache = new WeakMap<GPUDevice, DeviceSurfaceCache>()
 function settleTile(width: number, height: number, index: number): TileRect {
   // Split on even coordinates so every 2x2 derivative quad lies strictly inside one tile.
@@ -200,11 +212,22 @@ function getSurfaceCache(device: GPUDevice): DeviceSurfaceCache {
   return entry
 }
 
-async function buildEarthTexture(device: GPUDevice, cache: DeviceSurfaceCache, url: string): Promise<GPUTexture> {
+async function buildEarthTexture(
+  device: GPUDevice,
+  cache: DeviceSurfaceCache,
+  url: string,
+  maxWidth?: number,
+): Promise<GPUTexture> {
   const { signal } = cache.controller
   const response = await fetch(url, { signal })
   if (!response.ok) throw new Error('Could not load the Earth background. Reload to retry.')
-  const bitmap = await createImageBitmap(await response.blob(), { colorSpaceConversion: 'none' })
+  const blob = await response.blob()
+  const bitmap = await createImageBitmap(
+    blob,
+    maxWidth
+      ? { colorSpaceConversion: 'none', resizeWidth: maxWidth, resizeHeight: maxWidth >> 1, resizeQuality: 'high' }
+      : { colorSpaceConversion: 'none' },
+  )
   let texture: GPUTexture | undefined
   try {
     signal.throwIfAborted()
@@ -228,15 +251,21 @@ async function buildEarthTexture(device: GPUDevice, cache: DeviceSurfaceCache, u
   }
 }
 
-function loadSharedEarthTexture(device: GPUDevice, url: string, signal: AbortSignal): Promise<GPUTexture> {
+function loadSharedEarthTexture(
+  device: GPUDevice,
+  url: string,
+  signal: AbortSignal,
+  maxWidth?: number,
+): Promise<GPUTexture> {
   signal.throwIfAborted()
   const cache = getSurfaceCache(device)
-  let pending = cache.earthTextures.get(url)
+  const key = maxWidth ? `${url}@${maxWidth}` : url
+  let pending = cache.earthTextures.get(key)
   if (!pending) {
-    pending = buildEarthTexture(device, cache, url)
-    cache.earthTextures.set(url, pending)
+    pending = buildEarthTexture(device, cache, url, maxWidth)
+    cache.earthTextures.set(key, pending)
     void pending.catch(() => {
-      if (cache.earthTextures.get(url) === pending) cache.earthTextures.delete(url)
+      if (cache.earthTextures.get(key) === pending) cache.earthTextures.delete(key)
     })
   }
   return raceAbort(pending, signal)
@@ -346,7 +375,21 @@ function getSurfacePipelines(
         vertex: {
           module,
           entryPoint: vertexEntry,
-          buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
+          buffers: [
+            {
+              arrayStride: 12,
+              stepMode: 'vertex',
+              attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
+            },
+            {
+              arrayStride: INSTANCE_FLOATS * 4,
+              stepMode: 'instance',
+              attributes: [
+                { shaderLocation: 1, offset: 0, format: 'float32x4' },
+                { shaderLocation: 2, offset: 16, format: 'float32x4' },
+              ],
+            },
+          ],
         },
         fragment: { module, entryPoint, targets, constants },
         primitive: { topology: 'triangle-list', cullMode: 'back' },
@@ -441,8 +484,13 @@ function getSharedMeshGpu(device: GPUDevice): SharedMeshGpu {
   const cache = getSurfaceCache(device)
   if (!cache.mesh) {
     cache.mesh = {
-      vertexBuffer: uploadBuffer(device, 'Surface UV vertices', sharedMesh.uv, GPUBufferUsage.VERTEX),
-      indexBuffer: uploadBuffer(device, 'Surface indices', sharedMesh.indices, GPUBufferUsage.INDEX),
+      vertexBuffer: uploadBuffer(
+        device,
+        'Earth quadtree patch vertices',
+        sharedPatchMesh.vertices,
+        GPUBufferUsage.VERTEX,
+      ),
+      indexBuffer: uploadBuffer(device, 'Earth quadtree patch indices', sharedPatchMesh.indices, GPUBufferUsage.INDEX),
       geographicSampler: device.createSampler({
         addressModeU: 'repeat',
         addressModeV: 'clamp-to-edge',
@@ -504,6 +552,24 @@ export class SurfaceRenderer {
   private preparedTerrain: PreparedTerrain<'rg32float'> | null = null
   private vertexBuffer!: GPUBuffer
   private indexBuffer!: GPUBuffer
+  private patchInstanceBuffer!: GPUBuffer
+  private loupePatchInstanceBuffer!: GPUBuffer
+  private readonly patchInstances = new Float32Array(MAX_PATCH_INSTANCES * INSTANCE_FLOATS)
+  private readonly loupePatchInstances = new Float32Array(MAX_PATCH_INSTANCES * INSTANCE_FLOATS)
+  private earthQuadtree = EarthQuadtree.createFlat()
+  private earthPatchCount = 0
+  private scoreRevision = 0
+  private heroBackdrop: {
+    frame: SolarFrame
+    width: number
+    height: number
+    hdr: boolean
+    bodies: SolarBodies
+    earthReady: boolean
+    terrainReady: boolean
+    solarTerrain: boolean
+    scoreRevision: number
+  } | null = null
   private geographicSampler!: GPUSampler
   private mesh = sharedMesh
   private picker = new SurfacePicker(this.mesh)
@@ -590,6 +656,7 @@ export class SurfaceRenderer {
   setHeroBodies(bodies: SolarBodies) {
     if (!this.heroStage) return
     this.heroStage.bodies = bodies
+    this.heroBackdrop = null
     this.solar?.setBodies(bodies)
     this.invalidate(false)
   }
@@ -649,6 +716,7 @@ export class SurfaceRenderer {
       .then(prepared => {
         if (this.destroyed) return
         this.terrain = prepared.terrain
+        this.earthQuadtree = getEarthQuadtree(prepared.terrain)
         this.poleHeights = prepared.poles
         this.preparedTerrain = prepared
         this.preparePicker()
@@ -812,7 +880,9 @@ export class SurfaceRenderer {
         this.solarSettings.assetUrl,
         this.solarSettings.loadTerrain,
         this.solarSettings.loadPlanetTilePack,
-        this.heroStage ? { bodies: this.heroStage.bodies, eagerTerrain: true } : undefined,
+        this.heroStage
+          ? { bodies: this.heroStage.bodies, eagerTerrain: true, albedoMaxWidths: { moon: 512, mars: 4096 } }
+          : undefined,
       )
       if (this.destroyed || this.device !== device) {
         solar.destroy()
@@ -838,6 +908,16 @@ export class SurfaceRenderer {
       label: 'Optical loupe surface parameters',
       size: this.uniformValues.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    })
+    this.patchInstanceBuffer = device.createBuffer({
+      label: 'Earth quadtree patch instances',
+      size: this.patchInstances.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    })
+    this.loupePatchInstanceBuffer = device.createBuffer({
+      label: 'Earth loupe quadtree patch instances',
+      size: this.loupePatchInstances.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     })
     const sharedGpu = getSharedMeshGpu(device)
     this.vertexBuffer = sharedGpu.vertexBuffer
@@ -972,7 +1052,7 @@ export class SurfaceRenderer {
   private startEarthUpload(url: string) {
     const device = this.device
     const { signal } = this.terrainRequest
-    void loadSharedEarthTexture(device, url, signal)
+    void loadSharedEarthTexture(device, url, signal, this.heroStage ? 2048 : undefined)
       .then(texture => {
         if (this.destroyed || this.lost || this.device !== device || this.earthImageUrl !== url) return
         if (this.earthOwned) this.earthTexture.destroy()
@@ -1070,6 +1150,8 @@ export class SurfaceRenderer {
   }
 
   private publishScoreInfo(score: ScoreDescription, distribution: ScoreDistribution, entries: number, bytes: number) {
+    this.scoreRevision++
+    this.heroBackdrop = null
     this.distribution = distribution
     this.style = resolveScoreStyle(distribution, this.options, this.style)
     this.selected = null
@@ -1301,7 +1383,7 @@ export class SurfaceRenderer {
     const canvas = this.canvas,
       device = this.device
     const hero = this.heroStage
-    const displayRatio = Math.min(window.devicePixelRatio || 1, hero ? 1.5 : 2)
+    const displayRatio = hero || this.loupeOnly ? 1 : Math.min(window.devicePixelRatio || 1, 2)
     const progressive = !hero && displayRatio > 1.25
     const maxDim = device.limits.maxTextureDimension2D
     // Render interactive motion/preview frames at DPR 1 and refine into native DPR 2
@@ -1410,7 +1492,39 @@ export class SurfaceRenderer {
     if (this.annotationsStale && !skipAnnotations && (hasSelectedMarker || hover || earthBoundary)) annotations = true
     const metresPerPixel = (2 * Math.tan(FOV / 2) * (camera.distance - earthMorph) * EARTH_AXIS) / clientHeight
     const detail = contourDetail(metresPerPixel)
-    if (redraw || annotations) {
+    const canUseHeroBackdrop = Boolean(
+      hero &&
+        sceneFrame &&
+        redraw &&
+        !motion &&
+        !tile &&
+        !useLowRes &&
+        this.post.hasValidHeroBackdrop &&
+        this.heroBackdrop &&
+        this.heroBackdrop.width === renderWidth &&
+        this.heroBackdrop.height === renderHeight &&
+        this.heroBackdrop.hdr === hdr &&
+        this.heroBackdrop.bodies === hero.bodies &&
+        this.heroBackdrop.earthReady === this.earthReady &&
+        this.heroBackdrop.terrainReady === Boolean(this.terrain) &&
+        this.heroBackdrop.solarTerrain === Boolean(solar?.terrainReady) &&
+        this.heroBackdrop.scoreRevision === this.scoreRevision &&
+        Math.abs(this.heroBackdrop.frame.aspect - sceneFrame.aspect) < 1e-4 &&
+        Math.hypot(
+          this.heroBackdrop.frame.eye[0] - sceneFrame.eye[0],
+          this.heroBackdrop.frame.eye[1] - sceneFrame.eye[1],
+          this.heroBackdrop.frame.eye[2] - sceneFrame.eye[2],
+        ) < 2.2 &&
+        Math.max(
+          Math.abs(this.heroBackdrop.frame.back[0] - sceneFrame.back[0]),
+          Math.abs(this.heroBackdrop.frame.back[1] - sceneFrame.back[1]),
+          Math.abs(this.heroBackdrop.frame.back[2] - sceneFrame.back[2]),
+          Math.abs(this.heroBackdrop.frame.right[0] - sceneFrame.right[0]),
+          Math.abs(this.heroBackdrop.frame.right[1] - sceneFrame.right[1]),
+          Math.abs(this.heroBackdrop.frame.right[2] - sceneFrame.right[2]),
+        ) < 0.00022,
+    )
+    if ((redraw && !canUseHeroBackdrop) || (annotations && !skipAnnotations)) {
       const u = this.uniformValues
       const baseMatrix = sceneFrame ? solar!.earthMatrix(sceneFrame) : cameraMatrix(camera)
       u.set(baseMatrix, 0)
@@ -1440,66 +1554,145 @@ export class SurfaceRenderer {
       } else {
         u.fill(0, 60, 76)
       }
-      if (redraw) device.queue.writeBuffer(this.uniformBuffer, 0, u)
+      if (redraw && !canUseHeroBackdrop) device.queue.writeBuffer(this.uniformBuffer, 0, u)
       if (annotations && !skipAnnotations) device.queue.writeBuffer(this.annotationUniform, 0, u)
+      if (renderEarth && earthSmallPad <= 0 && ((redraw && !canUseHeroBackdrop) || (annotations && !skipAnnotations))) {
+        this.earthPatchCount = this.earthQuadtree.selectPatches(
+          this.patchInstances,
+          baseMatrix,
+          earthEye,
+          renderWidth,
+          renderHeight,
+          earthMorph,
+          activeMeshRelief,
+        )
+        if (this.earthPatchCount > 0) {
+          device.queue.writeBuffer(
+            this.patchInstanceBuffer,
+            0,
+            this.patchInstances,
+            0,
+            this.earthPatchCount * INSTANCE_FLOATS,
+          )
+        }
+      }
     }
     const encoder = device.createCommandEncoder({ label: 'Surface frame' })
-    const drawMesh = (pass: GPURenderPassEncoder, pipeline: GPURenderPipeline, bindings: GPUBindGroup) => {
+    const drawMesh = (
+      pass: GPURenderPassEncoder,
+      pipeline: GPURenderPipeline,
+      bindings: GPUBindGroup,
+      instanceBuffer = this.patchInstanceBuffer,
+      instanceCount = this.earthPatchCount,
+    ) => {
+      if (instanceCount <= 0) return
       pass.setPipeline(pipeline)
       pass.setBindGroup(0, bindings)
       pass.setVertexBuffer(0, this.vertexBuffer)
-      pass.setIndexBuffer(this.indexBuffer, 'uint32')
-      pass.drawIndexed(this.mesh.indices.length)
+      pass.setVertexBuffer(1, instanceBuffer)
+      pass.setIndexBuffer(this.indexBuffer, 'uint16')
+      pass.drawIndexed(sharedPatchMesh.indexCount, instanceCount)
     }
     const pipelines = this.pipelines!
     const drawSystemOrbits = Boolean(sceneFrame && this.solarFocus === 'system')
     if (redraw) {
-      if (sceneFrame && hero?.prepareOverlay) {
-        hero.prepareOverlay(encoder, renderWidth, renderHeight, renderRatio, heroTimeSeconds)
+      const overlayFrame = canUseHeroBackdrop && this.heroBackdrop ? this.heroBackdrop.frame : sceneFrame
+      if (overlayFrame && hero?.prepareOverlay) {
+        hero.prepareOverlay(encoder, overlayFrame, renderWidth, renderHeight, renderRatio, heroTimeSeconds)
       }
-      const pass = this.post.begin(
-        encoder,
-        hdr,
-        Boolean(motion) || drawSystemOrbits,
-        Boolean(motion) || drawSystemOrbits,
-        useLowRes,
-        tile,
-      )
-      if (sceneFrame) {
-        const overview = this.solarFocus === 'system'
-        const flightTarget = this.solarFocus !== 'system' && solar!.camera.flying ? this.solarFocus : undefined
-        solar!.draw(
-          pass,
-          sceneFrame,
-          renderWidth,
-          renderHeight,
-          clientHeight,
-          hdr,
-          renderRatio,
-          overview,
-          flightTarget,
-          renderEarth
-            ? () => {
-                if (earthSmallPad > 0) {
-                  pass.setPipeline(pipelines.surfaceSmall)
-                  pass.setBindGroup(0, this.bindings)
-                  pass.draw(6)
-                } else {
-                  drawMesh(pass, pipelines.surface, this.bindings)
+      if (hero && sceneFrame && !motion && !tile && !useLowRes) {
+        if (!canUseHeroBackdrop) {
+          const backdropPass = this.post.beginHeroBackdrop(encoder, hdr)
+          solar!.draw(
+            backdropPass,
+            sceneFrame,
+            renderWidth,
+            renderHeight,
+            clientHeight,
+            hdr,
+            renderRatio,
+            false,
+            undefined,
+            renderEarth
+              ? () => {
+                  if (earthSmallPad > 0) {
+                    backdropPass.setPipeline(pipelines.surfaceSmall)
+                    backdropPass.setBindGroup(0, this.bindings)
+                    backdropPass.draw(6)
+                  } else {
+                    drawMesh(backdropPass, pipelines.surface, this.bindings)
+                  }
                 }
-              }
-            : undefined,
+              : undefined,
+          )
+          if (renderEarth && earthMorph > 0.001)
+            solar!.drawEarthAtmosphere(backdropPass, sceneFrame, earthMorph, clientHeight, earthSmallPad > 0)
+          solar!.drawMarsAtmosphere(backdropPass, sceneFrame, clientHeight, marsSmallPad > 0)
+          solar!.drawHalo(backdropPass)
+          backdropPass.end()
+          this.heroBackdrop = {
+            frame: sceneFrame,
+            width: renderWidth,
+            height: renderHeight,
+            hdr,
+            bodies: hero.bodies,
+            earthReady: this.earthReady,
+            terrainReady: Boolean(this.terrain),
+            solarTerrain: Boolean(solar?.terrainReady),
+            scoreRevision: this.scoreRevision,
+          }
+        }
+        const overlayPass = this.post.beginHeroOverlay(encoder, canUseHeroBackdrop)
+        if (hero.drawOverlay) {
+          const overlayFrame = canUseHeroBackdrop ? this.heroBackdrop!.frame : sceneFrame
+          hero.drawOverlay(overlayPass, overlayFrame, renderWidth, renderHeight, renderRatio, heroTimeSeconds)
+        }
+        overlayPass.end()
+      } else {
+        const pass = this.post.begin(
+          encoder,
+          hdr,
+          Boolean(motion) || drawSystemOrbits,
+          Boolean(motion) || drawSystemOrbits,
+          useLowRes,
+          tile,
         )
-      } else if (renderEarth) {
-        drawMesh(pass, pipelines.surface, this.bindings)
+        if (sceneFrame) {
+          const overview = this.solarFocus === 'system'
+          const flightTarget = this.solarFocus !== 'system' && solar!.camera.flying ? this.solarFocus : undefined
+          solar!.draw(
+            pass,
+            sceneFrame,
+            renderWidth,
+            renderHeight,
+            clientHeight,
+            hdr,
+            renderRatio,
+            overview,
+            flightTarget,
+            renderEarth
+              ? () => {
+                  if (earthSmallPad > 0) {
+                    pass.setPipeline(pipelines.surfaceSmall)
+                    pass.setBindGroup(0, this.bindings)
+                    pass.draw(6)
+                  } else {
+                    drawMesh(pass, pipelines.surface, this.bindings)
+                  }
+                }
+              : undefined,
+          )
+        } else if (renderEarth) {
+          drawMesh(pass, pipelines.surface, this.bindings)
+        }
+        if (sceneFrame && !motion && renderEarth && earthMorph > 0.001)
+          solar!.drawEarthAtmosphere(pass, sceneFrame, earthMorph, clientHeight, earthSmallPad > 0)
+        if (sceneFrame && !motion) solar!.drawMarsAtmosphere(pass, sceneFrame, clientHeight, marsSmallPad > 0)
+        if (sceneFrame) solar!.drawHalo(pass)
+        if (sceneFrame && hero?.drawOverlay)
+          hero.drawOverlay(pass, sceneFrame, renderWidth, renderHeight, renderRatio, heroTimeSeconds)
+        pass.end()
       }
-      if (sceneFrame && !motion && renderEarth && earthMorph > 0.001)
-        solar!.drawEarthAtmosphere(pass, sceneFrame, earthMorph, clientHeight, earthSmallPad > 0)
-      if (sceneFrame && !motion) solar!.drawMarsAtmosphere(pass, sceneFrame, clientHeight, marsSmallPad > 0)
-      if (sceneFrame) solar!.drawHalo(pass)
-      if (sceneFrame && hero?.drawOverlay)
-        hero.drawOverlay(pass, sceneFrame, renderWidth, renderHeight, renderRatio, heroTimeSeconds)
-      pass.end()
     }
     if (annotations && !skipAnnotations) {
       const pass = this.post.beginAnnotations(encoder, earthBoundary, useLowRes)
@@ -1802,7 +1995,13 @@ export class SurfaceRenderer {
 
   private renderLoupe(
     encoder: GPUCommandEncoder,
-    drawMesh: (pass: GPURenderPassEncoder, pipeline: GPURenderPipeline, bindings: GPUBindGroup) => void,
+    drawMesh: (
+      pass: GPURenderPassEncoder,
+      pipeline: GPURenderPipeline,
+      bindings: GPUBindGroup,
+      instanceBuffer?: GPUBuffer,
+      instanceCount?: number,
+    ) => void,
     camera: Camera,
     sceneFrame: SolarFrame | undefined,
     rect: DOMRect,
@@ -1862,7 +2061,26 @@ export class SurfaceRenderer {
         lu[38] = 0
         lu[51] = 0
         this.device.queue.writeBuffer(this.loupeUniform, 0, lu)
-        drawMesh(loupePass, pipelines.surface, this.loupeBindings)
+        const loupeEye = sceneFrame ? solar!.earthEye(sceneFrame) : cameraBasis(camera).eye
+        const loupePatches = this.earthQuadtree.selectPatches(
+          this.loupePatchInstances,
+          loupeMatrix,
+          loupeEye,
+          LOUPE_TEXTURE_SIZE,
+          LOUPE_TEXTURE_SIZE,
+          ease(o.morph),
+          this.displayedMeshRelief,
+        )
+        if (loupePatches > 0) {
+          this.device.queue.writeBuffer(
+            this.loupePatchInstanceBuffer,
+            0,
+            this.loupePatchInstances,
+            0,
+            loupePatches * INSTANCE_FLOATS,
+          )
+        }
+        drawMesh(loupePass, pipelines.surface, this.loupeBindings, this.loupePatchInstanceBuffer, loupePatches)
         if (sceneFrame) solar!.drawLoupeSky(loupePass, sceneFrame, nx, ny, 1 / sx, 1 / sy)
         if (sceneFrame && o.morph > 0.001) solar!.drawLoupeEarthAtmosphere(loupePass, sceneFrame, ease(o.morph))
       } else if (sceneFrame && (this.solarFocus === 'moon' || this.solarFocus === 'mars')) {
@@ -2300,6 +2518,9 @@ export class SurfaceRenderer {
     this.uniformBuffer?.destroy()
     this.annotationUniform?.destroy()
     this.loupeUniform?.destroy()
+    this.patchInstanceBuffer?.destroy()
+    this.loupePatchInstanceBuffer?.destroy()
+    this.heroBackdrop = null
     this.post?.destroy()
     this.pipelines = null
   }

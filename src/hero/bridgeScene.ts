@@ -241,6 +241,52 @@ export function buildBridgeFrame(
 }
 
 /**
+ * Project a rest-frame screen UV `(u, v)` anchored on the infinite celestial sphere
+ * (`BASE_BASIS`) through the live camera `frame`, matching `solar-sky.wgsl` exactly.
+ */
+export function projectSkyUv(u: number, v: number, frame: SolarFrame): { u: number; v: number } | null {
+  const tanY = Math.tan(FOV / 2)
+  const tanX = tanY * frame.aspect
+  const dir = camDirToWorld((u * 2 - 1) * tanX, (1 - v * 2) * tanY, -1)
+  const cx = dot(dir, frame.right)
+  const cy = dot(dir, frame.up)
+  const cz = -dot(dir, frame.back)
+  if (cz <= 0.02) return null
+  return {
+    u: (cx / (cz * tanX) + 1) * 0.5,
+    v: (1 - cy / (cz * tanY)) * 0.5,
+  }
+}
+
+/**
+ * Project a rest-frame box (CSS px relative to the hero viewport) anchored on the
+ * celestial sphere through the live camera `frame`, returning both the pixel-locked
+ * live box and its CSS translation delta from rest.
+ */
+export function projectSkyBox(
+  rest: { left: number; top: number; width: number; height: number },
+  viewportW: number,
+  viewportH: number,
+  frame: SolarFrame,
+): { left: number; top: number; width: number; height: number; dx: number; dy: number } | null {
+  if (viewportW <= 1 || viewportH <= 1 || rest.width <= 1 || rest.height <= 1) return null
+  const u0 = (rest.left + rest.width * 0.5) / viewportW
+  const v0 = (rest.top + rest.height * 0.5) / viewportH
+  const projected = projectSkyUv(u0, v0, frame)
+  if (!projected) return null
+  const dx = (projected.u - u0) * viewportW
+  const dy = (projected.v - v0) * viewportH
+  return {
+    left: rest.left + dx,
+    top: rest.top + dy,
+    width: rest.width,
+    height: rest.height,
+    dx,
+    dy,
+  }
+}
+
+/**
  * Compute exact 3D world-space endpoints for The Bridge filament from Jezero Crater
  * on Mars to the live peak Earth analogue coordinate.
  */

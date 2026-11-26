@@ -1023,9 +1023,8 @@ export class CrewAstronautStage {
     if (this.destroyed) return
     const rect = this.canvas.getBoundingClientRect()
     if (rect.width < 2 || rect.height < 2) return
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const w = Math.max(2, Math.round(rect.width * dpr))
-    const h = Math.max(2, Math.round(rect.height * dpr))
+    const w = Math.max(2, Math.round(rect.width))
+    const h = Math.max(2, Math.round(rect.height))
     if (this.canvas.width !== w || this.canvas.height !== h) {
       this.canvas.width = w
       this.canvas.height = h
