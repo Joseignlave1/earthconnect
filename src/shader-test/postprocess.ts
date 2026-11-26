@@ -147,6 +147,13 @@ export type PostMotionAtmospheres = (
   motionView: GPUTextureView | null,
   depthView: GPUTextureView,
 ) => void
+export type PostSceneEffect = (
+  encoder: GPUCommandEncoder,
+  scene: GPUTexture,
+  sceneView: GPUTextureView,
+  width: number,
+  height: number,
+) => void
 export type Presentation = {
   hdr: boolean
   exposure: number
@@ -164,6 +171,7 @@ export type Presentation = {
   prepareOrbits?: PrepareOrbits
   compositeOrbits?: CompositeOrbits
   postMotionAtmospheres?: PostMotionAtmospheres
+  postScene?: PostSceneEffect
 }
 
 type PostUniformValues = {
@@ -845,6 +853,9 @@ export class PostProcess {
     bank.annotationsUpdated = false
     if (!this.staticResolvePipeline && orbitView && p.compositeOrbits) {
       p.compositeOrbits(encoder, bank.multisampleView, bank.sceneView)
+    }
+    if (redrawSurface && p.postScene) {
+      p.postScene(encoder, bank.scene, bank.sceneView, bank.width, bank.height)
     }
     const motionChanged = motion !== this.displayedMotion
     const sceneUpdated = redrawSurface || staticResolved

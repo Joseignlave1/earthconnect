@@ -47,7 +47,7 @@ import {
   writeScoreLookup,
   type ScoreTextures,
 } from './computed-scores.ts'
-import type { SolarCamera, SolarFocus, SolarFrame, SourceBody } from '../workspace/solarCamera.ts'
+import type { SolarBodies, SolarCamera, SolarFocus, SolarFrame, SourceBody } from '../workspace/solarCamera.ts'
 import type { SolarScene, SourcePoint } from '../workspace/solarScene.ts'
 import { createSurfaceDevicePool } from './surface-device.ts'
 import type { TerrainLoader } from '../workspace/earthWorkspaceResources.ts'
@@ -87,6 +87,36 @@ type SolarSettings = {
   onSourcePick: (body: SourceBody, point: SourcePoint) => void
 }
 type SurfaceAssets = WorkspaceAssets['url']
+export type HeroStage = {
+  bodies: SolarBodies
+  frame: (aspect: number, timeSeconds: number) => SolarFrame
+  prepareOverlay?: (
+    encoder: GPUCommandEncoder,
+    width: number,
+    height: number,
+    ratio: number,
+    timeSeconds: number,
+  ) => void
+  drawOverlay?: (
+    pass: GPURenderPassEncoder,
+    frame: SolarFrame,
+    width: number,
+    height: number,
+    ratio: number,
+    timeSeconds: number,
+  ) => void
+  postScene?: (
+    encoder: GPUCommandEncoder,
+    scene: GPUTexture,
+    sceneView: GPUTextureView,
+    width: number,
+    height: number,
+    ratio: number,
+    timeSeconds: number,
+  ) => void
+  animate?: boolean
+  options?: Partial<Options>
+}
 type RendererSettings = {
   assets?: SurfaceAssets
   loadTerrain?: TerrainLoader
@@ -97,6 +127,10 @@ type RendererSettings = {
   signal?: AbortSignal
   initialView?: { latitude: number; longitude: number }
   solar?: SolarSettings
+  hero?: HeroStage
+  loupeOnly?: boolean
+  initialProjection?: 'globe' | 'plane'
+  initialOptions?: Partial<Options>
 }
 type ComputedSource = { layout: ScoreLayout; bestAddress: number | null }
 type OrbitView = { rotation: Rotation; zoom: number; center: Vec3 }
@@ -510,6 +544,8 @@ export class SurfaceRenderer {
   private readonly solarViews = new Map<SolarFocus, OrbitView>()
   private cameraHistory?: { camera: SolarFrame; time: number; flying: boolean }
   private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+  private readonly heroStartedAt = performance.now()
+  private heroPaused = false
   readonly options: Options = {
     dataBoundary: false,
     contextFloor: 0.1,
@@ -543,6 +579,24 @@ export class SurfaceRenderer {
   get computeDevice(): GPUDevice | null {
     return this.lost || this.destroyed ? null : this.device
   }
+  get solarScene(): SolarScene | undefined {
+    return this.solar
+  }
+  get bestScoreLocation(): { latitude: number; longitude: number; score: number } | null {
+    if (!this.computed || !this.distribution?.valid || this.computed.bestAddress === null) return null
+    const center = this.computed.layout.locate(this.computed.bestAddress)?.center
+    return center ? { latitude: center.latitude, longitude: center.longitude, score: this.distribution.best } : null
+  }
+  setHeroBodies(bodies: SolarBodies) {
+    if (!this.heroStage) return
+    this.heroStage.bodies = bodies
+    this.solar?.setBodies(bodies)
+    this.invalidate(false)
+  }
+  setPaused(paused: boolean) {
+    this.heroPaused = paused
+    if (!paused && this.heroStage?.animate && !this.destroyed && !this.lost) this.invalidate(false)
+  }
 
   private constructor(
     private canvas: HTMLCanvasElement,
@@ -556,7 +610,19 @@ export class SurfaceRenderer {
     private onDevice?: RendererSettings['onDevice'],
     loadTerrain?: TerrainLoader,
     private loadEarthTilePack?: EarthTilePackLoader,
+    private heroStage?: HeroStage,
+    private loupeOnly = false,
+    initialProjection?: 'globe' | 'plane',
+    initialOptions?: Partial<Options>,
   ) {
+    if (heroStage?.options) Object.assign(this.options, heroStage.options)
+    if (initialOptions) Object.assign(this.options, initialOptions)
+    if (initialProjection === 'plane') {
+      this.options.morph = 0
+      this.rotation = [0, 0, 0, 1]
+      this.zoom = 1
+      this.center = [0, 0, 0]
+    }
     const context = canvas.getContext('webgpu')
     if (!context) throw new Error('Could not create the WebGPU surface.')
     this.context = context
@@ -601,17 +667,31 @@ export class SurfaceRenderer {
       this.invalidate()
     })
     this.observer.observe(canvas)
-    canvas.addEventListener('pointerdown', this.pointerDown)
-    canvas.addEventListener('pointermove', this.pointerMove)
-    canvas.addEventListener('pointerleave', this.pointerLeave)
-    canvas.addEventListener('pointerup', this.pointerUp)
-    canvas.addEventListener('pointercancel', this.pointerCancel)
-    canvas.addEventListener('wheel', this.wheel, { passive: false })
-    canvas.addEventListener('keydown', this.keyDown)
-    window.addEventListener('keydown', this.shiftKey)
-    window.addEventListener('keyup', this.shiftKey)
-    window.addEventListener('blur', this.pointerBlur)
+    if (this.loupeOnly) {
+      canvas.addEventListener('pointermove', this.pointerMove)
+      canvas.addEventListener('pointerleave', this.pointerLeave)
+      window.addEventListener('blur', this.pointerBlur)
+    } else if (!this.heroStage) {
+      canvas.addEventListener('pointerdown', this.pointerDown)
+      canvas.addEventListener('pointermove', this.pointerMove)
+      canvas.addEventListener('pointerleave', this.pointerLeave)
+      canvas.addEventListener('pointerup', this.pointerUp)
+      canvas.addEventListener('pointercancel', this.pointerCancel)
+      canvas.addEventListener('wheel', this.wheel, { passive: false })
+      canvas.addEventListener('keydown', this.keyDown)
+      window.addEventListener('keydown', this.shiftKey)
+      window.addEventListener('keyup', this.shiftKey)
+      window.addEventListener('blur', this.pointerBlur)
+    } else {
+      document.addEventListener('visibilitychange', this.onVisibilityChange)
+    }
     this.invalidate()
+  }
+
+  private onVisibilityChange = () => {
+    if (!document.hidden && this.heroStage?.animate && !this.heroPaused && !this.destroyed && !this.lost) {
+      this.invalidate(false)
+    }
   }
 
   static async create(
@@ -629,6 +709,10 @@ export class SurfaceRenderer {
       loadTerrain,
       loadEarthTilePack,
       onDevice,
+      hero,
+      loupeOnly,
+      initialProjection,
+      initialOptions,
     }: RendererSettings = {},
   ) {
     signal?.throwIfAborted()
@@ -644,6 +728,10 @@ export class SurfaceRenderer {
       onDevice,
       loadTerrain,
       loadEarthTilePack,
+      hero,
+      loupeOnly,
+      initialProjection,
+      initialOptions,
     )
     if (initialView)
       renderer.rotation = viewRotation((initialView.longitude * Math.PI) / 180, (initialView.latitude * Math.PI) / 180)
@@ -724,6 +812,7 @@ export class SurfaceRenderer {
         this.solarSettings.assetUrl,
         this.solarSettings.loadTerrain,
         this.solarSettings.loadPlanetTilePack,
+        this.heroStage ? { bodies: this.heroStage.bodies, eagerTerrain: true } : undefined,
       )
       if (this.destroyed || this.device !== device) {
         solar.destroy()
@@ -811,7 +900,7 @@ export class SurfaceRenderer {
     if (this.terrain) this.uploadTerrain()
     if (this.earthImageUrl) this.startEarthUpload(this.earthImageUrl)
     this.canvas.dispatchEvent(new Event('computedevicechange'))
-    this.canvas.classList.add('custom-cursor')
+    if (!this.heroStage && !this.loupeOnly) this.canvas.classList.add('custom-cursor')
     if (restoreScores && !this.distribution) {
       this.onStatus('WebGPU recovered. Run the live query again to restore the score map.')
     }
@@ -1211,13 +1300,20 @@ export class SurfaceRenderer {
     if (this.destroyed || this.lost) return false
     const canvas = this.canvas,
       device = this.device
-    const displayRatio = Math.min(window.devicePixelRatio || 1, 2)
-    const progressive = displayRatio > 1.25
+    const hero = this.heroStage
+    const displayRatio = Math.min(window.devicePixelRatio || 1, hero ? 1.5 : 2)
+    const progressive = !hero && displayRatio > 1.25
     const maxDim = device.limits.maxTextureDimension2D
     // Render interactive motion/preview frames at DPR 1 and refine into native DPR 2
     // across 4 even-aligned scissor tiles once motion stops on HiDPI screens.
-    const baseWidth = Math.min(progressive ? maxDim >> 1 : maxDim, Math.max(1, Math.round(canvas.clientWidth)))
-    const baseHeight = Math.min(progressive ? maxDim >> 1 : maxDim, Math.max(1, Math.round(canvas.clientHeight)))
+    const baseWidth = Math.min(
+      progressive ? maxDim >> 1 : maxDim,
+      Math.max(1, Math.round(canvas.clientWidth * (hero ? displayRatio : 1))),
+    )
+    const baseHeight = Math.min(
+      progressive ? maxDim >> 1 : maxDim,
+      Math.max(1, Math.round(canvas.clientHeight * (hero ? displayRatio : 1))),
+    )
     const width = progressive ? baseWidth * 2 : baseWidth
     const height = progressive ? baseHeight * 2 : baseHeight
     const ratio = width / Math.max(1, canvas.clientWidth)
@@ -1240,11 +1336,15 @@ export class SurfaceRenderer {
       s = this.style
     const solar = this.solar
     const frameTime = performance.now()
-    const sceneFrame = solar?.camera.update(solar.bodies, this.solarFocus, camera, frameTime)
-    const flying = solar?.camera.flying ?? false
+    const heroTimeSeconds = hero ? (frameTime - this.heroStartedAt) / 1000 : 0
+    const sceneFrame = hero
+      ? hero.frame(camera.aspect, heroTimeSeconds)
+      : solar?.camera.update(solar.bodies, this.solarFocus, camera, frameTime)
+    const flying = hero ? false : (solar?.camera.flying ?? false)
     const stableCamera = sceneFrame
     const prior = this.cameraHistory
     const cameraMoved =
+      !hero &&
       redraw &&
       (stableCamera
         ? Boolean(prior && cameraChanged(prior.camera, stableCamera))
@@ -1255,10 +1355,10 @@ export class SurfaceRenderer {
                 this.center.some((v, i) => Math.abs(v - this.lastStandaloneCamera!.center[i]) > 1e-9)),
           ))
     const motion =
-      stableCamera && redraw && !this.reducedMotion.matches && prior?.flying === flying
+      !hero && stableCamera && redraw && !this.reducedMotion.matches && prior?.flying === flying
         ? motionBlurUniforms(prior.camera, stableCamera, frameTime - prior.time, 1, !flying)
         : undefined
-    const arrival = solar?.camera.takeArrival()
+    const arrival = hero ? undefined : solar?.camera.takeArrival()
     if (arrival) {
       this.rotation = arrival
       this.center = [0, 0, 0]
@@ -1295,17 +1395,17 @@ export class SurfaceRenderer {
       sceneFrame && earthMorph >= 0.999 ? solar!.bodySmallPad(sceneFrame, 'earth', clientHeight, renderRatio) : 0
     const marsSmallPad = sceneFrame ? solar!.bodySmallPad(sceneFrame, 'mars', clientHeight, renderRatio) : 0
     const cursor =
-      this.cursor && document.elementFromPoint(this.cursor.x, this.cursor.y) === canvas ? this.cursor : null
+      !hero && this.cursor && document.elementFromPoint(this.cursor.x, this.cursor.y) === canvas ? this.cursor : null
     const hover =
       cursor && !dragging && !flying
         ? this.solarFocus === 'earth'
           ? this.pickAt(cursor.x, cursor.y)
           : (this.pickSourceAt(cursor.x, cursor.y) ?? null)
         : null
-    const earthBoundary = o.dataBoundary && this.solarFocus === 'earth'
-    const hasSelectedMarker = Boolean(this.selected || this.sourcePoints.moon || this.sourcePoints.mars)
+    const earthBoundary = !hero && o.dataBoundary && this.solarFocus === 'earth'
+    const hasSelectedMarker = !hero && Boolean(this.selected || this.sourcePoints.moon || this.sourcePoints.mars)
     const skipAnnotations =
-      activeSettlePass > 0 || ((flying || dragging) && !hasSelectedMarker && !hover && !o.dataBoundary)
+      Boolean(hero) || activeSettlePass > 0 || ((flying || dragging) && !hasSelectedMarker && !hover && !o.dataBoundary)
     if (redraw && !this.post.hasAnnotations(useLowRes) && !skipAnnotations) annotations = true
     if (this.annotationsStale && !skipAnnotations && (hasSelectedMarker || hover || earthBoundary)) annotations = true
     const metresPerPixel = (2 * Math.tan(FOV / 2) * (camera.distance - earthMorph) * EARTH_AXIS) / clientHeight
@@ -1354,6 +1454,9 @@ export class SurfaceRenderer {
     const pipelines = this.pipelines!
     const drawSystemOrbits = Boolean(sceneFrame && this.solarFocus === 'system')
     if (redraw) {
+      if (sceneFrame && hero?.prepareOverlay) {
+        hero.prepareOverlay(encoder, renderWidth, renderHeight, renderRatio, heroTimeSeconds)
+      }
       const pass = this.post.begin(
         encoder,
         hdr,
@@ -1394,6 +1497,8 @@ export class SurfaceRenderer {
         solar!.drawEarthAtmosphere(pass, sceneFrame, earthMorph, clientHeight, earthSmallPad > 0)
       if (sceneFrame && !motion) solar!.drawMarsAtmosphere(pass, sceneFrame, clientHeight, marsSmallPad > 0)
       if (sceneFrame) solar!.drawHalo(pass)
+      if (sceneFrame && hero?.drawOverlay)
+        hero.drawOverlay(pass, sceneFrame, renderWidth, renderHeight, renderRatio, heroTimeSeconds)
       pass.end()
     }
     if (annotations && !skipAnnotations) {
@@ -1453,7 +1558,7 @@ export class SurfaceRenderer {
       locked,
     )
     const cursorScreen: [number, number] | null =
-      cursor && !loupeOverlay
+      cursor && !loupeOverlay && !this.loupeOnly
         ? [
             ((cursor.x - rect.left) * width) / Math.max(1, rect.width),
             ((cursor.y - rect.top) * height) / Math.max(1, rect.height),
@@ -1541,12 +1646,25 @@ export class SurfaceRenderer {
                   marsSmallPad > 0,
                 )
             : undefined,
+        postScene:
+          sceneFrame && hero?.postScene
+            ? (enc, sceneTex, sceneView, w, h) =>
+                hero.postScene!(enc, sceneTex, sceneView, w, h, renderRatio, heroTimeSeconds)
+            : undefined,
       },
       redraw,
       display || (annotations && earthBoundary),
     )
     device.queue.submit([encoder.finish()])
-    if (renderEarth && this.solarFocus === 'earth' && !flying && this.earthTiles?.ready && (redraw || loupeOverlay)) {
+    if (hero && sceneFrame && solar?.terrainReady && redraw) {
+      solar.updatePlanetTiles(sceneFrame, 'mars', clientHeight, ratio, null)
+    } else if (
+      renderEarth &&
+      this.solarFocus === 'earth' &&
+      !flying &&
+      this.earthTiles?.ready &&
+      (redraw || loupeOverlay)
+    ) {
       const loupePick = loupeOverlay
         ? locked
           ? this.pickAt(rect.left + locked.rx, rect.top + locked.ry)
@@ -1627,13 +1745,14 @@ export class SurfaceRenderer {
     if (redraw) {
       canvas.dataset.sceneDraws = String(Number(canvas.dataset.sceneDraws || 0) + 1)
       if (solar) {
-        const needsSolarTerrain = this.solarFocus === 'moon' || this.solarFocus === 'mars'
+        const needsSolarTerrain = Boolean(hero) || this.solarFocus === 'moon' || this.solarFocus === 'mars'
         const settled =
           renderEarth &&
           this.earthReady &&
           this.terrain &&
           solar.skySettled &&
-          (!needsSolarTerrain || solar.terrainReady)
+          (!needsSolarTerrain || solar.terrainReady) &&
+          (!hero || Boolean(this.computed))
         canvas.dataset.frameSource = settled ? canvas.dataset.source || 'surface' : ''
         // Defer Moon & Mars terrain/8K albedo loading until Earth has settled its first frame
         // so startup CPU cores and GPU queue fences stay dedicated to Earth + scoring.
@@ -1671,7 +1790,11 @@ export class SurfaceRenderer {
         canvas.dispatchEvent(new CustomEvent('solarlabels', { detail: showLabels ? solar!.labels(sceneFrame) : [] }))
         this.hasSolarLabels = showLabels
       }
-      if (solar!.camera.flying) this.invalidate()
+      if (
+        solar!.camera.flying ||
+        (hero?.animate && !this.heroPaused && !this.reducedMotion.matches && !document.hidden)
+      )
+        this.invalidate(false)
     }
     canvas.dispatchEvent(new Event('renderstatus'))
     return true
@@ -1696,7 +1819,7 @@ export class SurfaceRenderer {
   ): LoupeOverlay | null {
     const scanning =
       !locked &&
-      this.shiftDown &&
+      (this.loupeOnly || this.shiftDown) &&
       Boolean(cursor) &&
       hasHover &&
       !flying &&
@@ -2201,6 +2324,7 @@ export class SurfaceRenderer {
     window.removeEventListener('keydown', this.shiftKey)
     window.removeEventListener('keyup', this.shiftKey)
     window.removeEventListener('blur', this.pointerBlur)
+    document.removeEventListener('visibilitychange', this.onVisibilityChange)
     this.canvas.classList.remove('custom-cursor')
     this.releaseGpuResources()
     this.context.unconfigure()

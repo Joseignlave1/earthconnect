@@ -32,6 +32,7 @@ import {
   subtract,
   toView,
   worldToGeographic,
+  type SolarBodies,
   type SolarFrame,
   type SourceBody,
 } from './solarCamera.ts'
@@ -318,7 +319,7 @@ function getSolarPipelines(device: GPUDevice): Promise<SolarPipelines> {
 }
 
 export class SolarScene {
-  readonly bodies
+  bodies: SolarBodies
   private terrain?: PlanetTerrainRenderer
   private loadingTerrain = false
   skySettled = false
@@ -378,6 +379,7 @@ export class SolarScene {
     assetUrl: WorkspaceAssets['url'],
     terrainLoader?: TerrainLoader,
     loadPlanetTilePack?: PlanetTilePackLoader,
+    options?: { bodies?: SolarBodies; eagerTerrain?: boolean },
   ) {
     const {
       skyPipeline,
@@ -414,6 +416,7 @@ export class SolarScene {
       assetUrl,
       terrainLoader,
       loadPlanetTilePack,
+      options,
     )
   }
 
@@ -438,15 +441,21 @@ export class SolarScene {
     private readonly assetUrl: WorkspaceAssets['url'],
     private readonly terrainLoader?: TerrainLoader,
     private readonly loadPlanetTilePack?: PlanetTilePackLoader,
+    options?: { bodies?: SolarBodies; eagerTerrain?: boolean },
   ) {
-    this.bodies = solarSystemAt(date)
-    this.orbits = ids.flatMap(id => {
-      const vertices = orbitPolyline(id, date)
-      return vertices.length ? [{ id, vertices }] : []
-    })
+    this.bodies = options?.bodies ?? solarSystemAt(date)
+    this.orbits = options?.bodies
+      ? []
+      : ids.flatMap(id => {
+          const vertices = orbitPolyline(id, date)
+          return vertices.length ? [{ id, vertices }] : []
+        })
     // Per orbit: one 6-vertex capsule quad per segment (12 floats/vertex).
     this.orbitData = new Float32Array(
-      this.orbits.reduce((count, path) => count + (path.vertices.length - 1) * 6 * 12, 0),
+      Math.max(
+        12,
+        this.orbits.reduce((count, path) => count + (path.vertices.length - 1) * 6 * 12, 0),
+      ),
     )
     this.orbitBuffer = device.createBuffer({
       label: 'Camera-relative orbit ribbons',
@@ -602,6 +611,12 @@ export class SolarScene {
         this.skySettled = true
         this.invalidate()
       })
+    if (options?.eagerTerrain) this.loadTerrain()
+  }
+
+  setBodies(bodies: SolarBodies) {
+    this.bodies = bodies
+    this.invalidate()
   }
 
   private bindSky(buffer: GPUBuffer, texture: GPUTexture) {
