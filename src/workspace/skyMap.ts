@@ -1,4 +1,4 @@
-import { loadSrgbMipmappedTexture, raceAbort } from '../shader-test/gpu.ts'
+import { loadBc7MipmappedTexture, loadSrgbMipmappedTexture, raceAbort } from '../shader-test/gpu.ts'
 
 type DeviceSkyCache = {
   controller: AbortController
@@ -25,12 +25,19 @@ function getSkyCache(device: GPUDevice): DeviceSkyCache {
   return entry
 }
 
-async function buildSkyMap(device: GPUDevice, cache: DeviceSkyCache, skyMapUrl: string): Promise<GPUTexture> {
-  const atlas = await loadSrgbMipmappedTexture(device, skyMapUrl, cache.controller.signal, {
-    label: 'NASA Deep Star Maps 2020',
-    mipLabel: 'Build sky map mipmaps',
-    downloadErrorMessage: 'Sky map download failed.',
-  })
+async function buildSkyMap(
+  device: GPUDevice,
+  cache: DeviceSkyCache,
+  skyMapUrl: string,
+  isBc7: boolean,
+): Promise<GPUTexture> {
+  const atlas = isBc7
+    ? await loadBc7MipmappedTexture(device, skyMapUrl, cache.controller.signal, 'NASA Deep Star Maps 2020 (BC7)')
+    : await loadSrgbMipmappedTexture(device, skyMapUrl, cache.controller.signal, {
+        label: 'NASA Deep Star Maps 2020',
+        mipLabel: 'Build sky map mipmaps',
+        downloadErrorMessage: 'Sky map download failed.',
+      })
   cache.created.add(atlas)
   return atlas
 }
@@ -39,15 +46,21 @@ async function buildSkyMap(device: GPUDevice, cache: DeviceSkyCache, skyMapUrl: 
  * Load and mipmap the star map once per (GPUDevice, URL). The returned texture
  * is shared across all scenes on the device and destroyed on device loss.
  */
-export function loadSkyMap(device: GPUDevice, signal: AbortSignal, skyMapUrl: string): Promise<GPUTexture> {
+export function loadSkyMap(
+  device: GPUDevice,
+  signal: AbortSignal,
+  skyMapUrl: string,
+  isBc7 = false,
+): Promise<GPUTexture> {
   signal.throwIfAborted()
   const cache = getSkyCache(device)
-  let pending = cache.textures.get(skyMapUrl)
+  const key = isBc7 ? `bc7:${skyMapUrl}` : skyMapUrl
+  let pending = cache.textures.get(key)
   if (!pending) {
-    pending = buildSkyMap(device, cache, skyMapUrl)
-    cache.textures.set(skyMapUrl, pending)
+    pending = buildSkyMap(device, cache, skyMapUrl, isBc7)
+    cache.textures.set(key, pending)
     void pending.catch(() => {
-      if (cache.textures.get(skyMapUrl) === pending) cache.textures.delete(skyMapUrl)
+      if (cache.textures.get(key) === pending) cache.textures.delete(key)
     })
   }
   return raceAbort(pending, signal)

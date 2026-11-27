@@ -561,8 +561,19 @@ export class SolarScene {
       ],
     })
     const { signal } = this.controller
-    this.skyPromise = this.assetUrl('textures/nasa-deep-star-map.webp', signal)
-      .then(url => loadSkyMap(device, signal, url))
+    const loadSky = async () => {
+      if (device.features.has('texture-compression-bc')) {
+        try {
+          const bc7Url = await this.assetUrl('textures/nasa-deep-star-map.bc7', signal)
+          return await loadSkyMap(device, signal, bc7Url, true)
+        } catch {
+          signal.throwIfAborted()
+        }
+      }
+      const webpUrl = await this.assetUrl('textures/nasa-deep-star-map.webp', signal)
+      return loadSkyMap(device, signal, webpUrl, false)
+    }
+    this.skyPromise = loadSky()
       .then(texture => {
         if (signal.aborted) return
         const group = this.bindSky(this.viewBuffer, texture)

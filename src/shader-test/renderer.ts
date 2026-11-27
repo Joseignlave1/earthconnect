@@ -30,6 +30,7 @@ import { createPatchMesh, EARTH_INSTANCE_FLOATS, EarthQuadtree, MAX_PATCH_INSTAN
 import { contourDetail } from './contours.ts'
 import { MISSING, SIZE, worldTiles } from './world-grid.ts'
 import { elevationAt, elevationPyramid, packRg32FloatLevels, type Terrain } from './terrain.ts'
+import { buildRg32FloatTerrainTextureGpu } from './terrain-gpu-mips.ts'
 import { loadPreparedTerrain, type PreparedTerrain } from './terrain-loader.ts'
 import type { EarthScore, ScoreLayout } from '../earth-score/index.ts'
 import {
@@ -344,6 +345,11 @@ function loadSharedTerrainTexture(
   let pending = cache.terrains.get(terrain)
   if (!pending) {
     pending = (async () => {
+      if (!prepared?.levels && (terrain.stride ?? 4) === 4) {
+        const texture = await buildRg32FloatTerrainTextureGpu(device, terrain, cache.controller.signal)
+        cache.createdTextures.push(texture)
+        return texture
+      }
       const levels = prepared?.levels ?? packRg32FloatLevels(elevationPyramid(terrain))
       const first = levels[0]
       const texture = device.createTexture({

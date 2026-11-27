@@ -1,7 +1,7 @@
 {
   "format": "earth-connect-assets-v1",
-  "runtimeFileCount": 60,
-  "runtimeBytes": 395386663,
+  "runtimeFileCount": 63,
+  "runtimeBytes": 427046946,
   "scoreManifest": {
     "key": "compute-data/world/manifest-6aa2a505b289ca126ab57af9e33ddfdc205841427f7124dd729b5d3b4dee95e9.json",
     "bytes": 16947,
@@ -435,6 +435,15 @@
       "cacheControl": "public, max-age=31536000, immutable",
       "role": "runtime"
     },
+    "textures/mars-albedo-4096.bc7": {
+      "key": "assets/textures/mars-albedo-4096-93cb64e8ed644b90ef88610798b12297679f70c161d1c246b79963388dbb90f7.bc7",
+      "bytes": 6616132,
+      "sha256": "93cb64e8ed644b90ef88610798b12297679f70c161d1c246b79963388dbb90f7",
+      "etag": "e92243b3e4294c1faeec3b827f84d38e",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
     "textures/mars-albedo.webp": {
       "key": "assets/textures/mars-albedo-bb39bf148273ac61e7cb1291f6d7e1973cf50100f025ad8302ef5b1e5d9f793c.webp",
       "bytes": 1178768,
@@ -485,6 +494,15 @@
       "bytes": 5180002,
       "sha256": "5e0b22193311f8c90a68dfd6bbd18d2a26edb193972daa5255c53bb89e8f507e",
       "etag": "0d4731b05e3d94f82be58e94020bd418",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
+    "textures/moon-albedo-512.bc7": {
+      "key": "assets/textures/moon-albedo-512-5ba9a99dea141b97a6d61583ae51c8e6ff1182191ef6db129bbeb5980020bb10.bc7",
+      "bytes": 135831,
+      "sha256": "5ba9a99dea141b97a6d61583ae51c8e6ff1182191ef6db129bbeb5980020bb10",
+      "etag": "d22f830e040b0b59e5b34789ca362205",
       "contentType": "application/octet-stream",
       "cacheControl": "public, max-age=31536000, immutable",
       "role": "runtime"
@@ -543,6 +561,15 @@
       "cacheControl": "public, max-age=31536000, immutable",
       "role": "runtime"
     },
+    "textures/nasa-deep-star-map.bc7": {
+      "key": "assets/textures/nasa-deep-star-map-5ae4f97617e759474974264bf493a4bb7a35b569ee54cc0058376164e9d3f6ad.bc7",
+      "bytes": 24908320,
+      "sha256": "5ae4f97617e759474974264bf493a4bb7a35b569ee54cc0058376164e9d3f6ad",
+      "etag": "cda1d913abc299f96547a689185dfe88",
+      "contentType": "application/octet-stream",
+      "cacheControl": "public, max-age=31536000, immutable",
+      "role": "runtime"
+    },
     "textures/nasa-deep-star-map.webp": {
       "key": "assets/textures/nasa-deep-star-map-97a6634a6ceedfd5ac2b748154a125626d91130213796eeccf3e8ae2bd46f55d.webp",
       "bytes": 4418364,
@@ -573,6 +600,6 @@
       "role": "metadata"
     }
   },
-  "release": "990f924d462cacc62ddb48caed8734f42c4d610c667bea563b5ac42b9c423f7f",
-  "immutableManifestKey": "releases/990f924d462cacc62ddb48caed8734f42c4d610c667bea563b5ac42b9c423f7f.json"
+  "release": "599e260d1557f706218dd2710ecde25d003f2b367c8632f3b9cb86faf5fb6259",
+  "immutableManifestKey": "releases/599e260d1557f706218dd2710ecde25d003f2b367c8632f3b9cb86faf5fb6259.json"
 }

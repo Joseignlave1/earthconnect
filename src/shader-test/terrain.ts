@@ -10,6 +10,13 @@ type TerrainZstdDecompressor = (
   outputBytes: number,
   signal?: AbortSignal,
 ) => Promise<Uint8Array<ArrayBuffer>>
+export type TerrainEct2WasmDecoder = (
+  frame: ArrayBuffer,
+  width: number,
+  height: number,
+  flags: number,
+  signal?: AbortSignal,
+) => Promise<Uint8ClampedArray<ArrayBuffer>>
 export type TerrainPackFormat = 'rg32float' | 'rg8unorm'
 export type PackedTerrainLevel<
   T extends Float32Array<ArrayBuffer> | Uint8Array<ArrayBuffer> = Float32Array<ArrayBuffer> | Uint8Array<ArrayBuffer>,
@@ -18,9 +25,9 @@ export type PackedTerrainLevel<
   width: number
   height: number
 }
-export type TerrainWorkerRequest = { url: string; format: TerrainPackFormat }
+export type TerrainWorkerRequest = { url: string; format: TerrainPackFormat; skipMipmaps?: boolean }
 export type TerrainWorkerResponse =
-  | { kind: 'ok'; terrain: Terrain; poles: [number, number]; levels: PackedTerrainLevel[] }
+  | { kind: 'ok'; terrain: Terrain; poles: [number, number]; levels: PackedTerrainLevel[] | null }
   | { kind: 'error'; message: string }
 
 export function packRg32FloatLevels(
@@ -188,6 +195,7 @@ export async function decodeTerrainEct2(
   buffer: ArrayBuffer,
   decompress: TerrainZstdDecompressor,
   signal?: AbortSignal,
+  decodeEct2Wasm?: TerrainEct2WasmDecoder,
 ): Promise<Terrain> {
   const view = new DataView(buffer)
   if (buffer.byteLength < 16 || view.getUint32(0) !== 0x45435432) throw new Error('Invalid ECT2 terrain header.')
@@ -195,8 +203,14 @@ export async function decodeTerrainEct2(
     height = view.getUint32(8, true),
     flags = view.getUint32(12, true)
   if (!width || !height || width > 16384 || height > 16384) throw new Error('Invalid ECT2 terrain dimensions.')
+  const frame = buffer.slice(16)
+  if (decodeEct2Wasm) {
+    const pixels = await decodeEct2Wasm(frame, width, height, flags, signal)
+    const stride: 2 | 4 = flags & 4 ? 4 : 2
+    return { pixels, width, height, stride, polarSmoothed: Boolean(flags & 2) }
+  }
   const payloadStride = flags & 4 ? 3 : 2
-  const payload = await decompress(buffer.slice(16), width * height * payloadStride, signal)
+  const payload = await decompress(frame, width * height * payloadStride, signal)
   return decodeTerrainEct2Payload(width, height, flags, payload)
 }
 
@@ -204,14 +218,15 @@ export async function loadTerrain(
   url: string,
   signal: AbortSignal,
   decompress?: TerrainZstdDecompressor,
+  decodeEct2Wasm?: TerrainEct2WasmDecoder,
 ): Promise<Terrain> {
   const response = await fetch(url, { signal })
   if (!response.ok || !response.body) throw new Error('Could not load terrain elevation. Reload to retry.')
   const raw = await response.arrayBuffer()
   signal.throwIfAborted()
   if (raw.byteLength >= 16 && new DataView(raw).getUint32(0) === 0x45435432) {
-    if (!decompress) throw new Error('Zstd decompressor is required for ECT2 terrain.')
-    return decodeTerrainEct2(raw, decompress, signal)
+    if (!decompress && !decodeEct2Wasm) throw new Error('Zstd decompressor is required for ECT2 terrain.')
+    return decodeTerrainEct2(raw, decompress!, signal, decodeEct2Wasm)
   }
   const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))
   return decodeTerrain(await new Response(stream).arrayBuffer())
@@ -418,14 +433,20 @@ export async function prepareTerrainData<F extends TerrainPackFormat>(
   format: F,
   signal: AbortSignal,
   decompressZstd: TerrainZstdDecompressor,
+  options?: { skipMipmaps?: boolean; decodeEct2Wasm?: TerrainEct2WasmDecoder },
 ): Promise<{
   terrain: Terrain
   poles: [number, number]
-  levels: PackedTerrainLevel<F extends 'rg32float' ? Float32Array<ArrayBuffer> : Uint8Array<ArrayBuffer>>[]
+  levels: PackedTerrainLevel<F extends 'rg32float' ? Float32Array<ArrayBuffer> : Uint8Array<ArrayBuffer>>[] | null
 }> {
-  const terrain = await loadTerrain(url, signal, decompressZstd)
+  const terrain = await loadTerrain(url, signal, decompressZstd, options?.decodeEct2Wasm)
   signal.throwIfAborted()
   const poles = poleElevations(terrain)
+  const canBuildOnGpu =
+    options?.skipMipmaps &&
+    ((format === 'rg32float' && (terrain.stride ?? 4) === 4) ||
+      (format === 'rg8unorm' && (terrain.stride ?? 4) === 2 && Boolean(terrain.polarSmoothed)))
+  if (canBuildOnGpu) return { terrain, poles, levels: null }
   const levels = (
     format === 'rg8unorm' ? packRg8PyramidDirect(terrain) : packRg32FloatPyramidDirect(terrain, false)
   ) as PackedTerrainLevel<F extends 'rg32float' ? Float32Array<ArrayBuffer> : Uint8Array<ArrayBuffer>>[]

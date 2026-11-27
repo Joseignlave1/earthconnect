@@ -1,4 +1,6 @@
 import { checkedGpu } from '../earth-score/gpu.ts'
+import type { Bc7WorkerRequest, Bc7WorkerResponse } from './bc7-worker.ts'
+import { createBc7Worker } from './bc7-worker-factory.ts'
 import fullscreenWgsl from './shaders/fullscreen.wgsl?raw'
 import mipBlitWgsl from './shaders/mip-blit.wgsl?raw'
 
@@ -269,5 +271,150 @@ export async function loadSrgbMipmappedTexture(
     throw error
   } finally {
     bitmap.close()
+  }
+}
+
+function totalBc7Bytes(width: number, height: number, mipCount: number): number {
+  let total = 0
+  for (let mip = 0; mip < mipCount; mip++) {
+    const mw = Math.max(1, width >> mip)
+    const mh = Math.max(1, height >> mip)
+    total += Math.ceil(mw / 4) * Math.ceil(mh / 4) * 16
+  }
+  return total
+}
+
+async function decodeBc7OnMainThread(
+  url: string,
+  signal: AbortSignal,
+): Promise<{ width: number; height: number; mipCount: number; data: ArrayBuffer }> {
+  const response = await fetch(url, { signal })
+  if (!response.ok) throw new Error(`BC7 texture HTTP ${response.status}`)
+  const raw = await response.arrayBuffer()
+  signal.throwIfAborted()
+  if (raw.byteLength < 16) throw new Error('Invalid BC7 texture header.')
+  const view = new DataView(raw)
+  if (view.getUint32(0) !== 0x45434243) throw new Error('Invalid BC7 magic.')
+  const width = view.getUint32(4, true)
+  const height = view.getUint32(8, true)
+  const mipCount = view.getUint32(12, true)
+  const { decompressZstd } = await import('../earth-score/decode.ts')
+  const decoded = await decompressZstd(raw.slice(16), totalBc7Bytes(width, height, mipCount), signal)
+  return { width, height, mipCount, data: decoded.buffer }
+}
+
+function decodeBc7InWorker(
+  url: string,
+  signal: AbortSignal,
+): Promise<{ width: number; height: number; mipCount: number; data: ArrayBuffer }> {
+  signal.throwIfAborted()
+  const resolved = typeof globalThis.location?.href === 'string' ? new URL(url, globalThis.location.href).href : url
+  return new Promise((resolve, reject) => {
+    let worker: Worker
+    try {
+      worker = createBc7Worker()
+    } catch {
+      void decodeBc7OnMainThread(resolved, signal).then(resolve, reject)
+      return
+    }
+    let settled = false
+    const cleanup = () => {
+      signal.removeEventListener('abort', onAbort)
+      worker.terminate()
+    }
+    const onAbort = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(signal.reason)
+    }
+    const fallback = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      void decodeBc7OnMainThread(resolved, signal).then(resolve, reject)
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    worker.onmessage = ({ data }: MessageEvent<Bc7WorkerResponse>) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      if (data.kind === 'error') reject(new Error(data.message))
+      else resolve({ width: data.width, height: data.height, mipCount: data.mipCount, data: data.data })
+    }
+    worker.onerror = event => {
+      event.preventDefault()
+      fallback()
+    }
+    worker.onmessageerror = fallback
+    try {
+      worker.postMessage({ url: resolved } satisfies Bc7WorkerRequest)
+    } catch {
+      fallback()
+    }
+  })
+}
+
+/**
+ * Fetch and Zstd-decompress a pre-mipmapped ECBC BC7 texture off the main thread,
+ * then upload all mip levels directly into `bc7-rgba-unorm-srgb` (zero ImageBitmap
+ * decode, zero GPU mipmap pass, 4× less VRAM).
+ */
+export async function loadBc7MipmappedTexture(
+  device: GPUDevice,
+  url: string,
+  signal: AbortSignal,
+  label: string,
+  maxChunkBytes = 32 * 1024 * 1024,
+): Promise<GPUTexture> {
+  const { width, height, mipCount, data } = await decodeBc7InWorker(url, signal)
+  signal.throwIfAborted()
+  const texture = device.createTexture({
+    label,
+    size: [width, height],
+    mipLevelCount: mipCount,
+    format: 'bc7-rgba-unorm-srgb',
+    usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
+  })
+  try {
+    const bytes = new Uint8Array(data)
+    let offset = 0
+    for (let mip = 0; mip < mipCount; mip++) {
+      signal.throwIfAborted()
+      const mw = Math.max(1, width >> mip)
+      const mh = Math.max(1, height >> mip)
+      const blocksX = Math.ceil(mw / 4)
+      const blocksY = Math.ceil(mh / 4)
+      const bytesPerRow = blocksX * 16
+      const mipBytes = bytesPerRow * blocksY
+      const blockRowsPerChunk = Math.max(1, Math.floor(maxChunkBytes / bytesPerRow))
+      if (blocksY <= blockRowsPerChunk) {
+        device.queue.writeTexture(
+          { texture, mipLevel: mip },
+          bytes.subarray(offset, offset + mipBytes),
+          { bytesPerRow, rowsPerImage: blocksY },
+          [blocksX * 4, blocksY * 4],
+        )
+        if (mipBytes >= maxChunkBytes / 2) await waitForQueue(device.queue, signal)
+      } else {
+        for (let by = 0; by < blocksY; by += blockRowsPerChunk) {
+          signal.throwIfAborted()
+          const rows = Math.min(blockRowsPerChunk, blocksY - by)
+          const start = offset + by * bytesPerRow
+          device.queue.writeTexture(
+            { texture, mipLevel: mip, origin: [0, by * 4, 0] },
+            bytes.subarray(start, start + rows * bytesPerRow),
+            { bytesPerRow, rowsPerImage: rows },
+            [blocksX * 4, rows * 4],
+          )
+          await waitForQueue(device.queue, signal)
+        }
+      }
+      offset += mipBytes
+    }
+    return texture
+  } catch (error) {
+    texture.destroy()
+    throw error
   }
 }

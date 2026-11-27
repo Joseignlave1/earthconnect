@@ -40,3 +40,4 @@ exports/
 /public/textures/moon-terrain.bin
 /public/textures/moon-tiles-*.bin
 /public/textures/nasa-deep-star-map.webp
+/public/textures/*.bc7

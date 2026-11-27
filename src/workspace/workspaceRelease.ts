@@ -17,7 +17,17 @@ const planetTilePaths = [
   ...Array.from({ length: 4 }, (_, index) => `textures/mars-tiles-${index}.bin`),
 ]
 const allTilePaths = [...earthTilePaths, ...planetTilePaths]
-const optionalRenderPaths = new Set(['textures/moon-albedo.webp', 'textures/mars-albedo.webp', ...allTilePaths])
+const bc7TexturePaths = [
+  'textures/nasa-deep-star-map.bc7',
+  'textures/mars-albedo-4096.bc7',
+  'textures/moon-albedo-512.bc7',
+] as const
+const optionalRenderPaths = new Set([
+  'textures/moon-albedo.webp',
+  'textures/mars-albedo.webp',
+  ...bc7TexturePaths,
+  ...allTilePaths,
+])
 // Legacy CDN releases still list the removed basins snapshot in their manifest totals.
 const ignoredPaths = new Set(['data/surface-basins.bin'])
 const hashPattern = /^[a-f0-9]{64}$/
@@ -323,8 +333,11 @@ function orderedPaths(files: Record<string, Asset>) {
   const priority = [
     scorePath,
     'textures/earth-blue-marble.jpg',
+    'textures/nasa-deep-star-map.bc7',
     'textures/nasa-deep-star-map.webp',
     'textures/earth-terrain.bin',
+    'textures/mars-albedo-4096.bc7',
+    'textures/moon-albedo-512.bc7',
     'textures/moon-albedo.webp',
     'textures/mars-albedo.webp',
     'textures/moon-terrain.bin',

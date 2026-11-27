@@ -14,6 +14,14 @@ type Decoder = {
   allocate: (bytes: number) => number
   release: (ptr: number, bytes: number) => void
   decode: (frame: number, frameBytes: number, output: number, outputBytes: number) => number
+  decode_ect2: (
+    frame: number,
+    frameBytes: number,
+    width: number,
+    height: number,
+    flags: number,
+    output: number,
+  ) => number
 }
 
 export async function compileZstdModule(signal?: AbortSignal): Promise<WebAssembly.Module> {
@@ -106,6 +114,43 @@ export async function decompressZstd(
     if (status === 1) throw new Error('Incorrect Zstd frame content size')
     if (status !== 0) throw new Error('Zstd decompression or checksum failed')
     return new Uint8Array(zstd.memory.buffer, outputPtr, outputBytes).slice()
+  } finally {
+    zstd.release(outputPtr, outputBytes)
+    zstd.release(inputPtr, frame.byteLength)
+  }
+}
+
+export async function decompressTerrainEct2Wasm(
+  frame: ArrayBuffer,
+  width: number,
+  height: number,
+  flags: number,
+  signal?: AbortSignal,
+): Promise<Uint8ClampedArray<ArrayBuffer>> {
+  sharedZstdModule ??= compileZstdModule().catch(error => {
+    sharedZstdModule = undefined
+    throw error
+  })
+  const zstd = await loadDecoder(await sharedZstdModule, signal)
+  signal?.throwIfAborted()
+  const outStride = flags & 4 ? 4 : 2
+  const outputBytes = width * height * outStride
+  const inputPtr = zstd.allocate(frame.byteLength)
+  if (!inputPtr) throw new Error('Unable to allocate Zstd input buffer')
+  const outputPtr = zstd.allocate(outputBytes)
+  if (!outputPtr) {
+    zstd.release(inputPtr, frame.byteLength)
+    throw new Error('Unable to allocate ECT2 output buffer')
+  }
+  try {
+    new Uint8Array(zstd.memory.buffer, inputPtr, frame.byteLength).set(new Uint8Array(frame))
+    const status = zstd.decode_ect2(inputPtr, frame.byteLength, width, height, flags, outputPtr)
+    if (status === 1) throw new Error('Incorrect Zstd frame content size')
+    if (status === 3) throw new Error('Invalid ECT2 terrain dimensions.')
+    if (status !== 0) throw new Error('Zstd decompression or checksum failed')
+    const out = new Uint8ClampedArray(outputBytes)
+    out.set(new Uint8Array(zstd.memory.buffer, outputPtr, outputBytes))
+    return out
   } finally {
     zstd.release(outputPtr, outputBytes)
     zstd.release(inputPtr, frame.byteLength)

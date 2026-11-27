@@ -14,7 +14,9 @@ async function createSurfaceDevice(): Promise<SurfaceDevice> {
       'WebGPU is enabled, but no compatible GPU adapter was found. Make sure hardware acceleration is turned on in your browser settings.',
     )
   }
-  const requiredFeatures = (['float32-filterable'] as const).filter(feature => adapter.features.has(feature))
+  const requiredFeatures = (['float32-filterable', 'texture-compression-bc'] as const).filter(feature =>
+    adapter.features.has(feature),
+  )
   try {
     return { adapter, device: await adapter.requestDevice({ requiredFeatures }) }
   } catch (error) {
