@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { SurfaceRenderer } from '../shader-test/renderer.ts'
+import { createBootGraph } from '../workspace/bootGraph.ts'
 import type { EarthWorkspaceResources } from '../workspace/earthWorkspaceResources.ts'
 import type { SolarBodies } from '../workspace/solarCamera.ts'
 import { SolarScene } from '../workspace/solarScene.ts'
@@ -173,9 +174,6 @@ export function BridgeHero({
     let world: ReturnType<EarthWorkspaceResources['acquireWorld']> | undefined
     let notifiedReady = false
     let scoreReady = false
-    let readyArmed = false
-    let deviceGeneration = 0
-    let fencedGeneration = -1
     let deviceController: AbortController | null = null
 
     const signalReady = () => {
@@ -229,33 +227,6 @@ export function BridgeHero({
     if (ctaStageRef.current) layoutObserver.observe(ctaStageRef.current)
     window.addEventListener('resize', syncRestLayout, { passive: true, signal })
 
-    const onRenderStatus = () => {
-      if (notifiedReady || !readyArmed || signal.aborted || !renderer) return
-      if (fencedGeneration === deviceGeneration) return
-      const solar = renderer.solarScene
-      if (
-        canvas.dataset.frameSource !== 'computed' ||
-        canvas.dataset.terrainReady !== 'true' ||
-        !scoreReady ||
-        (solar && (!solar.skySettled || !solar.terrainSettled))
-      ) {
-        return
-      }
-      const device = renderer.computeDevice
-      if (!device) return
-      const gen = deviceGeneration
-      fencedGeneration = gen
-      void device.queue.onSubmittedWorkDone().then(
-        () => {
-          if (!signal.aborted && gen === deviceGeneration) signalReady()
-        },
-        () => {
-          if (!signal.aborted && gen === deviceGeneration) signalReady()
-        },
-      )
-    }
-    canvas.addEventListener('renderstatus', onRenderStatus, { signal })
-
     const releaseHeroDeviceResources = () => {
       deviceController?.abort()
       deviceController = null
@@ -271,99 +242,327 @@ export function BridgeHero({
       world?.release()
       world = undefined
       scoreReady = false
-      readyArmed = false
     }
 
-    const mountHeroDevice = async (instance: SurfaceRenderer, device: GPUDevice) => {
+    type HeroOverlayBundle = {
+      bridge: BridgeOverlay
+      title: ConstellationTitleOverlay
+      cta: StardustCtaOverlay
+      lens: BlackHoleLensPass
+    }
+
+    const createOverlays = async (device: GPUDevice, devSignal: AbortSignal): Promise<HeroOverlayBundle> => {
+      const results = await Promise.allSettled([
+        BridgeOverlay.create(device),
+        ConstellationTitleOverlay.create(device),
+        StardustCtaOverlay.create(device),
+        BlackHoleLensPass.create(device),
+      ])
+      const bridge = results[0].status === 'fulfilled' ? results[0].value : undefined
+      const title = results[1].status === 'fulfilled' ? results[1].value : undefined
+      const cta = results[2].status === 'fulfilled' ? results[2].value : undefined
+      const lens = results[3].status === 'fulfilled' ? results[3].value : undefined
+      const firstRejected = results.find(r => r.status === 'rejected')
+      if (firstRejected && firstRejected.status === 'rejected') {
+        bridge?.destroy()
+        title?.destroy()
+        cta?.destroy()
+        lens?.destroy()
+        throw firstRejected.reason
+      }
+      if (devSignal.aborted) {
+        bridge?.destroy()
+        title?.destroy()
+        cta?.destroy()
+        lens?.destroy()
+        devSignal.throwIfAborted()
+      }
+      return { bridge: bridge!, title: title!, cta: cta!, lens: lens! }
+    }
+
+    const createHeroRenderer = (devSignal: AbortSignal) =>
+      SurfaceRenderer.create(
+        canvas,
+        () => undefined,
+        err => {
+          if (!signal.aborted) {
+            setError(err.message)
+            signalReady()
+          }
+        },
+        () => undefined,
+        {
+          signal: devSignal,
+          acquireDevice: resources.acquireDevice,
+          assets: assets.url,
+          loadTerrain: resources.acquireTerrain,
+          initialPhase: 'prepare',
+          solar: {
+            createScene: SolarScene.create,
+            assetUrl: assets.url,
+            loadTerrain: resources.acquireTerrain,
+            onSourcePick: () => undefined,
+          },
+          hero: {
+            bodies: currentBodies,
+            animate: true,
+            options: {
+              hdr: true,
+              exposure: 1.06,
+              bloom: 0.42,
+              emission: 1.85,
+              opacity: 0.84,
+              contextFloor: 0.08,
+              contextOpacity: 0.24,
+              contourOpacity: 0.16,
+              relief: 22,
+              imagery: false,
+            },
+            frame: (aspect, timeSeconds) => {
+              if (Math.abs(aspect - currentAspect) > 0.004) {
+                currentAspect = aspect
+                currentBodies = buildBridgeBodies(aspect, earthTarget)
+                const solar = renderer?.solarScene
+                if (solar) solar.bodies = currentBodies
+              }
+              pointerSmooth.x += (pointerTarget.x - pointerSmooth.x) * 0.06
+              pointerSmooth.y += (pointerTarget.y - pointerSmooth.y) * 0.06
+              return buildBridgeFrame(
+                aspect,
+                timeSeconds,
+                pointerSmooth,
+                reducedMotion.matches,
+                scrollProgressRef.current,
+              )
+            },
+            prepareOverlay: (encoder, frame, width, height, ratio, timeSeconds) => {
+              const canvasRect = cachedCanvasRect
+              if (canvasRect.width <= 1 || canvasRect.height <= 1) return
+              const scaleX = width / canvasRect.width
+              const scaleY = height / canvasRect.height
+              const bhGeom = computeBlackHoleGeometry(scrollProgressRef.current, width / Math.max(1, height))
+              const prepareSkyOverlay = (
+                target: ConstellationTitleOverlay | StardustCtaOverlay | undefined,
+                restBox: { left: number; top: number; width: number; height: number } | null,
+                domEl: HTMLElement | null,
+              ) => {
+                if (!target || !restBox) return
+                const skyBox = projectSkyBox(restBox, canvasRect.width, canvasRect.height, frame)
+                if (!skyBox) return
+                if (domEl)
+                  domEl.style.transform = `translate3d(${skyBox.dx.toFixed(2)}px, ${skyBox.dy.toFixed(2)}px, 0)`
+                target.prepare(
+                  encoder,
+                  {
+                    leftPx: skyBox.left * scaleX,
+                    topPx: skyBox.top * scaleY,
+                    widthPx: skyBox.width * scaleX,
+                    heightPx: skyBox.height * scaleY,
+                  },
+                  canvasRect,
+                  width,
+                  height,
+                  ratio,
+                  timeSeconds,
+                  reducedMotion.matches,
+                  1,
+                  bhGeom,
+                )
+              }
+              prepareSkyOverlay(titleOverlay, restTitleBox, titleStageRef.current)
+              prepareSkyOverlay(ctaOverlay, restCtaBox, ctaStageRef.current)
+            },
+            drawOverlay: (pass, frame, width, height, ratio, timeSeconds) => {
+              if (overlay && scoreReady) {
+                const marsLocal = renderer?.solarScene?.sourcePosition('mars', HERO_MARS_SITE)
+                const endpoints = bridgeEndpoints(currentBodies, earthTarget, marsLocal)
+                overlay.draw(pass, frame, endpoints, width, height, ratio, timeSeconds, reducedMotion.matches, 1)
+              }
+              titleOverlay?.draw(pass)
+              ctaOverlay?.draw(pass)
+            },
+            postScene: (encoder, sceneView, width, height, timeSeconds) => {
+              if (!blackHoleLens) return null
+              const geom = computeBlackHoleGeometry(scrollProgressRef.current, width / Math.max(1, height))
+              return blackHoleLens.apply(encoder, sceneView, width, height, timeSeconds, geom)
+            },
+          },
+        },
+      )
+
+    /**
+     * Declarative hero boot DAG (`prepare` -> `settle` -> `live`):
+     * - Runs renderer creation, hero overlays, world loading, score dispatch,
+     *   sky map, and planetary terrain maximally in parallel while `SurfaceRenderer`
+     *   stays in `prepare` (zero hidden swapchain draws).
+     * - Once all critical tasks finish, renders one complete GPU-fenced frame,
+     *   releases the ~530 MB compute buffers, switches to `live`, and signals ready.
+     */
+    const bootHeroScene = async (existing?: { instance: SurfaceRenderer; device: GPUDevice }) => {
       releaseHeroDeviceResources()
-      const gen = ++deviceGeneration
       const localController = new AbortController()
       deviceController = localController
       const devSignal = AbortSignal.any([signal, localController.signal])
-
-      let bridge: BridgeOverlay | undefined
-      let title: ConstellationTitleOverlay | undefined
-      let cta: StardustCtaOverlay | undefined
-      let lens: BlackHoleLensPass | undefined
+      const boot = createBootGraph(devSignal, 'prepare')
+      const isInitial = !existing
+      let bootDeviceLease: ReturnType<EarthWorkspaceResources['acquireDevice']> | undefined
       let localWorld: ReturnType<EarthWorkspaceResources['acquireWorld']> | undefined
+      let createdOverlays: HeroOverlayBundle | undefined
 
       try {
-        const results = await Promise.allSettled([
-          BridgeOverlay.create(device),
-          ConstellationTitleOverlay.create(device),
-          StardustCtaOverlay.create(device),
-          BlackHoleLensPass.create(device),
-        ])
-        if (results[0].status === 'fulfilled') bridge = results[0].value
-        if (results[1].status === 'fulfilled') title = results[1].value
-        if (results[2].status === 'fulfilled') cta = results[2].value
-        if (results[3].status === 'fulfilled') lens = results[3].value
-        const firstRejected = results.find(r => r.status === 'rejected')
-        if (firstRejected && firstRejected.status === 'rejected') throw firstRejected.reason
+        existing?.instance.setPhase('prepare')
+
+        boot.task('hero-device', {
+          recordTiming: false,
+          run: async () => {
+            if (existing) return existing.device
+            bootDeviceLease = resources.acquireDevice()
+            const { device } = await bootDeviceLease.ready
+            return device
+          },
+        })
+
+        boot.task('hero-renderer', {
+          recordTiming: isInitial,
+          run: async ({ signal: s }) => {
+            if (existing) return existing.instance
+            const instance = await createHeroRenderer(s)
+            if (s.aborted) {
+              instance.destroy()
+              s.throwIfAborted()
+            }
+            renderer = instance
+            rendererRef.current = instance
+            instance.setPaused(leavingRef.current || scrollPausedRef.current)
+            return instance
+          },
+        })
+
+        boot.task('hero-overlays', {
+          after: ['hero-device'],
+          recordTiming: isInitial,
+          run: async ({ get, signal: s }) => {
+            const bundle = await createOverlays(get<GPUDevice>('hero-device'), s)
+            createdOverlays = bundle
+            return bundle
+          },
+        })
+
+        boot.task('hero-world', {
+          after: ['hero-device'],
+          recordTiming: false,
+          run: async ({ get }) => {
+            const dev = get<GPUDevice>('hero-device')
+            localWorld = resources.acquireWorld(dev, {
+              manifestUrl: scoreManifestUrl,
+              readAsset: assets.readAsset,
+            })
+            world = localWorld
+            const earth = await localWorld.loading
+            return { lease: localWorld, earth }
+          },
+        })
+
+        boot.task('hero-score', {
+          after: ['hero-renderer', 'hero-world'],
+          recordTiming: isInitial,
+          run: async ({ get, signal: s }) => {
+            const instance = get<SurfaceRenderer>('hero-renderer')
+            const { lease, earth } = get<{
+              lease: ReturnType<EarthWorkspaceResources['acquireWorld']>
+              earth: Awaited<ReturnType<EarthWorkspaceResources['acquireWorld']>['loading']>
+            }>('hero-world')
+            await lease.publish(async () => {
+              s.throwIfAborted()
+              await earth.dispatchShader(HERO_BRIDGE_SCORE_SHADER, s)
+              s.throwIfAborted()
+              await instance.setComputedScores(
+                earth,
+                {
+                  name: 'Jezero Crater analogue',
+                  description: 'Arid basin floors enclosed by rugged regional relief',
+                },
+                s,
+              )
+            })
+          },
+        })
+
+        boot.task('hero-terrain', {
+          after: ['hero-renderer'],
+          recordTiming: false,
+          run: ({ get, signal: s }) => get<SurfaceRenderer>('hero-renderer').waitForTerrainReady(s),
+        })
+
+        boot.task('hero-sky', {
+          after: ['hero-renderer'],
+          recordTiming: isInitial,
+          run: ({ get, signal: s }) => get<SurfaceRenderer>('hero-renderer').solarScene?.whenSkySettled(s),
+        })
+
+        boot.task('hero-planets', {
+          after: ['hero-renderer'],
+          recordTiming: isInitial,
+          run: ({ get, signal: s }) => get<SurfaceRenderer>('hero-renderer').solarScene?.whenTerrainSettled(s),
+        })
+
+        await boot.ready('critical')
         devSignal.throwIfAborted()
 
-        overlay = bridge
-        titleOverlay = title
-        ctaOverlay = cta
-        blackHoleLens = lens
-        ctaOverlayRef.current = cta!
-        bridge = title = cta = lens = undefined
-
-        localWorld = resources.acquireWorld(device, {
-          manifestUrl: scoreManifestUrl,
-          readAsset: assets.readAsset,
-        })
-        world = localWorld
-        try {
-          const earth = await localWorld.loading
-          devSignal.throwIfAborted()
-          await localWorld.publish(async () => {
-            devSignal.throwIfAborted()
-            await earth.dispatchShader(HERO_BRIDGE_SCORE_SHADER, devSignal)
-            devSignal.throwIfAborted()
-            await instance.setComputedScores(
-              earth,
-              {
-                name: 'Jezero Crater analogue',
-                description: 'Arid basin floors enclosed by rugged regional relief',
-              },
-              devSignal,
-            )
-          })
-          devSignal.throwIfAborted()
-          // Scores are now baked into SurfaceRenderer's Native scores textures; wait for GPU submission
-          // before releasing the ~530 MB EarthScore compute buffers while on the hero.
-          await device.queue.onSubmittedWorkDone()
-          devSignal.throwIfAborted()
-        } finally {
-          localWorld.release()
-          if (world === localWorld) world = undefined
-          localWorld = undefined
-        }
+        const instance = boot.get<SurfaceRenderer>('hero-renderer')
+        const bundle = boot.get<HeroOverlayBundle>('hero-overlays')
+        overlay = bundle.bridge
+        titleOverlay = bundle.title
+        ctaOverlay = bundle.cta
+        blackHoleLens = bundle.lens
+        ctaOverlayRef.current = bundle.cta
+        createdOverlays = undefined
 
         const best = instance.bestScoreLocation
         if (best) {
           earthTarget = { latitude: best.latitude, longitude: best.longitude }
           currentBodies = buildBridgeBodies(currentAspect, earthTarget)
           instance.setHeroBodies(currentBodies)
-        } else {
-          instance.invalidateHeroFrame()
         }
-        if (gen === deviceGeneration && !devSignal.aborted) {
-          scoreReady = true
-          // Arm readiness for the next submitted frame that reflects final staging.
-          readyArmed = true
+        scoreReady = true
+
+        // Render exactly one settled frame and wait for its GPU fence before releasing compute buffers and revealing.
+        await boot.task('hero-settle', {
+          phase: 'settle',
+          recordTiming: isInitial,
+          run: ({ signal: s }) => instance.settleFrame(s),
+        })
+        devSignal.throwIfAborted()
+
+        if (localWorld) {
+          localWorld.release()
+          if (world === localWorld) world = undefined
+          localWorld = undefined
         }
+
+        instance.setPhase('live')
+        signalReady()
+        boot.startBackground()
       } catch (cause) {
-        bridge?.destroy()
-        title?.destroy()
-        cta?.destroy()
-        lens?.destroy()
+        if (createdOverlays) {
+          createdOverlays.bridge.destroy()
+          createdOverlays.title.destroy()
+          createdOverlays.cta.destroy()
+          createdOverlays.lens.destroy()
+        }
+        if (localWorld) {
+          localWorld.release()
+          if (world === localWorld) world = undefined
+          localWorld = undefined
+        }
         if (!devSignal.aborted) {
           console.error('Could not initialize hero scene:', cause)
           setError(cause instanceof Error ? cause.message : String(cause))
+          renderer?.setPhase('live')
           signalReady()
         }
+      } finally {
+        bootDeviceLease?.release()
       }
     }
 
@@ -374,138 +573,11 @@ export function BridgeHero({
         releaseHeroDeviceResources()
         return
       }
-      void mountHeroDevice(renderer, nextDevice)
+      void bootHeroScene({ instance: renderer, device: nextDevice })
     }
     canvas.addEventListener('computedevicechange', onComputeDeviceChange, { signal })
 
-    void (async () => {
-      try {
-        const instance = await SurfaceRenderer.create(
-          canvas,
-          () => undefined,
-          err => {
-            if (!signal.aborted) {
-              setError(err.message)
-              signalReady()
-            }
-          },
-          () => undefined,
-          {
-            signal,
-            acquireDevice: resources.acquireDevice,
-            assets: assets.url,
-            loadTerrain: resources.acquireTerrain,
-            solar: {
-              createScene: SolarScene.create,
-              assetUrl: assets.url,
-              loadTerrain: resources.acquireTerrain,
-              onSourcePick: () => undefined,
-            },
-            hero: {
-              bodies: currentBodies,
-              animate: true,
-              options: {
-                hdr: true,
-                exposure: 1.06,
-                bloom: 0.42,
-                emission: 1.85,
-                opacity: 0.84,
-                contextFloor: 0.08,
-                contextOpacity: 0.24,
-                contourOpacity: 0.16,
-                relief: 22,
-                imagery: false,
-              },
-              frame: (aspect, timeSeconds) => {
-                if (Math.abs(aspect - currentAspect) > 0.004) {
-                  currentAspect = aspect
-                  currentBodies = buildBridgeBodies(aspect, earthTarget)
-                  const solar = renderer?.solarScene
-                  if (solar) solar.bodies = currentBodies
-                }
-                pointerSmooth.x += (pointerTarget.x - pointerSmooth.x) * 0.06
-                pointerSmooth.y += (pointerTarget.y - pointerSmooth.y) * 0.06
-                return buildBridgeFrame(
-                  aspect,
-                  timeSeconds,
-                  pointerSmooth,
-                  reducedMotion.matches,
-                  scrollProgressRef.current,
-                )
-              },
-              prepareOverlay: (encoder, frame, width, height, ratio, timeSeconds) => {
-                const canvasRect = cachedCanvasRect
-                if (canvasRect.width <= 1 || canvasRect.height <= 1) return
-                const scaleX = width / canvasRect.width
-                const scaleY = height / canvasRect.height
-                const bhGeom = computeBlackHoleGeometry(scrollProgressRef.current, width / Math.max(1, height))
-                const prepareSkyOverlay = (
-                  target: ConstellationTitleOverlay | StardustCtaOverlay | undefined,
-                  restBox: { left: number; top: number; width: number; height: number } | null,
-                  domEl: HTMLElement | null,
-                ) => {
-                  if (!target || !restBox) return
-                  const skyBox = projectSkyBox(restBox, canvasRect.width, canvasRect.height, frame)
-                  if (!skyBox) return
-                  if (domEl)
-                    domEl.style.transform = `translate3d(${skyBox.dx.toFixed(2)}px, ${skyBox.dy.toFixed(2)}px, 0)`
-                  target.prepare(
-                    encoder,
-                    {
-                      leftPx: skyBox.left * scaleX,
-                      topPx: skyBox.top * scaleY,
-                      widthPx: skyBox.width * scaleX,
-                      heightPx: skyBox.height * scaleY,
-                    },
-                    canvasRect,
-                    width,
-                    height,
-                    ratio,
-                    timeSeconds,
-                    reducedMotion.matches,
-                    1,
-                    bhGeom,
-                  )
-                }
-                prepareSkyOverlay(titleOverlay, restTitleBox, titleStageRef.current)
-                prepareSkyOverlay(ctaOverlay, restCtaBox, ctaStageRef.current)
-              },
-              drawOverlay: (pass, frame, width, height, ratio, timeSeconds) => {
-                if (overlay && scoreReady) {
-                  const marsLocal = renderer?.solarScene?.sourcePosition('mars', HERO_MARS_SITE)
-                  const endpoints = bridgeEndpoints(currentBodies, earthTarget, marsLocal)
-                  overlay.draw(pass, frame, endpoints, width, height, ratio, timeSeconds, reducedMotion.matches, 1)
-                }
-                titleOverlay?.draw(pass)
-                ctaOverlay?.draw(pass)
-              },
-              postScene: (encoder, sceneView, width, height, timeSeconds) => {
-                if (!blackHoleLens) return null
-                const geom = computeBlackHoleGeometry(scrollProgressRef.current, width / Math.max(1, height))
-                return blackHoleLens.apply(encoder, sceneView, width, height, timeSeconds, geom)
-              },
-            },
-          },
-        )
-        if (signal.aborted) {
-          instance.destroy()
-          return
-        }
-        renderer = instance
-        rendererRef.current = instance
-        instance.setPaused(leavingRef.current || scrollPausedRef.current)
-
-        const device = instance.computeDevice
-        if (!device) throw new Error('WebGPU is unavailable.')
-        await mountHeroDevice(instance, device)
-      } catch (cause) {
-        if (!signal.aborted) {
-          console.error('Could not initialize hero scene:', cause)
-          setError(cause instanceof Error ? cause.message : String(cause))
-          signalReady()
-        }
-      }
-    })()
+    void bootHeroScene()
 
     return () => {
       controller.abort()

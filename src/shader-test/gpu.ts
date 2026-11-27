@@ -90,7 +90,7 @@ export async function copyExternalImageChunked(
   const rowsPerChunk = Math.max(1, Math.floor(maxChunkBytes / bytesPerRow))
   if (source.height <= rowsPerChunk) {
     queue.copyExternalImageToTexture({ source }, { texture }, [source.width, source.height])
-    await waitForQueue(queue, signal)
+    if (source.width * source.height * 4 >= maxChunkBytes / 2) await waitForQueue(queue, signal)
     return
   }
   for (let y = 0; y < source.height; y += rowsPerChunk) {

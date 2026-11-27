@@ -40,6 +40,16 @@ export type PlanetPickingMesh = {
   positionAt: (longitude: number, latitude: number) => Vec3
 }
 
+/** Compute a single displaced 3D surface point without building the full picking mesh. */
+export function samplePlanetPosition(body: TerrainBody, terrain: Terrain, longitude: number, latitude: number): Vec3 {
+  const { relief } = PLANET_TERRAIN_SETTINGS[body]
+  const radius = bodyRadius(body)
+  const elevation = createPlanetElevationSampler(terrain)(longitude, latitude)
+  const magnitude = radius + (elevation * relief) / 1000
+  const [x, y, z] = sphericalNormal(longitude, latitude)
+  return [magnitude * x, magnitude * y, magnitude * z]
+}
+
 /**
  * Build a 512x256 CPU picking and marker-placement mesh for Moon/Mars.
  * GPU rendering uses DEM-displaced cube-sphere patches; this mesh accelerates
@@ -52,13 +62,17 @@ export function buildPlanetPickingMesh(body: TerrainBody, terrain: Terrain): Pla
     rows = planetRows
   const { uv, indices } = getPlanetGrid()
   const readElevation = createPlanetElevationSampler(terrain)
-  const positions = new Float32Array((uv.length / 2) * 3)
-  for (let vertex = 0; vertex < uv.length / 2; vertex++) {
+  const vertexCount = uv.length / 2
+  const positions = new Float32Array(vertexCount * 3)
+  for (let vertex = 0; vertex < vertexCount; vertex++) {
     const longitude = (uv[vertex * 2] - 0.5) * 2 * Math.PI
     const latitude = (uv[vertex * 2 + 1] - 0.5) * Math.PI
     const magnitude = radius + (readElevation(longitude, latitude) * relief) / 1000
     const [x, y, z] = sphericalNormal(longitude, latitude)
-    positions.set([magnitude * x, magnitude * y, magnitude * z], vertex * 3)
+    const o = vertex * 3
+    positions[o] = magnitude * x
+    positions[o + 1] = magnitude * y
+    positions[o + 2] = magnitude * z
   }
 
   const positionAt = (longitude: number, latitude: number): Vec3 => {

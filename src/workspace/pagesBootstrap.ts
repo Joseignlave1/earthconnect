@@ -1,10 +1,8 @@
-import type { WorkspaceAssets } from './workspaceAssets.ts'
-import { loadWorkspaceRelease, type DownloadProgress } from './workspaceRelease.ts'
 import { createSurfaceDevicePool, WEBGPU_UNAVAILABLE_MESSAGE } from '../shader-test/surface-device.ts'
+import { createBootGraph } from './bootGraph.ts'
+import type { WorkspaceAssets } from './workspaceAssets.ts'
 import type { WorkspacePrewarm } from './workspacePrewarm.ts'
-import { endStartupSpan, markStartup, startStartupSpan } from './startupTiming.ts'
-
-markStartup('bootstrap')
+import { type DownloadProgress, loadWorkspaceRelease } from './workspaceRelease.ts'
 
 if (!navigator.gpu) {
   const initial = document.querySelector<HTMLElement>('#initial')
@@ -16,14 +14,13 @@ if (!navigator.gpu) {
   }
   initial?.setAttribute('data-visible', 'true')
 } else {
+  const boot = createBootGraph(undefined, 'bootstrap')
+
   // Start WebGPU adapter/device acquisition immediately in parallel with IDB and JS loading.
   const devicePool = createSurfaceDevicePool()
-  startStartupSpan('gpu-device')
   const initialDeviceLease = devicePool()
-  void initialDeviceLease.ready.then(
-    () => endStartupSpan('gpu-device'),
-    () => undefined,
-  )
+  boot.task('gpu-device', { run: () => initialDeviceLease.ready })
+
   let deviceClaimed = false
   function releaseUnclaimedDevice() {
     if (deviceClaimed) return
@@ -55,23 +52,25 @@ if (!navigator.gpu) {
       }
     | undefined
   const refresh = new URLSearchParams(location.search).get('refreshCache') === '1'
-  const initialRelease = loadWorkspaceRelease(
-    new AbortController().signal,
-    progress => {
-      latestProgress = progress
-      listener?.onProgress(progress)
-    },
-    {
-      refresh,
-      onAssets: assets => {
-        latestAssets = assets
-        startBootstrapPrewarm(assets)
-        listener?.onAssets?.(assets)
-      },
-    },
-  )
-  // A failed network check can settle before the UI starts observing it.
-  void initialRelease.catch(() => undefined)
+  const initialRelease = boot.task('release', {
+    detail: r => (r.downloadedBytes ? `downloaded ${(r.downloadedBytes / 1e6).toFixed(1)} MB` : 'cached (IDB)'),
+    run: () =>
+      loadWorkspaceRelease(
+        new AbortController().signal,
+        progress => {
+          latestProgress = progress
+          listener?.onProgress(progress)
+        },
+        {
+          refresh,
+          onAssets: assets => {
+            latestAssets = assets
+            startBootstrapPrewarm(assets)
+            listener?.onAssets?.(assets)
+          },
+        },
+      ),
+  })
 
   const loadInitialRelease: typeof loadWorkspaceRelease = async (signal, onProgress, options) => {
     signal.throwIfAborted()
@@ -95,16 +94,12 @@ if (!navigator.gpu) {
   // On the landing page (/), defer it until the user opens the workspace so startup stays lean.
   const path = location.pathname.replace(/\/+$/, '') || '/'
   if (path === '/find' || path.startsWith('/find/')) {
-    startStartupSpan('workspace-js')
-    void import('./SharedSkyWorkspace.tsx').then(
-      () => endStartupSpan('workspace-js'),
-      () => undefined,
-    )
+    boot.task('workspace-js', { run: () => import('./SharedSkyWorkspace.tsx') })
   }
-  startStartupSpan('app-bundle')
-  void import('./pagesApp.tsx')
+
+  void boot
+    .task('app-bundle', { run: () => import('./pagesApp.tsx') })
     .then(({ mount }) => {
-      endStartupSpan('app-bundle')
       mount(loadInitialRelease, devicePool, releaseUnclaimedDevice, () => prewarmPromise)
     })
     .catch(() => {

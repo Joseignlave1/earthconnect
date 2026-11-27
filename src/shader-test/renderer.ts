@@ -83,6 +83,8 @@ type SolarSettings = {
   onSourcePick: (body: SourceBody, point: SourcePoint) => void
 }
 type SurfaceAssets = WorkspaceAssets['url']
+export type RenderPhase = 'prepare' | 'settle' | 'live'
+
 export type HeroStage = {
   bodies: SolarBodies
   frame: (aspect: number, timeSeconds: number) => SolarFrame
@@ -126,6 +128,7 @@ type RendererSettings = {
   loupeOnly?: boolean
   initialProjection?: 'globe' | 'plane'
   initialOptions?: Partial<Options>
+  initialPhase?: RenderPhase
 }
 type SurfaceUniformParams = {
   matrix: Float32Array
@@ -215,9 +218,12 @@ type OrbitView = { rotation: Rotation; zoom: number; center: Vec3 }
 type SurfacePipelines = {
   layout: GPUBindGroupLayout
   surface: GPURenderPipeline
-  surfaceSmall: GPURenderPipeline
-  annotation: GPURenderPipeline
-  annotationSmall: GPURenderPipeline
+  surfaceSmall: GPURenderPipeline | null
+  surfaceSmallDescriptor: GPURenderPipelineDescriptor
+  annotation: GPURenderPipeline | null
+  annotationDescriptor: GPURenderPipelineDescriptor
+  annotationSmall: GPURenderPipeline | null
+  annotationSmallDescriptor: GPURenderPipelineDescriptor
   coverage: GPURenderPipeline | null
   coverageDescriptor: GPURenderPipelineDescriptor
   coverageSmall: GPURenderPipeline | null
@@ -486,41 +492,41 @@ function getSurfacePipelines(
         },
         multisample: { count: 4 },
       })
-      const [surface, surfaceSmall, annotation, annotationSmall] = await Promise.all([
-        device.createRenderPipelineAsync(
-          pipeline(
-            '4x MSAA Earth surface',
-            'surfaceFragment',
-            [{ format: 'rgba16float' }],
-            4,
-            'surfaceVertex',
-            true,
-            surfaceConstants,
-          ),
+      const surface = await device.createRenderPipelineAsync(
+        pipeline(
+          '4x MSAA Earth surface',
+          'surfaceFragment',
+          [{ format: 'rgba16float' }],
+          4,
+          'surfaceVertex',
+          true,
+          surfaceConstants,
         ),
-        device.createRenderPipelineAsync(
-          smallPipeline(
-            '4x MSAA Earth small per-sample ellipsoid',
-            'smallSurfaceFragment',
-            [{ format: 'rgba16float' }],
-            surfaceConstants,
-          ),
-        ),
-        device.createRenderPipelineAsync(
-          pipeline('Geographic annotations', 'annotationFragment', [{ format: 'rgba16float' }], 4, 'annotationVertex'),
-        ),
-        device.createRenderPipelineAsync(
-          smallPipeline('4x MSAA Earth small per-sample annotations', 'smallAnnotationFragment', [
-            { format: 'rgba16float' },
-          ]),
-        ),
-      ])
+      )
       return {
         layout: bindLayout,
         surface,
-        surfaceSmall,
-        annotation,
-        annotationSmall,
+        surfaceSmall: null,
+        surfaceSmallDescriptor: smallPipeline(
+          '4x MSAA Earth small per-sample ellipsoid',
+          'smallSurfaceFragment',
+          [{ format: 'rgba16float' }],
+          surfaceConstants,
+        ),
+        annotation: null,
+        annotationDescriptor: pipeline(
+          'Geographic annotations',
+          'annotationFragment',
+          [{ format: 'rgba16float' }],
+          4,
+          'annotationVertex',
+        ),
+        annotationSmall: null,
+        annotationSmallDescriptor: smallPipeline(
+          '4x MSAA Earth small per-sample annotations',
+          'smallAnnotationFragment',
+          [{ format: 'rgba16float' }],
+        ),
         coverage: null,
         coverageDescriptor: pipeline(
           'Geographic annotations with coverage',
@@ -607,6 +613,11 @@ export class SurfaceRenderer {
   private earthReady = false
   private terrainGpuReady = false
   private earthImageUrl: string | null = null
+  private earthImageRequested = false
+  private phase: RenderPhase = 'live'
+  private terrainReadyWaiters = new Set<() => void>()
+  private frameWaiters = new Set<() => void>()
+  private assets?: SurfaceAssets
   private earthTiles?: EarthTileCache
   private unsubscribeEarthTiles?: () => void
   private terrainTexture!: GPUTexture
@@ -728,7 +739,38 @@ export class SurfaceRenderer {
   }
   setPaused(paused: boolean) {
     this.heroPaused = paused
-    if (!paused && this.heroStage?.animate && !this.destroyed && !this.lost) this.invalidate(false)
+    if (!paused && this.heroStage?.animate && this.phase === 'live' && !this.destroyed && !this.lost)
+      this.invalidate(false)
+  }
+  setPhase(phase: RenderPhase) {
+    if (this.phase === phase) return
+    this.phase = phase
+    if (phase !== 'prepare' && !this.destroyed && !this.lost) this.invalidate(false)
+  }
+  waitForTerrainReady(signal?: AbortSignal): Promise<void> {
+    if (this.terrainGpuReady) return Promise.resolve()
+    let waiter!: () => void
+    const pending = new Promise<void>(resolve => {
+      waiter = resolve
+      this.terrainReadyWaiters.add(resolve)
+    })
+    return raceAbort(pending, signal).finally(() => this.terrainReadyWaiters.delete(waiter))
+  }
+  /** Transition out of `prepare`, render one settled frame, and await its GPU queue fence. */
+  async settleFrame(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
+    if (this.destroyed || this.lost) return
+    if (this.phase === 'prepare') this.phase = 'settle'
+    let waiter!: () => void
+    const submitted = new Promise<void>(resolve => {
+      waiter = resolve
+      this.frameWaiters.add(resolve)
+    })
+    this.invalidate(false)
+    await raceAbort(submitted, signal).finally(() => this.frameWaiters.delete(waiter))
+    signal?.throwIfAborted()
+    if (this.destroyed || this.lost) return
+    await raceAbort(this.device.queue.onSubmittedWorkDone(), signal)
   }
   invalidateHeroFrame() {
     if (!this.heroStage || this.destroyed || this.lost) return
@@ -751,9 +793,11 @@ export class SurfaceRenderer {
     private loupeOnly = false,
     initialProjection?: 'globe' | 'plane',
     initialOptions?: Partial<Options>,
+    initialPhase: RenderPhase = 'live',
   ) {
     if (heroStage?.options) Object.assign(this.options, heroStage.options)
     if (initialOptions) Object.assign(this.options, initialOptions)
+    this.phase = initialPhase
     this.style = resolveScoreStyle(null, this.options)
     if (initialProjection === 'plane') {
       this.options.morph = 0
@@ -768,21 +812,14 @@ export class SurfaceRenderer {
     const assetError = (error: unknown) => {
       if (!signal.aborted) this.onError(error instanceof Error ? error : new Error(String(error)))
     }
+    this.assets = assets
     const terrain = assets
       ? loadTerrain
         ? loadTerrain('textures/earth-terrain.bin', 'rg32float', s => assets('textures/earth-terrain.bin', s), signal)
         : assets('textures/earth-terrain.bin', signal).then(url => loadPreparedTerrain(url, 'rg32float', signal))
       : loadPreparedTerrain(`${import.meta.env.BASE_URL}textures/earth-terrain.bin`, 'rg32float', signal)
-    const imageUrlPromise = assets
-      ? assets('textures/earth-blue-marble.jpg', signal)
-      : Promise.resolve(`${import.meta.env.BASE_URL}textures/earth-blue-marble.jpg`)
-    void imageUrlPromise
-      .then(url => {
-        if (this.destroyed || signal.aborted) return
-        this.earthImageUrl = url
-        if (!this.lost) this.startEarthUpload(url)
-      })
-      .catch(assetError)
+    // Skip decoding the 8K Blue Marble texture when the hero disables Earth imagery.
+    if (!this.heroStage || this.options.imagery) this.requestEarthImage()
     void terrain
       .then(prepared => {
         if (this.destroyed) return
@@ -826,8 +863,33 @@ export class SurfaceRenderer {
     this.invalidate()
   }
 
+  private requestEarthImage() {
+    if (this.earthImageRequested) return
+    this.earthImageRequested = true
+    const { signal } = this.terrainRequest
+    const imageUrlPromise = this.assets
+      ? this.assets('textures/earth-blue-marble.jpg', signal)
+      : Promise.resolve(`${import.meta.env.BASE_URL}textures/earth-blue-marble.jpg`)
+    void imageUrlPromise
+      .then(url => {
+        if (this.destroyed || signal.aborted) return
+        this.earthImageUrl = url
+        if (!this.lost) this.startEarthUpload(url)
+      })
+      .catch(error => {
+        if (!signal.aborted) this.onError(error instanceof Error ? error : new Error(String(error)))
+      })
+  }
+
   private onVisibilityChange = () => {
-    if (!document.hidden && this.heroStage?.animate && !this.heroPaused && !this.destroyed && !this.lost) {
+    if (
+      !document.hidden &&
+      this.heroStage?.animate &&
+      this.phase === 'live' &&
+      !this.heroPaused &&
+      !this.destroyed &&
+      !this.lost
+    ) {
       this.invalidate(false)
     }
   }
@@ -851,6 +913,7 @@ export class SurfaceRenderer {
       loupeOnly,
       initialProjection,
       initialOptions,
+      initialPhase,
     }: RendererSettings = {},
   ) {
     signal?.throwIfAborted()
@@ -870,6 +933,7 @@ export class SurfaceRenderer {
       loupeOnly,
       initialProjection,
       initialOptions,
+      initialPhase,
     )
     if (initialView)
       renderer.rotation = viewRotation((initialView.longitude * Math.PI) / 180, (initialView.latitude * Math.PI) / 180)
@@ -935,34 +999,38 @@ export class SurfaceRenderer {
     this.bankSize = Math.min(256, device.limits.maxTextureArrayLayers)
     const banks = Math.ceil(tileCount / this.bankSize)
     const reverseDepth = Boolean(this.solarSettings)
-    const pipelines = await getSurfacePipelines(device, banks, this.bankSize, filterable, reverseDepth)
-    if (this.destroyed || this.device !== device) return
+    const post = new PostProcess(device, this.format, this.transparent, reverseDepth)
+    this.post = post
+    const [pipelines, solar] = await Promise.all([
+      getSurfacePipelines(device, banks, this.bankSize, filterable, reverseDepth),
+      this.solarSettings
+        ? this.solarSettings.createScene(
+            device,
+            new Date(this.sun.timestamp),
+            () => this.invalidate(),
+            this.onError,
+            this.solarCamera,
+            this.solarSettings.assetUrl,
+            this.solarSettings.loadTerrain,
+            this.solarSettings.loadPlanetTilePack,
+            this.heroStage
+              ? { bodies: this.heroStage.bodies, eagerTerrain: true, albedoMaxWidths: { moon: 512, mars: 4096 } }
+              : undefined,
+          )
+        : Promise.resolve(undefined),
+      post.initialize(),
+    ])
+    if (this.destroyed || this.device !== device) {
+      solar?.destroy()
+      return
+    }
     this.layout = pipelines.layout
     this.pipelines = pipelines
-    this.post = new PostProcess(device, this.format, this.transparent, reverseDepth)
-    if (this.solarSettings) {
-      const solar = await this.solarSettings.createScene(
-        device,
-        new Date(this.sun.timestamp),
-        () => this.invalidate(),
-        this.onError,
-        this.solarCamera,
-        this.solarSettings.assetUrl,
-        this.solarSettings.loadTerrain,
-        this.solarSettings.loadPlanetTilePack,
-        this.heroStage
-          ? { bodies: this.heroStage.bodies, eagerTerrain: true, albedoMaxWidths: { moon: 512, mars: 4096 } }
-          : undefined,
-      )
-      if (this.destroyed || this.device !== device) {
-        solar.destroy()
-        return
-      }
+    if (solar) {
       this.solar = solar
       this.solarCamera = solar.camera
     }
     const sunlight = this.solar?.sunlight('earth') as Vec3 | undefined
-    await this.post.initialize()
     if (this.destroyed || this.device !== device) return
     this.uniformBuffer = device.createBuffer({
       label: 'Surface parameters',
@@ -1100,6 +1168,8 @@ export class SurfaceRenderer {
         this.heroBackdrop = null
         this.bindResources()
         this.canvas.dataset.terrainReady = 'true'
+        for (const resolve of this.terrainReadyWaiters) resolve()
+        this.terrainReadyWaiters.clear()
         this.invalidate()
       })
       .catch(error => {
@@ -1263,6 +1333,7 @@ export class SurfaceRenderer {
     }
     if (keys.includes('morph') || keys.includes('relief')) this.cameraHistory = undefined
     Object.assign(this.options, options)
+    if (options.imagery && !this.earthImageRequested) this.requestEarthImage()
     if (['colorMode', 'base', 'focus', 'topRange', 'emphasis'].some(key => keys.includes(key as keyof Options)))
       this.style = resolveScoreStyle(this.distribution, this.options, this.style)
     const surface = keys.some(key => !['exposure', 'bloom', 'dataBoundary'].includes(key))
@@ -1451,6 +1522,7 @@ export class SurfaceRenderer {
     const canvas = this.canvas,
       device = this.device
     const hero = this.heroStage
+    if (this.phase === 'prepare') return false
     const displayRatio = hero || this.loupeOnly ? 1 : Math.min(window.devicePixelRatio || 1, 2)
     const progressive = !hero && displayRatio > 1.25
     const maxDim = device.limits.maxTextureDimension2D
@@ -1696,7 +1768,10 @@ export class SurfaceRenderer {
             renderEarth
               ? () => {
                   if (earthSmall) {
-                    backdropPass.setPipeline(pipelines.surfaceSmall)
+                    const smallPipe = (pipelines.surfaceSmall ??= device.createRenderPipeline(
+                      pipelines.surfaceSmallDescriptor,
+                    ))
+                    backdropPass.setPipeline(smallPipe)
                     backdropPass.setBindGroup(0, this.bindings)
                     backdropPass.draw(6)
                   } else {
@@ -1746,7 +1821,10 @@ export class SurfaceRenderer {
             renderEarth
               ? () => {
                   if (earthSmall) {
-                    pass.setPipeline(pipelines.surfaceSmall)
+                    const smallPipe = (pipelines.surfaceSmall ??= device.createRenderPipeline(
+                      pipelines.surfaceSmallDescriptor,
+                    ))
+                    pass.setPipeline(smallPipe)
                     pass.setBindGroup(0, this.bindings)
                     pass.draw(6)
                   } else {
@@ -1773,14 +1851,14 @@ export class SurfaceRenderer {
         if (earthSmall) {
           const smallPipe = earthBoundary
             ? (pipelines.coverageSmall ??= device.createRenderPipeline(pipelines.coverageSmallDescriptor))
-            : pipelines.annotationSmall
+            : (pipelines.annotationSmall ??= device.createRenderPipeline(pipelines.annotationSmallDescriptor))
           pass.setPipeline(smallPipe)
           pass.setBindGroup(0, this.bindings)
           pass.draw(6)
         } else {
           const pipeline = earthBoundary
             ? (pipelines.coverage ??= device.createRenderPipeline(pipelines.coverageDescriptor))
-            : pipelines.annotation
+            : (pipelines.annotation ??= device.createRenderPipeline(pipelines.annotationDescriptor))
           drawMesh(pass, pipeline, this.bindings)
         }
       }
@@ -2016,7 +2094,7 @@ export class SurfaceRenderer {
         const needsSolarTerrain = Boolean(hero) || this.solarFocus === 'moon' || this.solarFocus === 'mars'
         const settled =
           renderEarth &&
-          this.earthReady &&
+          (!this.options.imagery || this.earthReady) &&
           this.terrain &&
           solar.skySettled &&
           (!needsSolarTerrain || solar.terrainReady) &&
@@ -2060,11 +2138,15 @@ export class SurfaceRenderer {
       }
       if (
         solar!.camera.flying ||
-        (hero?.animate && !this.heroPaused && !this.reducedMotion.matches && !document.hidden)
+        (hero?.animate && this.phase === 'live' && !this.heroPaused && !this.reducedMotion.matches && !document.hidden)
       )
         this.invalidate(false)
     }
     canvas.dispatchEvent(new Event('renderstatus'))
+    if (this.frameWaiters.size) {
+      for (const resolve of this.frameWaiters) resolve()
+      this.frameWaiters.clear()
+    }
     return true
   }
 

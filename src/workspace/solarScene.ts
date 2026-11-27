@@ -1,7 +1,7 @@
 import type { WorkspaceAssets } from './workspaceAssets.ts'
 import type { TerrainLoader } from './earthWorkspaceResources.ts'
 import { EARTH_AXIS, FOV, intersectsAabb } from '../shader-test/geometry.ts'
-import { joinWgsl, shaderModule } from '../shader-test/gpu.ts'
+import { joinWgsl, raceAbort, shaderModule } from '../shader-test/gpu.ts'
 import { LOUPE_TEXTURE_SIZE } from '../shader-test/postprocess.ts'
 import fullscreenWgsl from '../shader-test/shaders/fullscreen.wgsl?raw'
 import { PlanetTerrainRenderer, type PlanetPickingMesh } from './planetTerrain.ts'
@@ -86,14 +86,13 @@ type SolarPipelines = {
   skyPipeline: GPURenderPipeline
   bodyPipeline: GPURenderPipeline
   bodyAnnotationLayout: GPUBindGroupLayout
-  bodyAnnotationPipeline: GPURenderPipeline
-  bodyAnnotationCoveragePipeline: GPURenderPipeline
-  orbitCoveragePipelines: GPURenderPipeline[]
-  orbitAccumPipeline: GPURenderPipeline
+  getBodyAnnotationPipeline: (includeCoverage: boolean) => GPURenderPipeline
+  getOrbitCoveragePipelines: () => GPURenderPipeline[]
+  getOrbitAccumPipeline: () => GPURenderPipeline
   haloPipeline: GPURenderPipeline
   lensFlarePipeline: GPURenderPipeline
   earthAtmoPipeline: GPURenderPipeline
-  earthAtmoMotionPipeline: GPURenderPipeline
+  getEarthAtmoMotionPipeline: () => GPURenderPipeline
 }
 
 const solarPipelines = new WeakMap<GPUDevice, Promise<SolarPipelines>>()
@@ -102,14 +101,11 @@ function getSolarPipelines(device: GPUDevice): Promise<SolarPipelines> {
   let pending = solarPipelines.get(device)
   if (!pending) {
     pending = (async () => {
-      const [sky, body, orbit, orbitComposite, halo, earthAtmo, earthAtmoMotion] = await Promise.all([
+      const [sky, body, halo, earthAtmo] = await Promise.all([
         shaderModule(device, 'Inertial sky', skyShader),
         shaderModule(device, 'Solar bodies', bodyShader),
-        shaderModule(device, 'Planetary paths', orbitShader),
-        shaderModule(device, 'Planetary path accumulate', orbitCompositeShader),
         shaderModule(device, 'Sunlight halo', haloShader),
         shaderModule(device, 'Earth Rayleigh atmosphere', earthAtmoShader),
-        shaderModule(device, 'Earth Rayleigh atmosphere post-motion', earthAtmoMotionShader),
       ])
       const color: GPUColorTargetState = { format: 'rgba16float' }
       const depth: GPUDepthStencilState = { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' }
@@ -126,31 +122,6 @@ function getSolarPipelines(device: GPUDevice): Promise<SolarPipelines> {
         color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
         alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
       }
-      const orbitCoverageBindGroupLayout = device.createBindGroupLayout({
-        label: 'Orbit coverage depth bind group layout',
-        entries: [
-          { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'depth', multisampled: true } },
-        ],
-      })
-      const orbitCoverageLayout = device.createPipelineLayout({
-        label: 'Orbit coverage pipeline layout',
-        bindGroupLayouts: [orbitCoverageBindGroupLayout],
-      })
-      const orbitAccumBindGroupLayout = device.createBindGroupLayout({
-        label: 'Orbit accumulate bind group layout',
-        entries: [
-          { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
-          {
-            binding: 1,
-            visibility: GPUShaderStage.FRAGMENT,
-            texture: { sampleType: 'unfilterable-float', multisampled: true },
-          },
-        ],
-      })
-      const orbitAccumLayout = device.createPipelineLayout({
-        label: 'Orbit accumulate pipeline layout',
-        bindGroupLayouts: [orbitAccumBindGroupLayout],
-      })
       const bodyAnnotationLayout = device.createBindGroupLayout({
         label: 'Billboard body annotation bind group layout',
         entries: [
@@ -166,19 +137,7 @@ function getSolarPipelines(device: GPUDevice): Promise<SolarPipelines> {
         label: 'Billboard body annotation pipeline layout',
         bindGroupLayouts: [bodyAnnotationLayout],
       })
-      const channelMasks = [GPUColorWrite.RED, GPUColorWrite.GREEN, GPUColorWrite.BLUE, GPUColorWrite.ALPHA]
-      const [
-        skyPipeline,
-        bodyPipeline,
-        bodyAnnotationPipeline,
-        bodyAnnotationCoveragePipeline,
-        orbitAccumPipeline,
-        haloPipeline,
-        lensFlarePipeline,
-        earthAtmoPipeline,
-        earthAtmoMotionPipeline,
-        ...orbitCoveragePipelines
-      ] = await Promise.all([
+      const [skyPipeline, bodyPipeline, haloPipeline, lensFlarePipeline, earthAtmoPipeline] = await Promise.all([
         device.createRenderPipelineAsync({
           ...common,
           label: 'Inertial sky',
@@ -192,37 +151,6 @@ function getSolarPipelines(device: GPUDevice): Promise<SolarPipelines> {
           vertex: { module: body, entryPoint: 'bodyVertex' },
           fragment: { module: body, entryPoint: 'bodyFragment', targets: [color] },
           depthStencil: depth,
-        }),
-        device.createRenderPipelineAsync({
-          layout: bodyAnnotationPipelineLayout,
-          multisample: { count: 4 },
-          label: 'Billboard body annotation occluders',
-          vertex: { module: body, entryPoint: 'bodyVertex' },
-          fragment: { module: body, entryPoint: 'bodyAnnotationFragment', targets: [color] },
-          depthStencil: depth,
-        }),
-        device.createRenderPipelineAsync({
-          layout: bodyAnnotationPipelineLayout,
-          multisample: { count: 4 },
-          label: 'Billboard body annotation coverage occluders',
-          vertex: { module: body, entryPoint: 'bodyVertex' },
-          fragment: {
-            module: body,
-            entryPoint: 'bodyAnnotationCoverageFragment',
-            targets: [color, { format: 'rg8unorm' }],
-          },
-          depthStencil: depth,
-        }),
-        device.createRenderPipelineAsync({
-          layout: orbitAccumLayout,
-          multisample: { count: 4 },
-          label: 'Ephemeris orbit accumulate',
-          vertex: { module: orbitComposite, entryPoint: 'screenVertex' },
-          fragment: {
-            module: orbitComposite,
-            entryPoint: 'orbitAccumFragment',
-            targets: [{ ...color, blend: premulOver }],
-          },
         }),
         device.createRenderPipelineAsync({
           ...common,
@@ -245,57 +173,144 @@ function getSolarPipelines(device: GPUDevice): Promise<SolarPipelines> {
           fragment: { module: earthAtmo, entryPoint: 'earthAtmoFragment', targets: [{ ...color, blend: additive }] },
           depthStencil: { ...depth, depthWriteEnabled: false },
         }),
-        device.createRenderPipelineAsync({
-          layout: 'auto',
-          multisample: { count: 1 },
-          label: 'Earth Rayleigh atmosphere post-motion',
-          vertex: { module: earthAtmoMotion, entryPoint: 'screenVertex' },
-          fragment: {
-            module: earthAtmoMotion,
-            entryPoint: 'earthAtmoMotionFragment',
-            targets: [{ ...color, blend: additive }],
-          },
-        }),
-        ...channelMasks.map((writeMask, i) =>
-          device.createRenderPipelineAsync({
-            layout: orbitCoverageLayout,
-            multisample: { count: 4 },
-            label: `Ephemeris orbit coverage ${i}`,
-            vertex: {
-              module: orbit,
-              entryPoint: 'orbitVertex',
-              buffers: [
-                {
-                  arrayStride: 48,
-                  attributes: [
-                    { shaderLocation: 0, offset: 0, format: 'float32x4' },
-                    { shaderLocation: 1, offset: 16, format: 'float32x4' },
-                    { shaderLocation: 2, offset: 32, format: 'float32x4' },
-                  ],
-                },
-              ],
-            },
-            fragment: {
-              module: orbit,
-              entryPoint: 'orbitCoverageFragment',
-              targets: [{ format: 'rgba8unorm', blend: maxBlend, writeMask }],
-            },
-            primitive: { topology: 'triangle-list', cullMode: 'none' },
-          }),
-        ),
       ])
+      let bodyAnnotationPipeline: GPURenderPipeline | undefined
+      let bodyAnnotationCoveragePipeline: GPURenderPipeline | undefined
+      let orbitCoveragePipelines: GPURenderPipeline[] | undefined
+      let orbitAccumPipeline: GPURenderPipeline | undefined
+      let earthAtmoMotionPipeline: GPURenderPipeline | undefined
       return {
         skyPipeline,
         bodyPipeline,
         bodyAnnotationLayout,
-        bodyAnnotationPipeline,
-        bodyAnnotationCoveragePipeline,
-        orbitCoveragePipelines,
-        orbitAccumPipeline,
+        getBodyAnnotationPipeline: (includeCoverage: boolean) =>
+          includeCoverage
+            ? (bodyAnnotationCoveragePipeline ??= device.createRenderPipeline({
+                layout: bodyAnnotationPipelineLayout,
+                multisample: { count: 4 },
+                label: 'Billboard body annotation coverage occluders',
+                vertex: { module: body, entryPoint: 'bodyVertex' },
+                fragment: {
+                  module: body,
+                  entryPoint: 'bodyAnnotationCoverageFragment',
+                  targets: [color, { format: 'rg8unorm' }],
+                },
+                depthStencil: depth,
+              }))
+            : (bodyAnnotationPipeline ??= device.createRenderPipeline({
+                layout: bodyAnnotationPipelineLayout,
+                multisample: { count: 4 },
+                label: 'Billboard body annotation occluders',
+                vertex: { module: body, entryPoint: 'bodyVertex' },
+                fragment: { module: body, entryPoint: 'bodyAnnotationFragment', targets: [color] },
+                depthStencil: depth,
+              })),
+        getOrbitCoveragePipelines: () => {
+          if (!orbitCoveragePipelines) {
+            const orbit = device.createShaderModule({ label: 'Planetary paths', code: orbitShader })
+            const orbitCoverageBindGroupLayout = device.createBindGroupLayout({
+              label: 'Orbit coverage depth bind group layout',
+              entries: [
+                {
+                  binding: 0,
+                  visibility: GPUShaderStage.FRAGMENT,
+                  texture: { sampleType: 'depth', multisampled: true },
+                },
+              ],
+            })
+            const orbitCoverageLayout = device.createPipelineLayout({
+              label: 'Orbit coverage pipeline layout',
+              bindGroupLayouts: [orbitCoverageBindGroupLayout],
+            })
+            const channelMasks = [GPUColorWrite.RED, GPUColorWrite.GREEN, GPUColorWrite.BLUE, GPUColorWrite.ALPHA]
+            orbitCoveragePipelines = channelMasks.map((writeMask, i) =>
+              device.createRenderPipeline({
+                layout: orbitCoverageLayout,
+                multisample: { count: 4 },
+                label: `Ephemeris orbit coverage ${i}`,
+                vertex: {
+                  module: orbit,
+                  entryPoint: 'orbitVertex',
+                  buffers: [
+                    {
+                      arrayStride: 48,
+                      attributes: [
+                        { shaderLocation: 0, offset: 0, format: 'float32x4' },
+                        { shaderLocation: 1, offset: 16, format: 'float32x4' },
+                        { shaderLocation: 2, offset: 32, format: 'float32x4' },
+                      ],
+                    },
+                  ],
+                },
+                fragment: {
+                  module: orbit,
+                  entryPoint: 'orbitCoverageFragment',
+                  targets: [{ format: 'rgba8unorm', blend: maxBlend, writeMask }],
+                },
+                primitive: { topology: 'triangle-list', cullMode: 'none' },
+              }),
+            )
+          }
+          return orbitCoveragePipelines
+        },
+        getOrbitAccumPipeline: () => {
+          if (!orbitAccumPipeline) {
+            const orbitComposite = device.createShaderModule({
+              label: 'Planetary path accumulate',
+              code: orbitCompositeShader,
+            })
+            const orbitAccumBindGroupLayout = device.createBindGroupLayout({
+              label: 'Orbit accumulate bind group layout',
+              entries: [
+                { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+                {
+                  binding: 1,
+                  visibility: GPUShaderStage.FRAGMENT,
+                  texture: { sampleType: 'unfilterable-float', multisampled: true },
+                },
+              ],
+            })
+            const orbitAccumLayout = device.createPipelineLayout({
+              label: 'Orbit accumulate pipeline layout',
+              bindGroupLayouts: [orbitAccumBindGroupLayout],
+            })
+            orbitAccumPipeline = device.createRenderPipeline({
+              layout: orbitAccumLayout,
+              multisample: { count: 4 },
+              label: 'Ephemeris orbit accumulate',
+              vertex: { module: orbitComposite, entryPoint: 'screenVertex' },
+              fragment: {
+                module: orbitComposite,
+                entryPoint: 'orbitAccumFragment',
+                targets: [{ ...color, blend: premulOver }],
+              },
+            })
+          }
+          return orbitAccumPipeline
+        },
         haloPipeline,
         lensFlarePipeline,
         earthAtmoPipeline,
-        earthAtmoMotionPipeline,
+        getEarthAtmoMotionPipeline: () => {
+          if (!earthAtmoMotionPipeline) {
+            const earthAtmoMotion = device.createShaderModule({
+              label: 'Earth Rayleigh atmosphere post-motion',
+              code: earthAtmoMotionShader,
+            })
+            earthAtmoMotionPipeline = device.createRenderPipeline({
+              layout: 'auto',
+              multisample: { count: 1 },
+              label: 'Earth Rayleigh atmosphere post-motion',
+              vertex: { module: earthAtmoMotion, entryPoint: 'screenVertex' },
+              fragment: {
+                module: earthAtmoMotion,
+                entryPoint: 'earthAtmoMotionFragment',
+                targets: [{ ...color, blend: additive }],
+              },
+            })
+          }
+          return earthAtmoMotionPipeline
+        },
       }
     })()
     solarPipelines.set(device, pending)
@@ -312,6 +327,8 @@ export class SolarScene {
   private loadingTerrain = false
   skySettled = false
   terrainSettled = false
+  private skyPromise: Promise<void>
+  private terrainPromise?: Promise<void>
   private readonly controller = new AbortController()
   private readonly viewBuffer: GPUBuffer
   private readonly annotationViewBuffer: GPUBuffer
@@ -544,7 +561,7 @@ export class SolarScene {
       ],
     })
     const { signal } = this.controller
-    void this.assetUrl('textures/nasa-deep-star-map.webp', signal)
+    this.skyPromise = this.assetUrl('textures/nasa-deep-star-map.webp', signal)
       .then(url => loadSkyMap(device, signal, url))
       .then(texture => {
         if (signal.aborted) return
@@ -587,11 +604,22 @@ export class SolarScene {
     return Boolean(this.terrain)
   }
 
+  whenSkySettled(signal?: AbortSignal): Promise<void> {
+    if (this.skySettled) return Promise.resolve()
+    return raceAbort(this.skyPromise, signal)
+  }
+
+  whenTerrainSettled(signal?: AbortSignal): Promise<void> {
+    if (this.terrainSettled) return Promise.resolve()
+    this.loadTerrain()
+    return this.terrainPromise ? raceAbort(this.terrainPromise, signal) : Promise.resolve()
+  }
+
   loadTerrain() {
     if (this.loadingTerrain || this.terrain || this.controller.signal.aborted) return
     this.loadingTerrain = true
     const { signal } = this.controller
-    void PlanetTerrainRenderer.create(
+    this.terrainPromise = PlanetTerrainRenderer.create(
       this.device,
       signal,
       this.assetUrl,
@@ -1082,9 +1110,10 @@ export class SolarScene {
     msaaPass.end()
     if (!motionView) return
     // Overlay crisp depth-tested atmospheres onto the 1x motion-blurred target after encodeMotion.
+    const atmoMotionPipeline = this.pipelines.getEarthAtmoMotionPipeline()
     let motionGroups = this.atmoMotionGroups.get(depthView)
     if (!motionGroups) {
-      const layout = this.pipelines.earthAtmoMotionPipeline.getBindGroupLayout(0)
+      const layout = atmoMotionPipeline.getBindGroupLayout(0)
       motionGroups = {
         earth: this.device.createBindGroup({
           layout,
@@ -1109,7 +1138,7 @@ export class SolarScene {
       label: 'Earth/Mars atmospheres post-motion',
       colorAttachments: [{ view: motionView, loadOp: 'load', storeOp: 'store' }],
     })
-    motionPass.setPipeline(this.pipelines.earthAtmoMotionPipeline)
+    motionPass.setPipeline(atmoMotionPipeline)
     if (showEarth) {
       motionPass.setBindGroup(0, motionGroups.earth)
       motionPass.draw(3)
@@ -1160,9 +1189,7 @@ export class SolarScene {
       overview,
       flightTarget,
     )
-    const pipeline = includeCoverage
-      ? this.pipelines.bodyAnnotationCoveragePipeline
-      : this.pipelines.bodyAnnotationPipeline
+    const pipeline = this.pipelines.getBodyAnnotationPipeline(includeCoverage)
     this.drawBillboardRuns(pass, pipeline, this.bodyAnnotationGroup, meshFlags)
   }
 
@@ -1184,10 +1211,9 @@ export class SolarScene {
   }
 
   sourcePosition(body: SourceBody, point: SourcePoint): Vec3 | null {
-    const terrain = this.terrain?.getTerrain(body)
-    if (!terrain) return null
+    if (!this.terrain) return null
     const rad = Math.PI / 180
-    return terrain.positionAt(point.longitude * rad, point.latitude * rad)
+    return this.terrain.positionAt(body, point.longitude * rad, point.latitude * rad)
   }
 
   sourceEye(frame: SolarFrame, body: SourceBody): Vec3 {
@@ -1264,7 +1290,7 @@ export class SolarScene {
     const accumMsaaView = this.orbitAccumMsaa.createView()
     this.orbitCoverageMsaaView = covMsaaView
     this.orbitAccumMsaaView = accumMsaaView
-    const accumLayout = this.pipelines.orbitAccumPipeline.getBindGroupLayout(0)
+    const accumLayout = this.pipelines.getOrbitAccumPipeline().getBindGroupLayout(0)
     this.orbitAccumGroups = this.orbitBatchBuffers.map(buffer =>
       this.device.createBindGroup({
         layout: accumLayout,
@@ -1439,12 +1465,14 @@ export class SolarScene {
     }
     if (!offset) return null
     this.device.queue.writeBuffer(this.orbitBuffer, 0, data.subarray(0, offset))
+    const orbitCoveragePipelines = this.pipelines.getOrbitCoveragePipelines()
+    const orbitAccumPipeline = this.pipelines.getOrbitAccumPipeline()
     const covMsaaView = this.orbitCoverageMsaaView!
     const accumMsaaView = this.orbitAccumMsaaView!
     let coverageDepthGroup = this.orbitDepthGroups.get(depthView)
     if (!coverageDepthGroup) {
       coverageDepthGroup = this.device.createBindGroup({
-        layout: this.pipelines.orbitCoveragePipelines[0].getBindGroupLayout(0),
+        layout: orbitCoveragePipelines[0].getBindGroupLayout(0),
         entries: [{ binding: 0, resource: depthView }],
       })
       this.orbitDepthGroups.set(depthView, coverageDepthGroup)
@@ -1475,7 +1503,7 @@ export class SolarScene {
         if (!vertexCount) continue
         const color = colors[id]
         this.orbitBatchScratch.set([color[0], color[1], color[2], 0.42], ch * 4)
-        covPass.setPipeline(this.pipelines.orbitCoveragePipelines[ch])
+        covPass.setPipeline(orbitCoveragePipelines[ch])
         covPass.setBindGroup(0, coverageDepthGroup)
         covPass.draw(vertexCount, 1, firstVertex, 0)
       }
@@ -1492,7 +1520,7 @@ export class SolarScene {
           },
         ],
       })
-      accumPass.setPipeline(this.pipelines.orbitAccumPipeline)
+      accumPass.setPipeline(orbitAccumPipeline)
       accumPass.setBindGroup(0, this.orbitAccumGroups[batch])
       accumPass.draw(3)
       accumPass.end()

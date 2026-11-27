@@ -40,10 +40,10 @@ type PostPipelines = {
   bloom: GPURenderPipeline
   composition: GPURenderPipeline
   presentation: GPURenderPipeline
-  cursor: GPURenderPipeline
-  loupe: GPURenderPipeline
-  motion?: GPURenderPipeline
-  staticResolve?: GPURenderPipeline
+  getCursor: () => GPURenderPipeline
+  getLoupe: () => GPURenderPipeline
+  getMotion?: () => GPURenderPipeline
+  getStaticResolve?: () => GPURenderPipeline
   backdropBlit?: GPURenderPipeline
 }
 
@@ -59,13 +59,10 @@ function getPostPipelines(device: GPUDevice, format: GPUTextureFormat, reverseDe
   let pending = byKey.get(key)
   if (!pending) {
     pending = (async () => {
-      const [bloom, composition, presentation, cursor, loupe, motion, backdropBlit] = await Promise.all([
+      const [bloom, composition, presentation, backdropBlit] = await Promise.all([
         shaderModule(device, 'Bloom WGSL', bloomShader),
         shaderModule(device, 'Composition WGSL', compositionShader),
         shaderModule(device, 'Presentation WGSL', presentationShader),
-        shaderModule(device, 'Cursor WGSL', cursorShader),
-        shaderModule(device, 'Optical loupe WGSL', loupeShader),
-        reverseDepth ? shaderModule(device, 'Camera motion blur WGSL', motionBlurShader) : undefined,
         reverseDepth ? shaderModule(device, 'Hero backdrop blit WGSL', backdropBlitShader) : undefined,
       ])
       const vertex = (module: GPUShaderModule, entryPoint = 'screenVertex') => ({ module, entryPoint })
@@ -73,7 +70,7 @@ function getPostPipelines(device: GPUDevice, format: GPUTextureFormat, reverseDe
         color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
         alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
       }
-      const [bp, cp, pp, sp, lp, mp, srp, bbp] = await Promise.all([
+      const [bp, cp, pp, bbp] = await Promise.all([
         device.createRenderPipelineAsync({
           label: 'HDR bloom',
           layout: 'auto',
@@ -92,34 +89,6 @@ function getPostPipelines(device: GPUDevice, format: GPUTextureFormat, reverseDe
           vertex: vertex(presentation),
           fragment: { module: presentation, entryPoint: 'presentFragment', targets: [{ format }] },
         }),
-        device.createRenderPipelineAsync({
-          label: 'Space cursor',
-          layout: 'auto',
-          vertex: vertex(cursor, 'cursorVertex'),
-          fragment: { module: cursor, entryPoint: 'cursorFragment', targets: [{ format, blend: alphaBlend }] },
-        }),
-        device.createRenderPipelineAsync({
-          label: 'Optical loupe',
-          layout: 'auto',
-          vertex: vertex(loupe, 'loupeVertex'),
-          fragment: { module: loupe, entryPoint: 'loupeFragment', targets: [{ format, blend: alphaBlend }] },
-        }),
-        motion
-          ? device.createRenderPipelineAsync({
-              label: 'Depth-aware camera motion blur',
-              layout: 'auto',
-              vertex: vertex(motion),
-              fragment: { module: motion, entryPoint: 'blurFragment', targets: [{ format: 'rgba16float' }] },
-            })
-          : undefined,
-        motion
-          ? device.createRenderPipelineAsync({
-              label: 'Per-sample static marker and orbit resolve',
-              layout: 'auto',
-              vertex: vertex(motion),
-              fragment: { module: motion, entryPoint: 'staticResolveFragment', targets: [{ format: 'rgba16float' }] },
-            })
-          : undefined,
         backdropBlit
           ? device.createRenderPipelineAsync({
               label: 'Hero cached backdrop blit',
@@ -135,14 +104,67 @@ function getPostPipelines(device: GPUDevice, format: GPUTextureFormat, reverseDe
             })
           : undefined,
       ])
+      let cursorPipe: GPURenderPipeline | undefined
+      let loupePipe: GPURenderPipeline | undefined
+      let motionModule: GPUShaderModule | undefined
+      let motionPipe: GPURenderPipeline | undefined
+      let staticResolvePipe: GPURenderPipeline | undefined
+      const getMotionModule = () =>
+        (motionModule ??= device.createShaderModule({ label: 'Camera motion blur WGSL', code: motionBlurShader }))
       return {
         bloom: bp,
         composition: cp,
         presentation: pp,
-        cursor: sp,
-        loupe: lp,
-        motion: mp,
-        staticResolve: srp,
+        getCursor: () => {
+          if (!cursorPipe) {
+            const mod = device.createShaderModule({ label: 'Cursor WGSL', code: cursorShader })
+            cursorPipe = device.createRenderPipeline({
+              label: 'Space cursor',
+              layout: 'auto',
+              vertex: vertex(mod, 'cursorVertex'),
+              fragment: { module: mod, entryPoint: 'cursorFragment', targets: [{ format, blend: alphaBlend }] },
+            })
+          }
+          return cursorPipe
+        },
+        getLoupe: () => {
+          if (!loupePipe) {
+            const mod = device.createShaderModule({ label: 'Optical loupe WGSL', code: loupeShader })
+            loupePipe = device.createRenderPipeline({
+              label: 'Optical loupe',
+              layout: 'auto',
+              vertex: vertex(mod, 'loupeVertex'),
+              fragment: { module: mod, entryPoint: 'loupeFragment', targets: [{ format, blend: alphaBlend }] },
+            })
+          }
+          return loupePipe
+        },
+        getMotion: reverseDepth
+          ? () =>
+              (motionPipe ??= device.createRenderPipeline({
+                label: 'Depth-aware camera motion blur',
+                layout: 'auto',
+                vertex: vertex(getMotionModule()),
+                fragment: {
+                  module: getMotionModule(),
+                  entryPoint: 'blurFragment',
+                  targets: [{ format: 'rgba16float' }],
+                },
+              }))
+          : undefined,
+        getStaticResolve: reverseDepth
+          ? () =>
+              (staticResolvePipe ??= device.createRenderPipeline({
+                label: 'Per-sample static marker and orbit resolve',
+                layout: 'auto',
+                vertex: vertex(getMotionModule()),
+                fragment: {
+                  module: getMotionModule(),
+                  entryPoint: 'staticResolveFragment',
+                  targets: [{ format: 'rgba16float' }],
+                },
+              }))
+          : undefined,
         backdropBlit: bbp,
       }
     })()
@@ -332,15 +354,12 @@ export class PostProcess {
   private displayedMotion = false
   private bakedStaticMarkers = false
   private lastStaticMarkers = new Float32Array(12)
-  private motionPipeline?: GPURenderPipeline
-  private staticResolvePipeline?: GPURenderPipeline
+  private pipelines!: PostPipelines
   private backdropBlitPipeline?: GPURenderPipeline
   private motionUniform?: GPUBuffer
   private bloomPipeline!: GPURenderPipeline
   private compositionPipeline!: GPURenderPipeline
   private presentationPipeline!: GPURenderPipeline
-  private cursorPipeline!: GPURenderPipeline
-  private loupePipeline!: GPURenderPipeline
   private loupeScene?: GPUTexture
   private loupeSceneView?: GPUTextureView
   private loupeMultisample?: GPUTexture
@@ -357,7 +376,7 @@ export class PostProcess {
   private cursorScratch = new Float32Array(8)
   private loupeScratch = new Float32Array(16)
   private sampler: GPUSampler
-  private cursorGroup!: GPUBindGroup
+  private cursorGroup?: GPUBindGroup
 
   constructor(
     private device: GPUDevice,
@@ -399,26 +418,12 @@ export class PostProcess {
 
   async initialize() {
     const device = this.device
-    const { bloom, composition, presentation, cursor, loupe, motion, staticResolve, backdropBlit } =
-      await getPostPipelines(device, this.format, this.reverseDepth)
-    this.motionPipeline = motion
-    this.staticResolvePipeline = staticResolve
-    this.backdropBlitPipeline = backdropBlit
-    if (motion)
-      this.motionUniform = device.createBuffer({
-        label: 'Camera motion parameters',
-        size: 96,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      })
-    this.bloomPipeline = bloom
-    this.compositionPipeline = composition
-    this.presentationPipeline = presentation
-    this.cursorPipeline = cursor
-    this.loupePipeline = loupe
-    this.cursorGroup = device.createBindGroup({
-      layout: cursor.getBindGroupLayout(0),
-      entries: [{ binding: 0, resource: { buffer: this.cursorUniform } }],
-    })
+    const pipelines = await getPostPipelines(device, this.format, this.reverseDepth)
+    this.pipelines = pipelines
+    this.backdropBlitPipeline = pipelines.backdropBlit
+    this.bloomPipeline = pipelines.bloom
+    this.compositionPipeline = pipelines.composition
+    this.presentationPipeline = pipelines.presentation
   }
 
   private target(
@@ -442,14 +447,7 @@ export class PostProcess {
     const multisample = this.target(`${label} 4x MSAA HDR scene`, width, height, 'rgba16float', 4, true)
     const multisampleView = multisample.createView()
     const depthFormat = this.reverseDepth ? 'depth32float' : 'depth24plus'
-    const depth = this.target(
-      `${label} 4x MSAA surface depth`,
-      width,
-      height,
-      depthFormat,
-      4,
-      Boolean(this.motionPipeline),
-    )
+    const depth = this.target(`${label} 4x MSAA surface depth`, width, height, depthFormat, 4, this.reverseDepth)
     const depthOnlyView = depth.createView({ aspect: 'depth-only' })
     const geographyView = this.emptyGeographyMsaaView
     const scale = Math.min(0.5, 1024 / Math.max(width, height))
@@ -602,11 +600,12 @@ export class PostProcess {
   }
 
   private encodeStaticResolve(encoder: GPUCommandEncoder, bank: RenderBank, orbitView: GPUTextureView | null) {
-    if (!this.staticResolvePipeline) return false
+    const staticResolvePipeline = this.pipelines.getStaticResolve?.()
+    if (!staticResolvePipeline) return false
     const boundOrbit = orbitView ?? this.emptyOrbitMsaaView
     if (!bank.staticResolveGroup || bank.staticResolveOrbitView !== boundOrbit) {
       bank.staticResolveGroup = this.device.createBindGroup({
-        layout: this.staticResolvePipeline.getBindGroupLayout(0),
+        layout: staticResolvePipeline.getBindGroupLayout(0),
         entries: [
           { binding: 1, resource: bank.multisampleView },
           { binding: 2, resource: bank.depthOnlyView },
@@ -621,7 +620,7 @@ export class PostProcess {
       label: 'Per-sample static marker and orbit resolve',
       colorAttachments: [{ view: bank.sceneView, loadOp: 'clear', storeOp: 'store' }],
     })
-    pass.setPipeline(this.staticResolvePipeline)
+    pass.setPipeline(staticResolvePipeline)
     pass.setBindGroup(0, bank.staticResolveGroup)
     pass.draw(3)
     pass.end()
@@ -634,7 +633,13 @@ export class PostProcess {
     motion: MotionBlurUniforms | undefined,
     orbitView: GPUTextureView | null,
   ) {
-    if (!motion || !this.motionPipeline || !this.motionUniform) return false
+    if (!motion || !this.pipelines.getMotion) return false
+    const motionPipeline = this.pipelines.getMotion()
+    const motionUniform = (this.motionUniform ??= this.device.createBuffer({
+      label: 'Camera motion parameters',
+      size: 96,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    }))
     if (!bank.motionTarget) {
       bank.motionTarget = this.target(`${bank.label} Motion-filtered HDR scene`, bank.width, bank.height)
       bank.motionTargetView = bank.motionTarget.createView()
@@ -659,9 +664,9 @@ export class PostProcess {
     const boundOrbit = orbitView ?? this.emptyOrbitMsaaView
     if (!bank.motionGroup || bank.motionOrbitView !== boundOrbit) {
       bank.motionGroup = this.device.createBindGroup({
-        layout: this.motionPipeline.getBindGroupLayout(0),
+        layout: motionPipeline.getBindGroupLayout(0),
         entries: [
-          { binding: 0, resource: { buffer: this.motionUniform } },
+          { binding: 0, resource: { buffer: motionUniform } },
           { binding: 1, resource: bank.multisampleView },
           { binding: 2, resource: bank.depthOnlyView },
           { binding: 3, resource: { buffer: this.compositeUniform } },
@@ -672,12 +677,12 @@ export class PostProcess {
       })
       bank.motionOrbitView = boundOrbit
     }
-    this.device.queue.writeBuffer(this.motionUniform, 0, motion)
+    this.device.queue.writeBuffer(motionUniform, 0, motion)
     const pass = encoder.beginRenderPass({
       label: 'Camera motion blur',
       colorAttachments: [{ view: bank.motionTargetView!, loadOp: 'clear', storeOp: 'store' }],
     })
-    pass.setPipeline(this.motionPipeline)
+    pass.setPipeline(motionPipeline)
     pass.setBindGroup(0, bank.motionGroup)
     pass.draw(3)
     pass.end()
@@ -758,8 +763,9 @@ export class PostProcess {
       this.loupeMultisampleView = this.loupeMultisample.createView()
       this.loupeDepth = this.target('Optical loupe depth', size, size, depthFormat, 4, false)
       this.loupeDepthView = this.loupeDepth.createView()
+      const loupePipeline = this.pipelines.getLoupe()
       this.loupeGroup = this.device.createBindGroup({
-        layout: this.loupePipeline.getBindGroupLayout(0),
+        layout: loupePipeline.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: { buffer: this.loupeUniform } },
           { binding: 1, resource: this.loupeSceneView },
@@ -878,7 +884,7 @@ export class PostProcess {
     if (lowRes && bank !== this.high) this.high.annotationsValid = false
     const firstTile = !tile || tile.index === 0
     const lastTile = !tile || tile.index === tile.count - 1
-    const keepDepth = storeDepth || !lastTile || Boolean(this.staticResolvePipeline)
+    const keepDepth = storeDepth || !lastTile || this.reverseDepth
     // Always preserve multisample color for non-hero banks because presentation reads sceneMsaa
     // whenever reconstructing selected/hovered reticles (including on later overlay-only frames).
     bank.hasMultisample = true
@@ -929,7 +935,7 @@ export class PostProcess {
       l[14] = Number(Boolean(sel))
       l[15] = 0
       this.device.queue.writeBuffer(this.loupeUniform, 0, l)
-      pass.setPipeline(this.loupePipeline)
+      pass.setPipeline(this.pipelines.getLoupe())
       pass.setBindGroup(0, this.loupeGroup)
       pass.draw(6)
     } else if (p.cursor) {
@@ -943,7 +949,12 @@ export class PostProcess {
       cur[6] = 0
       cur[7] = 0
       this.device.queue.writeBuffer(this.cursorUniform, 0, cur)
-      pass.setPipeline(this.cursorPipeline)
+      const cursorPipeline = this.pipelines.getCursor()
+      this.cursorGroup ??= this.device.createBindGroup({
+        layout: cursorPipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: { buffer: this.cursorUniform } }],
+      })
+      pass.setPipeline(cursorPipeline)
       pass.setBindGroup(0, this.cursorGroup)
       pass.draw(6)
     }
@@ -992,12 +1003,12 @@ export class PostProcess {
     const bank = redrawSurface ? (p.lowRes ? this.ensureLowBank() : this.high) : this.activeBank
     const bankSwitched = bank !== this.activeBank
     this.activeBank = bank
-    const willBlur = redrawSurface && Boolean(p.motion && this.motionPipeline && this.motionUniform)
+    const willBlur = redrawSurface && Boolean(p.motion && this.pipelines.getMotion)
     const orbitView =
       redrawSurface && p.prepareOrbits ? p.prepareOrbits(encoder, bank.depthOnlyView, bank.width, bank.height) : null
     if (redrawSurface) bank.lastOrbitView = orbitView
     const activeOrbitView = redrawSurface ? orbitView : bank.lastOrbitView
-    const canBakeStatic = Boolean(this.staticResolvePipeline && bank.hasMultisample)
+    const canBakeStatic = Boolean(this.pipelines.getStaticResolve && bank.hasMultisample)
     const { selEarth, selMoon, selMars } = p.markers
     const hasSelMarker = selEarth.opacity > 0.005 || selMoon.opacity > 0.005 || selMars.opacity > 0.005
     const selectedMarkers = [
@@ -1024,7 +1035,7 @@ export class PostProcess {
     const willBakeStaticMarkers = !willBlur && canBakeStatic && hasSelMarker
     const sceneNeedsStaticResolve =
       !willBlur &&
-      Boolean(this.staticResolvePipeline && bank.hasMultisample) &&
+      canBakeStatic &&
       (redrawSurface
         ? willBakeStaticMarkers || Boolean(activeOrbitView)
         : (this.displayedMotion && (willBakeStaticMarkers || Boolean(activeOrbitView))) ||

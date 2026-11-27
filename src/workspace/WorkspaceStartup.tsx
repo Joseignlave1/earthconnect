@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ConstellationLogo } from '../hero/ConstellationLogo.tsx'
 import { WEBGPU_UNAVAILABLE_MESSAGE } from '../shader-test/surface-device.ts'
-import { markStartup, reportStartupTiming } from './startupTiming.ts'
+import { endStartupSpan, reportStartupTiming, startStartupSpan } from './startupTiming.ts'
 import type { WorkspaceAssets } from './workspaceAssets.ts'
 import { type DownloadProgress, loadWorkspaceRelease } from './workspaceRelease.ts'
 import './WorkspaceStartup.css'
@@ -54,12 +54,13 @@ export function WorkspaceStartup({
         }
         // Leave a full paint opportunity for Monaco, the preview controls and
         // the already completed WebGPU canvas before removing the overlay.
+        if (!initialReported) startStartupSpan('reveal', 'settle')
         requestAnimationFrame(() =>
           requestAnimationFrame(() => {
             if (!isCurrent() || token !== readyToken.current) return
             if (!initialReported) {
               initialReported = true
-              markStartup('revealed')
+              endStartupSpan('reveal')
               reportStartupTiming()
             }
             setTransitioning(false)

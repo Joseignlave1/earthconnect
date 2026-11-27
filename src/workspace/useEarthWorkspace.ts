@@ -415,7 +415,7 @@ export function useEarthWorkspace(
         signal.throwIfAborted()
         await entry.publish(async () => {
           signal.throwIfAborted()
-          startStartupSpan('first-score')
+          startStartupSpan('first-score', 'prepare')
           update({ status: 'Scoring the Earth grid…' })
           await earth.dispatchShader(job.source, signal, points)
           signal.throwIfAborted()

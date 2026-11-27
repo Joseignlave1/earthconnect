@@ -23,10 +23,13 @@ import {
   buildPlanetPickingMesh,
   buildPlanetTerrain,
   PLANET_TERRAIN_SETTINGS as settings,
+  samplePlanetPosition,
   type PlanetPickingMesh,
   type PlanetTerrain,
   type TerrainBody,
 } from './planetTerrainMesh.ts'
+import type { Vec3 } from '../shader-test/geometry.ts'
+import { bodyRadius } from './solarSystem.ts'
 import { VIRTUAL_TILE_GUTTER, VIRTUAL_TILE_INNER, VIRTUAL_TILE_SIZE } from '../shader-test/virtual-tiles.ts'
 import {
   PLANET_TILE_BASE_COLS,
@@ -77,7 +80,9 @@ function writePlanetViewUniform(out: Float32Array, p: PlanetViewUniformParams) {
 }
 
 type SharedBodyTerrain = {
-  mesh: PlanetPickingMesh
+  radius: number
+  getMesh: () => PlanetPickingMesh
+  positionAt: (longitude: number, latitude: number) => Vec3
   quadtree: PlanetCubeQuadtree
   patchVertices: GPUBuffer
   patchIndices: GPUBuffer
@@ -117,11 +122,9 @@ type PlanetPipelines = {
   annotationLayout: GPUBindGroupLayout
   smallAnnotationLayout: GPUBindGroupLayout
   surface: GPURenderPipeline
-  surfaceSmall: GPURenderPipeline
-  annotation: GPURenderPipeline
-  annotationCoverage: GPURenderPipeline
-  annotationSmall: GPURenderPipeline
-  annotationSmallCoverage: GPURenderPipeline
+  getSurfaceSmall: () => GPURenderPipeline
+  getAnnotation: (includeCoverage: boolean) => GPURenderPipeline
+  getAnnotationSmall: (includeCoverage: boolean) => GPURenderPipeline
 }
 
 type DevicePlanetCache = {
@@ -205,8 +208,17 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
       label: 'Planetary analytic annotation resources',
       entries: [{ binding: 0, visibility: vf, buffer: { type: 'uniform' } }],
     })
+    const annotationLayout = device.createBindGroupLayout({
+      label: 'Planetary DEM annotation resources',
+      entries: [
+        { binding: 0, visibility: vf, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.VERTEX, texture: { sampleType: 'float' } },
+        { binding: 2, visibility: GPUShaderStage.VERTEX, sampler: { type: 'filtering' } },
+      ],
+    })
     const layout = device.createPipelineLayout({ bindGroupLayouts: [bindLayout] })
     const smallAnnotationPipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [smallAnnotationLayout] })
+    const annotationPipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [annotationLayout] })
     const surfaceConstants = {
       PLANET_TILE_PAIRS,
       VIRTUAL_TILE_SIZE,
@@ -215,24 +227,39 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
       PLANET_TILE_BASE_COLS,
       PLANET_TILE_BASE_ROWS,
     }
-    const pending = Promise.all([
-      shaderModule(device, 'Planetary DEM terrain shader', surfaceShader).then(module =>
-        Promise.all([
-          device.createRenderPipelineAsync({
-            label: 'Planetary DEM terrain',
-            layout,
-            vertex: { module, entryPoint: 'vertexMain', buffers: vertexBuffers },
-            fragment: {
-              module,
-              entryPoint: 'fragmentMain',
-              targets: [{ format: 'rgba16float' }],
-              constants: surfaceConstants,
-            },
-            primitive: { topology: 'triangle-list', cullMode: 'back' },
-            multisample: { count: 4 },
-            depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
-          }),
-          device.createRenderPipelineAsync({
+    const pending = shaderModule(device, 'Planetary DEM terrain shader', surfaceShader).then(async module => {
+      const surface = await device.createRenderPipelineAsync({
+        label: 'Planetary DEM terrain',
+        layout,
+        vertex: { module, entryPoint: 'vertexMain', buffers: vertexBuffers },
+        fragment: {
+          module,
+          entryPoint: 'fragmentMain',
+          targets: [{ format: 'rgba16float' }],
+          constants: surfaceConstants,
+        },
+        primitive: { topology: 'triangle-list', cullMode: 'back' },
+        multisample: { count: 4 },
+        depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
+      })
+      let surfaceSmall: GPURenderPipeline | undefined
+      let annotationSmall: GPURenderPipeline | undefined
+      let annotationSmallCoverage: GPURenderPipeline | undefined
+      let annotationModule: GPUShaderModule | undefined
+      let annotation: GPURenderPipeline | undefined
+      let annotationCoverage: GPURenderPipeline | undefined
+      const getAnnotationModule = () =>
+        (annotationModule ??= device.createShaderModule({
+          label: 'Planetary DEM annotation shader',
+          code: annotationShader,
+        }))
+      return {
+        layout: bindLayout,
+        annotationLayout,
+        smallAnnotationLayout,
+        surface,
+        getSurfaceSmall: () =>
+          (surfaceSmall ??= device.createRenderPipeline({
             label: 'Planetary DEM small per-sample sphere',
             layout,
             vertex: { module, entryPoint: 'smallVertex' },
@@ -245,82 +272,59 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
             primitive: { topology: 'triangle-list', cullMode: 'none' },
             multisample: { count: 4 },
             depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
-          }),
-          device.createRenderPipelineAsync({
-            label: 'Planetary DEM small per-sample annotations',
-            layout: smallAnnotationPipelineLayout,
-            vertex: { module, entryPoint: 'smallVertex' },
-            fragment: { module, entryPoint: 'smallAnnotationFragment', targets: [{ format: 'rgba16float' }] },
-            primitive: { topology: 'triangle-list', cullMode: 'none' },
-            multisample: { count: 4 },
-            depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
-          }),
-          device.createRenderPipelineAsync({
-            label: 'Planetary DEM small per-sample annotations with coverage mask',
-            layout: smallAnnotationPipelineLayout,
-            vertex: { module, entryPoint: 'smallVertex' },
-            fragment: {
-              module,
-              entryPoint: 'smallAnnotationCoverageFragment',
-              targets: [{ format: 'rgba16float' }, { format: 'rg8unorm' }],
-            },
-            primitive: { topology: 'triangle-list', cullMode: 'none' },
-            multisample: { count: 4 },
-            depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
-          }),
-        ]),
-      ),
-      shaderModule(device, 'Planetary DEM annotation shader', annotationShader).then(module => {
-        const annotationLayout = device.createBindGroupLayout({
-          label: 'Planetary DEM annotation resources',
-          entries: [
-            { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
-            { binding: 1, visibility: GPUShaderStage.VERTEX, texture: { sampleType: 'float' } },
-            { binding: 2, visibility: GPUShaderStage.VERTEX, sampler: { type: 'filtering' } },
-          ],
-        })
-        const annotationPipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [annotationLayout] })
-        return Promise.all([
-          device.createRenderPipelineAsync({
-            label: 'Planetary DEM annotations',
-            layout: annotationPipelineLayout,
-            vertex: { module, entryPoint: 'vertexMain', buffers: vertexBuffers },
-            fragment: { module, entryPoint: 'fragmentMain', targets: [{ format: 'rgba16float' }] },
-            primitive: { topology: 'triangle-list', cullMode: 'back' },
-            multisample: { count: 4 },
-            depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
-          }),
-          device.createRenderPipelineAsync({
-            label: 'Planetary DEM annotations with coverage mask',
-            layout: annotationPipelineLayout,
-            vertex: { module, entryPoint: 'vertexMain', buffers: vertexBuffers },
-            fragment: {
-              module,
-              entryPoint: 'fragmentCoverageMain',
-              targets: [{ format: 'rgba16float' }, { format: 'rg8unorm' }],
-            },
-            primitive: { topology: 'triangle-list', cullMode: 'back' },
-            multisample: { count: 4 },
-            depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
-          }),
-        ]).then(([annotation, annotationCoverage]) => ({ annotationLayout, annotation, annotationCoverage }))
-      }),
-    ]).then(
-      ([
-        [surface, surfaceSmall, annotationSmall, annotationSmallCoverage],
-        { annotationLayout, annotation, annotationCoverage },
-      ]) => ({
-        layout: bindLayout,
-        annotationLayout,
-        smallAnnotationLayout,
-        surface,
-        surfaceSmall,
-        annotation,
-        annotationCoverage,
-        annotationSmall,
-        annotationSmallCoverage,
-      }),
-    )
+          })),
+        getAnnotationSmall: (includeCoverage: boolean) =>
+          includeCoverage
+            ? (annotationSmallCoverage ??= device.createRenderPipeline({
+                label: 'Planetary DEM small per-sample annotations with coverage mask',
+                layout: smallAnnotationPipelineLayout,
+                vertex: { module, entryPoint: 'smallVertex' },
+                fragment: {
+                  module,
+                  entryPoint: 'smallAnnotationCoverageFragment',
+                  targets: [{ format: 'rgba16float' }, { format: 'rg8unorm' }],
+                },
+                primitive: { topology: 'triangle-list', cullMode: 'none' },
+                multisample: { count: 4 },
+                depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
+              }))
+            : (annotationSmall ??= device.createRenderPipeline({
+                label: 'Planetary DEM small per-sample annotations',
+                layout: smallAnnotationPipelineLayout,
+                vertex: { module, entryPoint: 'smallVertex' },
+                fragment: { module, entryPoint: 'smallAnnotationFragment', targets: [{ format: 'rgba16float' }] },
+                primitive: { topology: 'triangle-list', cullMode: 'none' },
+                multisample: { count: 4 },
+                depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
+              })),
+        getAnnotation: (includeCoverage: boolean) => {
+          const annMod = getAnnotationModule()
+          return includeCoverage
+            ? (annotationCoverage ??= device.createRenderPipeline({
+                label: 'Planetary DEM annotations with coverage mask',
+                layout: annotationPipelineLayout,
+                vertex: { module: annMod, entryPoint: 'vertexMain', buffers: vertexBuffers },
+                fragment: {
+                  module: annMod,
+                  entryPoint: 'fragmentCoverageMain',
+                  targets: [{ format: 'rgba16float' }, { format: 'rg8unorm' }],
+                },
+                primitive: { topology: 'triangle-list', cullMode: 'back' },
+                multisample: { count: 4 },
+                depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
+              }))
+            : (annotation ??= device.createRenderPipeline({
+                label: 'Planetary DEM annotations',
+                layout: annotationPipelineLayout,
+                vertex: { module: annMod, entryPoint: 'vertexMain', buffers: vertexBuffers },
+                fragment: { module: annMod, entryPoint: 'fragmentMain', targets: [{ format: 'rgba16float' }] },
+                primitive: { topology: 'triangle-list', cullMode: 'back' },
+                multisample: { count: 4 },
+                depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
+              }))
+        },
+      }
+    })
     cache.pipelines = pending
     void pending.catch(() => {
       if (cache.pipelines === pending) cache.pipelines = undefined
@@ -401,8 +405,8 @@ async function getSharedBodyTerrain(
       const source = cacheKey.pixels.byteLength ? prepared : await reloadSource(cache.controller.signal)
       const { terrain } = source
       const levels = source.levels ?? packRg8Levels(elevationPyramid(terrain, true))
-      const mesh = buildPlanetPickingMesh(body, terrain)
-      const quadtree = PlanetCubeQuadtree.fromTerrain(terrain, mesh.radius)
+      const radius = bodyRadius(body)
+      const quadtree = PlanetCubeQuadtree.fromTerrain(terrain, radius)
       const heights = device.createTexture({
         label: `${body} numeric terrain grid`,
         size: [terrain.width, terrain.height],
@@ -445,12 +449,30 @@ async function getSharedBodyTerrain(
         minFilter: 'linear',
         mipmapFilter: 'linear',
       })
-      const shared: SharedBodyTerrain = { mesh, quadtree, heights, patchVertices, patchIndices, sampler }
+      let mesh: PlanetPickingMesh | undefined
+      const getMesh = () => {
+        if (!mesh) {
+          mesh = buildPlanetPickingMesh(body, terrain)
+          if (terrain.pixels.byteLength) terrain.pixels = new Uint8ClampedArray(0)
+        }
+        return mesh
+      }
+      const positionAt = (longitude: number, latitude: number): Vec3 =>
+        mesh ? mesh.positionAt(longitude, latitude) : samplePlanetPosition(body, terrain, longitude, latitude)
+      const shared: SharedBodyTerrain = {
+        radius,
+        getMesh,
+        positionAt,
+        quadtree,
+        heights,
+        patchVertices,
+        patchIndices,
+        sampler,
+      }
       cache.created.push(shared)
-      // Mip levels and raw CPU elevation bytes are no longer needed once resident on the GPU.
-      // Keeping the original terrain object as the WeakMap key avoids re-uploading on the same device.
+      // Packed mip levels are no longer needed once resident on the GPU; raw pixels stay until
+      // the lazy CPU picking mesh is built on first pick.
       source.levels = null
-      if (source.terrain.pixels.byteLength) source.terrain.pixels = new Uint8ClampedArray(0)
       return shared
     })()
     cache.bodies.set(cacheKey, pending)
@@ -464,15 +486,11 @@ async function getSharedBodyTerrain(
 export class PlanetTerrainRenderer {
   private readonly bodies = new Map<TerrainBody, GpuTerrain>()
   private readonly device: GPUDevice
+  private readonly pipelines: PlanetPipelines
   private readonly bindLayout: GPUBindGroupLayout
   private readonly annotationLayout: GPUBindGroupLayout
   private readonly smallAnnotationLayout: GPUBindGroupLayout
   private readonly pipeline: GPURenderPipeline
-  private readonly smallPipeline: GPURenderPipeline
-  private readonly annotationPipeline: GPURenderPipeline
-  private readonly annotationCoveragePipeline: GPURenderPipeline
-  private readonly annotationSmallPipeline: GPURenderPipeline
-  private readonly annotationSmallCoveragePipeline: GPURenderPipeline
   private readonly tiles: PlanetTileCache
   private readonly unsubscribeTiles: () => void
   private readonly annotationScratch = new Float32Array(20)
@@ -484,15 +502,11 @@ export class PlanetTerrainRenderer {
     onTileUpdate?: () => void,
   ) {
     this.device = device
+    this.pipelines = pipelines
     this.bindLayout = pipelines.layout
     this.annotationLayout = pipelines.annotationLayout
     this.smallAnnotationLayout = pipelines.smallAnnotationLayout
     this.pipeline = pipelines.surface
-    this.smallPipeline = pipelines.surfaceSmall
-    this.annotationPipeline = pipelines.annotation
-    this.annotationCoveragePipeline = pipelines.annotationCoverage
-    this.annotationSmallPipeline = pipelines.annotationSmall
-    this.annotationSmallCoveragePipeline = pipelines.annotationSmallCoverage
     this.tiles = tiles
     this.unsubscribeTiles = tiles.subscribe(
       () => onTileUpdate?.(),
@@ -520,28 +534,31 @@ export class PlanetTerrainRenderer {
     if (loadPlanetTilePack) tiles.attachPacks(loadPlanetTilePack)
     const renderer = new PlanetTerrainRenderer(device, pipelines, tiles, onTileUpdate)
     try {
-      // Load Moon then Mars sequentially so we never overlap two 8K terrain workers
-      // or two 8K RGBA ImageBitmaps (~128 MiB each) in RAM at the same instant.
-      for (const body of bodies) {
+      const loadBody = async (body: TerrainBody) => {
         const terrainPath = `textures/${body}-terrain.bin`
-        const prepared = loadTerrain
-          ? await loadTerrain(terrainPath, 'rg8unorm', s => assetUrl(terrainPath, s), signal)
-          : await loadPreparedTerrain(await assetUrl(terrainPath, signal), 'rg8unorm', signal)
-        signal.throwIfAborted()
-        let albedo: GPUTexture
-        try {
-          const url = await assetUrl(`textures/${body}-albedo.webp`, signal)
-          albedo = await loadSharedBodyAlbedo(device, body, url, signal, albedoMaxWidths?.[body])
-        } catch {
-          if (signal.aborted) throw signal.reason
-          albedo = getFallbackAlbedo(device)
-        }
+        const terrainPromise = loadTerrain
+          ? loadTerrain(terrainPath, 'rg8unorm', s => assetUrl(terrainPath, s), signal)
+          : assetUrl(terrainPath, signal).then(url => loadPreparedTerrain(url, 'rg8unorm', signal))
+        const albedoPromise = assetUrl(`textures/${body}-albedo.webp`, signal)
+          .then(url => loadSharedBodyAlbedo(device, body, url, signal, albedoMaxWidths?.[body]))
+          .catch(() => {
+            if (signal.aborted) throw signal.reason
+            return getFallbackAlbedo(device)
+          })
+        const [prepared, albedo] = await Promise.all([terrainPromise, albedoPromise])
         signal.throwIfAborted()
         const reloadSource = async (reloadSignal: AbortSignal) =>
           loadPreparedTerrain(await assetUrl(terrainPath, reloadSignal), 'rg8unorm', reloadSignal)
         const shared = await getSharedBodyTerrain(device, body, prepared, reloadSource, signal)
         signal.throwIfAborted()
         renderer.attach(body, shared, albedo)
+      }
+      if (albedoMaxWidths) {
+        // Downscaled hero albedos fit easily in RAM; load Moon and Mars concurrently.
+        await Promise.all(bodies.map(loadBody))
+      } else {
+        // Full 8K workspace albedos: load sequentially to avoid overlapping two 128 MiB bitmaps.
+        for (const body of bodies) await loadBody(body)
       }
       return renderer
     } catch (error) {
@@ -597,7 +614,7 @@ export class PlanetTerrainRenderer {
     }))
     const parameters = new Float32Array(56)
     const { relief, interval, low, high } = settings[body]
-    parameters.set([shared.mesh.radius * 1000, relief, interval, 1], 20)
+    parameters.set([shared.radius * 1000, relief, interval, 1], 20)
     parameters.set(low, 24)
     parameters.set(high, 28)
     parameters[39] = body === 'mars' ? 1 : 0
@@ -696,7 +713,7 @@ export class PlanetTerrainRenderer {
       up,
       back,
       aspect,
-      data.shared.mesh.radius * 1000,
+      data.shared.radius * 1000,
       physicalMetresPerPixel,
       loupe,
     )
@@ -713,7 +730,11 @@ export class PlanetTerrainRenderer {
   }
 
   getTerrain(body: TerrainBody) {
-    return this.bodies.get(body)?.shared.mesh
+    return this.bodies.get(body)?.shared.getMesh()
+  }
+
+  positionAt(body: TerrainBody, longitude: number, latitude: number): Vec3 | null {
+    return this.bodies.get(body)?.shared.positionAt(longitude, latitude) ?? null
   }
 
   private prepareMainPatches(
@@ -793,28 +814,28 @@ export class PlanetTerrainRenderer {
         smallView,
       })
       this.device.queue.writeBuffer(smallAnnotationUniform, 0, smallAnnotationParameters)
-      pass.setPipeline(includeCoverage ? this.annotationSmallCoveragePipeline : this.annotationSmallPipeline)
+      pass.setPipeline(this.pipelines.getAnnotationSmall(includeCoverage))
       pass.setBindGroup(0, smallAnnotationBindGroup)
       pass.draw(6)
       return
     }
     const {
-      shared: { mesh, patchVertices, patchIndices },
+      shared: { radius, patchVertices, patchIndices },
       annotationUniform,
       annotationBindGroup,
       patchInstanceBuffer,
     } = data
     const relief = settings[body].relief
-    const eyeKm = eye ?? [0, 0, mesh.radius * 4]
+    const eyeKm = eye ?? [0, 0, radius * 4]
     const patchCount = this.prepareMainPatches(data, body, matrix, eyeKm, viewportWidth, viewportHeight, reliefFade)
     if (patchCount === 0) return
     this.annotationScratch.set(matrix, 0)
     this.annotationScratch[16] = body === 'moon' ? 2 : 4
     this.annotationScratch[17] = reliefFade
-    this.annotationScratch[18] = mesh.radius
+    this.annotationScratch[18] = radius
     this.annotationScratch[19] = relief
     this.device.queue.writeBuffer(annotationUniform, 0, this.annotationScratch)
-    pass.setPipeline(includeCoverage ? this.annotationCoveragePipeline : this.annotationPipeline)
+    pass.setPipeline(this.pipelines.getAnnotation(includeCoverage))
     pass.setBindGroup(0, annotationBindGroup)
     pass.setVertexBuffer(0, patchVertices)
     pass.setVertexBuffer(1, patchInstanceBuffer)
@@ -862,7 +883,7 @@ export class PlanetTerrainRenderer {
     })
     this.device.queue.writeBuffer(uniform, 0, parameters)
     if (isSmall) {
-      pass.setPipeline(this.smallPipeline)
+      pass.setPipeline(this.pipelines.getSurfaceSmall())
       pass.setBindGroup(0, bindGroup)
       pass.draw(6)
     } else {

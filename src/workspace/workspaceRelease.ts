@@ -1,6 +1,5 @@
 import { raceAbort } from '../shader-test/gpu.ts'
 import { workspaceAssets, type WorkspaceAssets } from './workspaceAssets.ts'
-import { endStartupSpan, startStartupSpan } from './startupTiming.ts'
 
 const manifestUrl = 'https://earth-connect-assets.pages.dev/manifest.json'
 const scorePath = 'compute-data/world/manifest.json'
@@ -423,7 +422,6 @@ async function prepareRelease(
   exclusive: boolean,
   { refresh, onAssets }: ReleaseOptions,
 ) {
-  startStartupSpan('release')
   const cache = await openCache()
   try {
     signal.throwIfAborted()
@@ -443,9 +441,8 @@ async function prepareRelease(
         try {
           await Promise.all(entries.map(([path]) => source.publish(path, existing.get(path)!)))
           signal.throwIfAborted()
-          endStartupSpan('release', 'cached (IDB)')
           void revalidateInBackground(saved)
-          return { assets: source.assets, saved: true }
+          return { assets: source.assets, saved: true, downloadedBytes: 0 }
         } catch {
           signal.throwIfAborted()
         }
@@ -562,8 +559,7 @@ async function prepareRelease(
           if (persisted && cache && exclusive) await pruneCache(cache, current)
         }
         transfer.throwIfAborted()
-        endStartupSpan('release', total ? `downloaded ${(total / 1e6).toFixed(1)} MB` : 'cached (IDB)')
-        return { assets: source.assets, saved: persisted }
+        return { assets: source.assets, saved: persisted, downloadedBytes: total }
       } catch (error) {
         controller.abort(error)
         await Promise.allSettled(verifications)

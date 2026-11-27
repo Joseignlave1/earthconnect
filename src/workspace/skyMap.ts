@@ -30,9 +30,6 @@ async function buildSkyMap(device: GPUDevice, cache: DeviceSkyCache, skyMapUrl: 
     label: 'NASA Deep Star Maps 2020',
     mipLabel: 'Build sky map mipmaps',
     downloadErrorMessage: 'Sky map download failed.',
-    validateGpu: true,
-    createStepLabel: 'Creating sky map',
-    uploadStepLabel: 'Uploading sky map',
   })
   cache.created.add(atlas)
   return atlas

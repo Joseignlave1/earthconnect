@@ -692,7 +692,7 @@ function ShaderWorkspace({
   const prewarmParking = useRef<HTMLDivElement>(null)
   const prewarmedHosts = useRef(new Map<string, HTMLElement>())
   const [initialPreview] = useState(() => {
-    startStartupSpan('monaco')
+    startStartupSpan('monaco', 'prepare')
     return initialPreviewFileId(projectFiles.files, projectFiles.activeFileId)
   })
 
