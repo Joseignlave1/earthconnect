@@ -21,6 +21,59 @@ pub unsafe extern "C" fn release(ptr: *mut u8, bytes: usize) {
     }
 }
 
+/// Returns the uncompressed Zstd frame content size in bytes, or 0 if unknown/invalid/overflowing u32.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn frame_content_size(frame: *const u8, frame_bytes: usize) -> u32 {
+    unsafe {
+        let size = zstd_sys::ZSTD_getFrameContentSize(frame.cast(), frame_bytes);
+        if size == zstd_sys::ZSTD_CONTENTSIZE_UNKNOWN as u64
+            || size == zstd_sys::ZSTD_CONTENTSIZE_ERROR as u64
+            || size > u32::MAX as u64
+        {
+            return 0;
+        }
+        size as u32
+    }
+}
+
+/// Computes exclusive prefix sums of escape bytes (`0xff`) per `(field, block)` of `lo`
+/// into `out_offsets` (`fields * ceil(rows / block_size)` u32 entries). Returns total escape count.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn count_epb2_escapes(
+    lo: *const u8,
+    rows: u32,
+    fields: u32,
+    block_size: u32,
+    out_offsets: *mut u32,
+) -> u32 {
+    if lo.is_null() || out_offsets.is_null() || rows == 0 || fields == 0 || block_size == 0 {
+        return 0;
+    }
+    let rows_usize = rows as usize;
+    let fields_usize = fields as usize;
+    let bs = block_size as usize;
+    let blocks = (rows_usize + bs - 1) / bs;
+    let total_lo = rows_usize * fields_usize;
+    let lo_slice = unsafe { std::slice::from_raw_parts(lo, total_lo) };
+    let offsets = unsafe { std::slice::from_raw_parts_mut(out_offsets, fields_usize * blocks) };
+    let mut running = 0u32;
+    for f in 0..fields_usize {
+        let col = &lo_slice[f * rows_usize..(f + 1) * rows_usize];
+        let base_idx = f * blocks;
+        for b in 0..blocks {
+            offsets[base_idx + b] = running;
+            let r0 = b * bs;
+            let r1 = (r0 + bs).min(rows_usize);
+            let mut cnt = 0u32;
+            for &byte in &col[r0..r1] {
+                cnt += (byte == 255) as u32;
+            }
+            running += cnt;
+        }
+    }
+    running
+}
+
 /// Returns zero on success. Both buffers must be valid for their given lengths.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn decode(

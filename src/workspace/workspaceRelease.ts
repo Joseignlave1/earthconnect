@@ -17,19 +17,16 @@ const planetTilePaths = [
   ...Array.from({ length: 4 }, (_, index) => `textures/mars-tiles-${index}.bin`),
 ]
 const allTilePaths = [...earthTilePaths, ...planetTilePaths]
-const bc7TexturePaths = [
+const tilePathSet = new Set(allTilePaths)
+const optionalRenderPaths = new Set(['textures/moon-albedo.webp', 'textures/mars-albedo.webp', ...allTilePaths])
+// Legacy CDN releases still list the removed basins snapshot and pre-baked BC7 textures
+// (now transcoded on-GPU from WebP/JPEG into local IndexedDB BC7 cache).
+const ignoredPaths = new Set([
+  'data/surface-basins.bin',
   'textures/nasa-deep-star-map.bc7',
   'textures/mars-albedo-4096.bc7',
   'textures/moon-albedo-512.bc7',
-] as const
-const optionalRenderPaths = new Set([
-  'textures/moon-albedo.webp',
-  'textures/mars-albedo.webp',
-  ...bc7TexturePaths,
-  ...allTilePaths,
 ])
-// Legacy CDN releases still list the removed basins snapshot in their manifest totals.
-const ignoredPaths = new Set(['data/surface-basins.bin'])
 const hashPattern = /^[a-f0-9]{64}$/
 type Asset = { key: string; bytes: number; sha256: string; contentType: string }
 type Release = { etag: string | null; files: Record<string, Asset>; bytes: number }
@@ -227,7 +224,12 @@ async function validateScoreManifest(blob: Blob, worldFiles: ReadonlyMap<string,
 function releaseSource(release: Release, lifetime: AbortSignal) {
   const slots = new Map<string, { blob?: Blob; pending?: Promise<Blob>; resolve?: (blob: Blob) => void }>()
   const worldFiles = new Map<string, Asset>()
+  const lazyTilePending = new Map<string, Promise<Blob>>()
   for (const [path, asset] of Object.entries(release.files)) {
+    if (tilePathSet.has(path)) {
+      slots.set(path, {})
+      continue
+    }
     let resolve!: (blob: Blob) => void
     const pending = new Promise<Blob>(ready => {
       resolve = ready
@@ -238,6 +240,39 @@ function releaseSource(release: Release, lifetime: AbortSignal) {
       slots.set(asset.key, slot)
       worldFiles.set(asset.key, asset)
     }
+  }
+  const loadLazyTilePack = (path: string, asset: Asset, slot: { blob?: Blob }): Promise<Blob> => {
+    let pending = lazyTilePending.get(path)
+    if (!pending) {
+      pending = (async () => {
+        const db = await openCache()
+        try {
+          const cached = await accessCache<Blob>(db, 'files', asset.sha256)
+          if (cached instanceof Blob && cached.size === asset.bytes) {
+            slot.blob = cached
+            return cached
+          }
+          const bytes = await downloadBytes(asset, lifetime, () => {})
+          const blob = await verifyAsset(asset, bytes, lifetime)
+          if (db && (await accessCache(db, 'files', asset.sha256, blob))) {
+            const diskBlob = await accessCache<Blob>(db, 'files', asset.sha256)
+            if (diskBlob instanceof Blob && diskBlob.size === asset.bytes) {
+              slot.blob = diskBlob
+              return diskBlob
+            }
+          }
+          slot.blob = blob
+          return blob
+        } finally {
+          db?.close()
+        }
+      })()
+      lazyTilePending.set(path, pending)
+      void pending.finally(() => {
+        if (lazyTilePending.get(path) === pending) lazyTilePending.delete(path)
+      })
+    }
+    return pending
   }
   const localDevUrlCache = import.meta.env.DEV ? new Map<string, Promise<string | undefined>>() : undefined
   const resolveLocalDevTextureUrl = (path: string, signal: AbortSignal) => {
@@ -265,17 +300,25 @@ function releaseSource(release: Release, lifetime: AbortSignal) {
       }
       const slot = slots.get(path)
       if (!slot) throw new Error(`Workspace data is missing ${path}.`)
-      return slot.blob ?? raceAbort(slot.pending!, combined)
+      if (slot.blob) return slot.blob
+      if (tilePathSet.has(path)) {
+        const asset = release.files[path]
+        if (!asset) throw new Error(`Workspace data is missing ${path}.`)
+        return raceAbort(loadLazyTilePack(path, asset, slot), combined)
+      }
+      return raceAbort(slot.pending!, combined)
     },
     localDevUrlCache
       ? (path, signal) => resolveLocalDevTextureUrl(path, AbortSignal.any([signal, lifetime]))
       : undefined,
+    path => release.files[path]?.sha256,
   )
   lifetime.addEventListener(
     'abort',
     () => {
       assets.dispose()
       slots.clear()
+      lazyTilePending.clear()
     },
     { once: true },
   )
@@ -330,24 +373,22 @@ const writeBacklog = 8
 
 function orderedPaths(files: Record<string, Asset>) {
   // Prioritize the score manifest and terrain/imagery needed immediately.
+  // High-resolution zoom tile packs (earth/moon/mars-tiles-*.bin) are fetched lazily
+  // per octant/quadrant on demand when the user zooms in, saving ~175 MB upfront.
   const priority = [
     scorePath,
     'textures/earth-blue-marble.jpg',
-    'textures/nasa-deep-star-map.bc7',
     'textures/nasa-deep-star-map.webp',
     'textures/earth-terrain.bin',
-    'textures/mars-albedo-4096.bc7',
-    'textures/moon-albedo-512.bc7',
     'textures/moon-albedo.webp',
     'textures/mars-albedo.webp',
     'textures/moon-terrain.bin',
     'textures/mars-terrain.bin',
   ].filter(path => Object.hasOwn(files, path))
-  const tiles = allTilePaths.filter(path => Object.hasOwn(files, path))
   const chunks = Object.keys(files).filter(
-    path => !priority.includes(path) && !tiles.includes(path) && !ignoredPaths.has(path),
+    path => !priority.includes(path) && !tilePathSet.has(path) && !ignoredPaths.has(path),
   )
-  return [...priority, ...chunks, ...tiles]
+  return [...priority, ...chunks]
 }
 
 function sameRelease(a: Release | undefined, b: Release | undefined): boolean {

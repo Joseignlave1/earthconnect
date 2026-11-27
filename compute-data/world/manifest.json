@@ -1,7 +1,418 @@
 {
+  "chunks": [
+    {
+      "compressedBytes": 247530,
+      "file": "chunk-00.zst",
+      "packedBytes": 4487456,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 275627,
+      "file": "chunk-01.zst",
+      "packedBytes": 4218896,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 253003,
+      "file": "chunk-02.zst",
+      "packedBytes": 4008176,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 255933,
+      "file": "chunk-03.zst",
+      "packedBytes": 3895968,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 362852,
+      "file": "chunk-04.zst",
+      "packedBytes": 4452912,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 2625325,
+      "file": "chunk-05.zst",
+      "packedBytes": 8956080,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 3596332,
+      "file": "chunk-06.zst",
+      "packedBytes": 10980592,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 6045897,
+      "file": "chunk-07.zst",
+      "packedBytes": 14223744,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 4845050,
+      "file": "chunk-08.zst",
+      "packedBytes": 11606688,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 7109075,
+      "file": "chunk-09.zst",
+      "packedBytes": 14845632,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 4857485,
+      "file": "chunk-10.zst",
+      "packedBytes": 12387664,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 6253425,
+      "file": "chunk-11.zst",
+      "packedBytes": 15383536,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 3045405,
+      "file": "chunk-12.zst",
+      "packedBytes": 10344752,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 2095760,
+      "file": "chunk-13.zst",
+      "packedBytes": 8393136,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 1171643,
+      "file": "chunk-14.zst",
+      "packedBytes": 6118624,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 2757720,
+      "file": "chunk-15.zst",
+      "packedBytes": 10177232,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 5719612,
+      "file": "chunk-16.zst",
+      "packedBytes": 15140368,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 2871021,
+      "file": "chunk-17.zst",
+      "packedBytes": 9551488,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 4753383,
+      "file": "chunk-18.zst",
+      "packedBytes": 11554672,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 9080499,
+      "file": "chunk-19.zst",
+      "packedBytes": 19703104,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 6363548,
+      "file": "chunk-20.zst",
+      "packedBytes": 14586048,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 6244854,
+      "file": "chunk-21.zst",
+      "packedBytes": 13626112,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 9387408,
+      "file": "chunk-22.zst",
+      "packedBytes": 19120032,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 7975023,
+      "file": "chunk-23.zst",
+      "packedBytes": 17375200,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 6843311,
+      "file": "chunk-24.zst",
+      "packedBytes": 15139632,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 3913993,
+      "file": "chunk-25.zst",
+      "packedBytes": 9628608,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 2807015,
+      "file": "chunk-26.zst",
+      "packedBytes": 8251072,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 5618277,
+      "file": "chunk-27.zst",
+      "packedBytes": 12544576,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 4626472,
+      "file": "chunk-28.zst",
+      "packedBytes": 11284816,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 4411716,
+      "file": "chunk-29.zst",
+      "packedBytes": 12325296,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 3295205,
+      "file": "chunk-30.zst",
+      "packedBytes": 12229280,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 2788906,
+      "file": "chunk-31.zst",
+      "packedBytes": 11341216,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 2365653,
+      "file": "chunk-32.zst",
+      "packedBytes": 9698624,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 2539010,
+      "file": "chunk-33.zst",
+      "packedBytes": 9872256,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 448191,
+      "file": "chunk-34.zst",
+      "packedBytes": 5115200,
+      "rows": 1004692
+    },
+    {
+      "compressedBytes": 127664,
+      "file": "chunk-35.zst",
+      "packedBytes": 2220616,
+      "rows": 386420
+    }
+  ],
+  "columns": [
+    "annual_precip_mm",
+    "bare_fraction",
+    "coldest_month_air_c",
+    "dominant_lithology_code",
+    "elevation_median_m",
+    "landcover_valid_fraction",
+    "permafrost_fraction",
+    "permafrost_valid_fraction",
+    "permanent_snow_ice_fraction",
+    "relief_21km_m",
+    "relief_5km_m",
+    "slope_mean_deg",
+    "surface_day_c",
+    "surface_day_valid_fraction",
+    "surface_high_c",
+    "surface_low_c",
+    "surface_mean_c",
+    "surface_night_c",
+    "surface_night_valid_fraction",
+    "surface_paired_valid_fraction",
+    "surface_range_c",
+    "terrain_valid_fraction",
+    "tpi_21km_m",
+    "tpi_5km_m",
+    "warmest_month_air_c"
+  ],
+  "encodings": [
+    {
+      "denominator": 1,
+      "origin": 1
+    },
+    {
+      "denominator": 1000,
+      "origin": 1
+    },
+    {
+      "denominator": 100,
+      "origin": 10001
+    },
+    {
+      "denominator": 1,
+      "origin": 0
+    },
+    {
+      "denominator": 1,
+      "origin": 1001
+    },
+    {
+      "denominator": 1000,
+      "origin": 1
+    },
+    {
+      "denominator": 1000,
+      "origin": 1
+    },
+    {
+      "denominator": 1000,
+      "origin": 1
+    },
+    {
+      "denominator": 1000,
+      "origin": 1
+    },
+    {
+      "denominator": 1,
+      "origin": 1
+    },
+    {
+      "denominator": 1,
+      "origin": 1
+    },
+    {
+      "denominator": 10,
+      "origin": 1
+    },
+    {
+      "denominator": 50,
+      "origin": 7501
+    },
+    {
+      "denominator": 1000,
+      "origin": 1
+    },
+    {
+      "denominator": 50,
+      "origin": 7501
+    },
+    {
+      "denominator": 50,
+      "origin": 7501
+    },
+    {
+      "denominator": 50,
+      "origin": 7501
+    },
+    {
+      "denominator": 50,
+      "origin": 7501
+    },
+    {
+      "denominator": 1000,
+      "origin": 1
+    },
+    {
+      "denominator": 1000,
+      "origin": 1
+    },
+    {
+      "denominator": 50,
+      "origin": 1
+    },
+    {
+      "denominator": 1000,
+      "origin": 1
+    },
+    {
+      "denominator": 4,
+      "origin": 20001
+    },
+    {
+      "denominator": 4,
+      "origin": 20001
+    },
+    {
+      "denominator": 100,
+      "origin": 10001
+    }
+  ],
+  "features": [
+    {
+      "field": "bare_fraction",
+      "group": 0,
+      "target": 1.0,
+      "tolerance": 0.2,
+      "weight": 1.0
+    },
+    {
+      "field": "relief_21km_m",
+      "group": 1,
+      "target": 362.0,
+      "tolerance": 150.0,
+      "weight": 1.0
+    },
+    {
+      "field": "relief_5km_m",
+      "group": 1,
+      "target": 82.0,
+      "tolerance": 50.0,
+      "weight": 1.0
+    },
+    {
+      "field": "slope_mean_deg",
+      "group": 2,
+      "target": 0.9258380861688738,
+      "tolerance": 2.0,
+      "weight": 1.0
+    },
+    {
+      "field": "surface_high_c",
+      "group": 3,
+      "target": 32.06500244140625,
+      "tolerance": 30.0,
+      "weight": 0.5
+    },
+    {
+      "field": "surface_low_c",
+      "group": 3,
+      "target": -97.14999389648438,
+      "tolerance": 30.0,
+      "weight": 0.5
+    },
+    {
+      "field": "surface_mean_c",
+      "group": 3,
+      "target": -36.35185241699219,
+      "tolerance": 30.0,
+      "weight": 0.5
+    },
+    {
+      "field": "tpi_21km_m",
+      "group": 4,
+      "target": 15.98412698412676,
+      "tolerance": 75.0,
+      "weight": 1.0
+    },
+    {
+      "field": "tpi_5km_m",
+      "group": 4,
+      "target": 1.2800000000002,
+      "tolerance": 25.0,
+      "weight": 1.0
+    }
+  ],
   "format": "earth-score-v1",
   "rows": 35550640,
-  "tileSize": 278,
   "sites": [
     "h00v07",
     "h00v08",
@@ -464,416 +875,5 @@
     "h35v09",
     "h35v10"
   ],
-  "columns": [
-    "annual_precip_mm",
-    "bare_fraction",
-    "coldest_month_air_c",
-    "dominant_lithology_code",
-    "elevation_median_m",
-    "landcover_valid_fraction",
-    "permafrost_fraction",
-    "permafrost_valid_fraction",
-    "permanent_snow_ice_fraction",
-    "relief_21km_m",
-    "relief_5km_m",
-    "slope_mean_deg",
-    "surface_day_c",
-    "surface_day_valid_fraction",
-    "surface_high_c",
-    "surface_low_c",
-    "surface_mean_c",
-    "surface_night_c",
-    "surface_night_valid_fraction",
-    "surface_paired_valid_fraction",
-    "surface_range_c",
-    "terrain_valid_fraction",
-    "tpi_21km_m",
-    "tpi_5km_m",
-    "warmest_month_air_c"
-  ],
-  "encodings": [
-    {
-      "origin": 1,
-      "denominator": 1
-    },
-    {
-      "origin": 1,
-      "denominator": 1000
-    },
-    {
-      "origin": 10001,
-      "denominator": 100
-    },
-    {
-      "origin": 0,
-      "denominator": 1
-    },
-    {
-      "origin": 1001,
-      "denominator": 1
-    },
-    {
-      "origin": 1,
-      "denominator": 1000
-    },
-    {
-      "origin": 1,
-      "denominator": 1000
-    },
-    {
-      "origin": 1,
-      "denominator": 1000
-    },
-    {
-      "origin": 1,
-      "denominator": 1000
-    },
-    {
-      "origin": 1,
-      "denominator": 1
-    },
-    {
-      "origin": 1,
-      "denominator": 1
-    },
-    {
-      "origin": 1,
-      "denominator": 10
-    },
-    {
-      "origin": 7501,
-      "denominator": 50
-    },
-    {
-      "origin": 1,
-      "denominator": 1000
-    },
-    {
-      "origin": 7501,
-      "denominator": 50
-    },
-    {
-      "origin": 7501,
-      "denominator": 50
-    },
-    {
-      "origin": 7501,
-      "denominator": 50
-    },
-    {
-      "origin": 7501,
-      "denominator": 50
-    },
-    {
-      "origin": 1,
-      "denominator": 1000
-    },
-    {
-      "origin": 1,
-      "denominator": 1000
-    },
-    {
-      "origin": 1,
-      "denominator": 50
-    },
-    {
-      "origin": 1,
-      "denominator": 1000
-    },
-    {
-      "origin": 20001,
-      "denominator": 4
-    },
-    {
-      "origin": 20001,
-      "denominator": 4
-    },
-    {
-      "origin": 10001,
-      "denominator": 100
-    }
-  ],
-  "features": [
-    {
-      "field": "bare_fraction",
-      "target": 1.0,
-      "tolerance": 0.2,
-      "weight": 1.0,
-      "group": 0
-    },
-    {
-      "field": "relief_21km_m",
-      "target": 362.0,
-      "tolerance": 150.0,
-      "weight": 1.0,
-      "group": 1
-    },
-    {
-      "field": "relief_5km_m",
-      "target": 82.0,
-      "tolerance": 50.0,
-      "weight": 1.0,
-      "group": 1
-    },
-    {
-      "field": "slope_mean_deg",
-      "target": 0.9258380861688738,
-      "tolerance": 2.0,
-      "weight": 1.0,
-      "group": 2
-    },
-    {
-      "field": "surface_high_c",
-      "target": 32.06500244140625,
-      "tolerance": 30.0,
-      "weight": 0.5,
-      "group": 3
-    },
-    {
-      "field": "surface_low_c",
-      "target": -97.14999389648438,
-      "tolerance": 30.0,
-      "weight": 0.5,
-      "group": 3
-    },
-    {
-      "field": "surface_mean_c",
-      "target": -36.35185241699219,
-      "tolerance": 30.0,
-      "weight": 0.5,
-      "group": 3
-    },
-    {
-      "field": "tpi_21km_m",
-      "target": 15.98412698412676,
-      "tolerance": 75.0,
-      "weight": 1.0,
-      "group": 4
-    },
-    {
-      "field": "tpi_5km_m",
-      "target": 1.2800000000002,
-      "tolerance": 25.0,
-      "weight": 1.0,
-      "group": 4
-    }
-  ],
-  "chunks": [
-    {
-      "file": "chunk-00.zst",
-      "rows": 1004692,
-      "compressedBytes": 583074,
-      "packedBytes": 4487456
-    },
-    {
-      "file": "chunk-01.zst",
-      "rows": 1004692,
-      "compressedBytes": 582731,
-      "packedBytes": 4218896
-    },
-    {
-      "file": "chunk-02.zst",
-      "rows": 1004692,
-      "compressedBytes": 599237,
-      "packedBytes": 4008176
-    },
-    {
-      "file": "chunk-03.zst",
-      "rows": 1004692,
-      "compressedBytes": 602804,
-      "packedBytes": 3895968
-    },
-    {
-      "file": "chunk-04.zst",
-      "rows": 1004692,
-      "compressedBytes": 748696,
-      "packedBytes": 4452912
-    },
-    {
-      "file": "chunk-05.zst",
-      "rows": 1004692,
-      "compressedBytes": 3450729,
-      "packedBytes": 8956080
-    },
-    {
-      "file": "chunk-06.zst",
-      "rows": 1004692,
-      "compressedBytes": 4722645,
-      "packedBytes": 10980592
-    },
-    {
-      "file": "chunk-07.zst",
-      "rows": 1004692,
-      "compressedBytes": 7571973,
-      "packedBytes": 14223744
-    },
-    {
-      "file": "chunk-08.zst",
-      "rows": 1004692,
-      "compressedBytes": 6151616,
-      "packedBytes": 11606688
-    },
-    {
-      "file": "chunk-09.zst",
-      "rows": 1004692,
-      "compressedBytes": 8559022,
-      "packedBytes": 14845632
-    },
-    {
-      "file": "chunk-10.zst",
-      "rows": 1004692,
-      "compressedBytes": 6366617,
-      "packedBytes": 12387664
-    },
-    {
-      "file": "chunk-11.zst",
-      "rows": 1004692,
-      "compressedBytes": 7999447,
-      "packedBytes": 15383536
-    },
-    {
-      "file": "chunk-12.zst",
-      "rows": 1004692,
-      "compressedBytes": 3870783,
-      "packedBytes": 10344752
-    },
-    {
-      "file": "chunk-13.zst",
-      "rows": 1004692,
-      "compressedBytes": 2870026,
-      "packedBytes": 8393136
-    },
-    {
-      "file": "chunk-14.zst",
-      "rows": 1004692,
-      "compressedBytes": 1848126,
-      "packedBytes": 6118624
-    },
-    {
-      "file": "chunk-15.zst",
-      "rows": 1004692,
-      "compressedBytes": 4066781,
-      "packedBytes": 10177232
-    },
-    {
-      "file": "chunk-16.zst",
-      "rows": 1004692,
-      "compressedBytes": 7833276,
-      "packedBytes": 15140368
-    },
-    {
-      "file": "chunk-17.zst",
-      "rows": 1004692,
-      "compressedBytes": 4030615,
-      "packedBytes": 9551488
-    },
-    {
-      "file": "chunk-18.zst",
-      "rows": 1004692,
-      "compressedBytes": 6612204,
-      "packedBytes": 11554672
-    },
-    {
-      "file": "chunk-19.zst",
-      "rows": 1004692,
-      "compressedBytes": 11971446,
-      "packedBytes": 19703104
-    },
-    {
-      "file": "chunk-20.zst",
-      "rows": 1004692,
-      "compressedBytes": 8576364,
-      "packedBytes": 14586048
-    },
-    {
-      "file": "chunk-21.zst",
-      "rows": 1004692,
-      "compressedBytes": 8822424,
-      "packedBytes": 13626112
-    },
-    {
-      "file": "chunk-22.zst",
-      "rows": 1004692,
-      "compressedBytes": 12447196,
-      "packedBytes": 19120032
-    },
-    {
-      "file": "chunk-23.zst",
-      "rows": 1004692,
-      "compressedBytes": 10510005,
-      "packedBytes": 17375200
-    },
-    {
-      "file": "chunk-24.zst",
-      "rows": 1004692,
-      "compressedBytes": 8756188,
-      "packedBytes": 15139632
-    },
-    {
-      "file": "chunk-25.zst",
-      "rows": 1004692,
-      "compressedBytes": 4996762,
-      "packedBytes": 9628608
-    },
-    {
-      "file": "chunk-26.zst",
-      "rows": 1004692,
-      "compressedBytes": 3871954,
-      "packedBytes": 8251072
-    },
-    {
-      "file": "chunk-27.zst",
-      "rows": 1004692,
-      "compressedBytes": 7332210,
-      "packedBytes": 12544576
-    },
-    {
-      "file": "chunk-28.zst",
-      "rows": 1004692,
-      "compressedBytes": 6002719,
-      "packedBytes": 11284816
-    },
-    {
-      "file": "chunk-29.zst",
-      "rows": 1004692,
-      "compressedBytes": 5685842,
-      "packedBytes": 12325296
-    },
-    {
-      "file": "chunk-30.zst",
-      "rows": 1004692,
-      "compressedBytes": 4163078,
-      "packedBytes": 12229280
-    },
-    {
-      "file": "chunk-31.zst",
-      "rows": 1004692,
-      "compressedBytes": 3618035,
-      "packedBytes": 11341216
-    },
-    {
-      "file": "chunk-32.zst",
-      "rows": 1004692,
-      "compressedBytes": 3139032,
-      "packedBytes": 9698624
-    },
-    {
-      "file": "chunk-33.zst",
-      "rows": 1004692,
-      "compressedBytes": 3387627,
-      "packedBytes": 9872256
-    },
-    {
-      "file": "chunk-34.zst",
-      "rows": 1004692,
-      "compressedBytes": 756941,
-      "packedBytes": 5115200
-    },
-    {
-      "file": "chunk-35.zst",
-      "rows": 386420,
-      "compressedBytes": 287396,
-      "packedBytes": 2220616
-    }
-  ]
+  "tileSize": 278
 }

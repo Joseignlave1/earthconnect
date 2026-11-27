@@ -1,4 +1,5 @@
 import wasmUrl from './zstd.wasm?url&no-inline'
+import { EPB1_MAGIC, EPB2_HEADER_BYTES, EPB2_MAGIC } from './epb2-gpu.ts'
 import { BLOCK_SIZE } from './manifest.ts'
 
 export type DecodeRequest = {
@@ -13,6 +14,8 @@ type Decoder = {
   memory: WebAssembly.Memory
   allocate: (bytes: number) => number
   release: (ptr: number, bytes: number) => void
+  frame_content_size: (frame: number, frameBytes: number) => number
+  count_epb2_escapes: (lo: number, rows: number, fields: number, blockSize: number, outOffsets: number) => number
   decode: (frame: number, frameBytes: number, output: number, outputBytes: number) => number
   decode_ect2: (
     frame: number,
@@ -68,24 +71,70 @@ function reserve(zstd: Decoder, slice: ScratchBuffer, needed: number) {
 
 function unpack(zstd: Decoder, scratch: Scratch, frame: ArrayBuffer, { packedBytes, rows, fields }: DecodeRequest) {
   reserve(zstd, scratch.input, frame.byteLength)
-  reserve(zstd, scratch.output, packedBytes)
-  // Allocations can grow WASM memory. Read its buffer only after both reservations.
   new Uint8Array(zstd.memory.buffer, scratch.input.ptr, frame.byteLength).set(new Uint8Array(frame))
-  const status = zstd.decode(scratch.input.ptr, frame.byteLength, scratch.output.ptr, packedBytes)
+  const contentSize = zstd.frame_content_size(scratch.input.ptr, frame.byteLength)
+  if (!contentSize) throw new Error('Incorrect Zstd frame content size')
+
+  const blocks = Math.ceil(rows / BLOCK_SIZE)
+  const totalBlocks = fields * blocks
+  // Reserve enough room for either EPB1 or EPB2 + trailing blockEscapeOffsets table.
+  const epb2TailBytes = totalBlocks * 4
+  const maxOutput = Math.max(contentSize, contentSize + epb2TailBytes)
+  reserve(zstd, scratch.output, maxOutput)
+
+  const status = zstd.decode(scratch.input.ptr, frame.byteLength, scratch.output.ptr, contentSize)
   if (status === 1) throw new Error('Incorrect Zstd frame content size')
   if (status !== 0) throw new Error('Zstd decompression or checksum failed')
-  const header = new DataView(zstd.memory.buffer, scratch.output.ptr, 16)
-  if (
-    header.getUint32(0, true) !== 0x31425045 ||
-    header.getUint32(4, true) !== BLOCK_SIZE ||
-    header.getUint32(8, true) !== rows ||
-    header.getUint32(12, true) !== fields
-  ) {
-    throw new Error('Incorrect GPU block header')
+
+  const header = new DataView(zstd.memory.buffer, scratch.output.ptr, Math.min(EPB2_HEADER_BYTES, contentSize))
+  const magic = header.getUint32(0, true)
+
+  if (magic === EPB1_MAGIC) {
+    if (
+      contentSize !== packedBytes ||
+      header.getUint32(4, true) !== BLOCK_SIZE ||
+      header.getUint32(8, true) !== rows ||
+      header.getUint32(12, true) !== fields
+    ) {
+      throw new Error('Incorrect GPU block header')
+    }
+    return new Uint8Array(zstd.memory.buffer, scratch.output.ptr, packedBytes).slice().buffer
   }
-  // WASM memory cannot be transferred. Copy the compact chunk once into a
-  // transferable buffer so postMessage adds no further payload copy.
-  return new Uint8Array(zstd.memory.buffer, scratch.output.ptr, packedBytes).slice().buffer
+
+  if (magic === EPB2_MAGIC) {
+    if (
+      contentSize < EPB2_HEADER_BYTES ||
+      header.getUint32(4, true) !== BLOCK_SIZE ||
+      header.getUint32(8, true) !== rows ||
+      header.getUint32(12, true) !== fields ||
+      header.getUint32(16, true) !== packedBytes
+    ) {
+      throw new Error('Incorrect GPU block header')
+    }
+    const loBytes = header.getUint32(24, true)
+    const escapeCount = header.getUint32(28, true)
+    const loAligned = (loBytes + 3) & ~3
+    const hiAligned = (escapeCount * 2 + 3) & ~3
+    const expectedRaw = EPB2_HEADER_BYTES + loAligned + hiAligned
+    if (loBytes !== rows * fields || contentSize !== expectedRaw) {
+      throw new Error('Incorrect EPB2 payload size')
+    }
+    const escOffsetsPtr = scratch.output.ptr + expectedRaw
+    const counted = zstd.count_epb2_escapes(
+      scratch.output.ptr + EPB2_HEADER_BYTES,
+      rows,
+      fields,
+      BLOCK_SIZE,
+      escOffsetsPtr,
+    )
+    if (counted !== escapeCount) {
+      throw new Error('EPB2 escape count mismatch')
+    }
+    const totalOutBytes = expectedRaw + epb2TailBytes
+    return new Uint8Array(zstd.memory.buffer, scratch.output.ptr, totalOutBytes).slice().buffer
+  }
+
+  throw new Error('Incorrect GPU block header')
 }
 
 let sharedZstdModule: Promise<WebAssembly.Module> | undefined

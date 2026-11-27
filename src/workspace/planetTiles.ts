@@ -1,3 +1,4 @@
+import { Bc7TileEncoder } from '../shader-test/bc7-gpu.ts'
 import { FOV } from '../shader-test/geometry.ts'
 import { generateMipmaps } from '../shader-test/gpu.ts'
 import {
@@ -24,6 +25,11 @@ export { planetTileKey }
 export type PlanetTileBody = 'moon' | 'mars'
 
 export const PLANET_TILE_PAIRS = 48
+const PLANET_TILE_PAIRS_BC7 = 96
+
+export function planetTilePairCapacity(device: GPUDevice): number {
+  return device.features.has('texture-compression-bc') ? PLANET_TILE_PAIRS_BC7 : PLANET_TILE_PAIRS
+}
 
 const PLANET_TILE_PACKS = 4
 export const PLANET_TILE_BASE_COLS = 24
@@ -65,8 +71,9 @@ function keyTx(key: number) {
 
 type BodyState = {
   packs: (PackHandle | null)[]
+  loadingPacks: Set<number>
   index: Map<number, TileEntry>
-  resident: Map<number, number> // pairKey -> pairSlotIndex (0..47)
+  resident: Map<number, number> // pairKey -> pairSlotIndex
   inFlight: Set<number>
   pageData: Uint8Array<ArrayBuffer>
   pageTexture: GPUTexture
@@ -76,9 +83,13 @@ type BodyState = {
 
 export class PlanetTileCache {
   private readonly device: GPUDevice
+  private readonly useBc7: boolean
+  readonly pairCapacity: number
   private readonly controller = new AbortController()
   private readonly bodies: Record<PlanetTileBody, BodyState>
-  private readonly slots: (PairSlot | null)[] = Array(PLANET_TILE_PAIRS).fill(null)
+  private readonly slots: (PairSlot | null)[]
+  private packLoader: PlanetTilePackLoader | null = null
+  private bc7Encoder: Bc7TileEncoder | null = null
   private pendingQueue: TileJob[] = []
   private activeDecodes = 0
   private frameCounter = 0
@@ -93,6 +104,9 @@ export class PlanetTileCache {
 
   constructor(device: GPUDevice) {
     this.device = device
+    this.useBc7 = device.features.has('texture-compression-bc')
+    this.pairCapacity = planetTilePairCapacity(device)
+    this.slots = Array(this.pairCapacity).fill(null)
     this.sampler = createTileSampler(device, 'Planetary virtual tile sampler')
     // Tiny placeholders until the user actually zooms into Moon or Mars (0 VRAM on Earth).
     this.poolTexture = device.createTexture({
@@ -119,6 +133,7 @@ export class PlanetTileCache {
       device.queue.writeTexture({ texture: pageTexture }, new Uint8Array([255, 0, 255, 0]), {}, [1, 1])
       return {
         packs: Array(PLANET_TILE_PACKS).fill(null),
+        loadingPacks: new Set(),
         index: new Map(),
         resident: new Map(),
         inFlight: new Set(),
@@ -167,12 +182,23 @@ export class PlanetTileCache {
   attachPacks(loadPack: PlanetTilePackLoader) {
     if (this.packsAttached || this.destroyed) return
     this.packsAttached = true
-    const { signal } = this.controller
-    for (const body of ['moon', 'mars'] as const) {
-      for (let packId = 0; packId < PLANET_TILE_PACKS; packId++) {
-        void this.loadPackIndex(body, packId, loadPack, signal)
-      }
+    this.packLoader = loadPack
+  }
+
+  private ensurePackLoaded(body: PlanetTileBody, packId: number) {
+    const state = this.bodies[body]
+    if (
+      this.destroyed ||
+      !this.packLoader ||
+      packId < 0 ||
+      packId >= PLANET_TILE_PACKS ||
+      state.packs[packId] ||
+      state.loadingPacks.has(packId)
+    ) {
+      return
     }
+    state.loadingPacks.add(packId)
+    void this.loadPackIndex(body, packId, this.packLoader, this.controller.signal)
   }
 
   private async loadPackIndex(
@@ -181,18 +207,26 @@ export class PlanetTileCache {
     loadPack: PlanetTilePackLoader,
     signal: AbortSignal,
   ) {
+    const state = this.bodies[body]
     try {
       const resource = await loadPack(body, packId, signal)
-      if (!resource || signal.aborted || this.destroyed) return
+      if (!resource || signal.aborted || this.destroyed) {
+        state.loadingPacks.delete(packId)
+        return
+      }
       const handle = toPackHandle(resource)
       const entries = await loadPackIndexEntries(handle, packId, signal)
-      if (!entries || signal.aborted || this.destroyed) return
-      const state = this.bodies[body]
+      if (!entries || signal.aborted || this.destroyed) {
+        state.loadingPacks.delete(packId)
+        return
+      }
       state.packs[packId] = handle
+      state.loadingPacks.delete(packId)
       for (const [key, entry] of entries) state.index.set(key, entry)
       if (!state.indexed && state.index.size > 0) state.indexed = true
       if (state.index.size > 0) this.notifyTileReady()
     } catch {
+      state.loadingPacks.delete(packId)
       // Optional Moon/Mars high-res packs degrade cleanly to 8K base albedo + 4K DEM.
     }
   }
@@ -203,12 +237,19 @@ export class PlanetTileCache {
     const device = this.device
     const oldPool = this.poolTexture
     this.poolTexture = device.createTexture({
-      label: 'Planetary paired albedo + normal virtual tile cache',
-      size: [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE, PLANET_TILE_PAIRS * 2],
+      label: this.useBc7
+        ? 'Planetary paired albedo + normal virtual tile cache (BC7)'
+        : 'Planetary paired albedo + normal virtual tile cache',
+      size: [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE, this.pairCapacity * 2],
       mipLevelCount: VIRTUAL_TILE_MIPS,
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      format: this.useBc7 ? 'bc7-rgba-unorm' : 'rgba8unorm',
+      usage: this.useBc7
+        ? GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+        : GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
     })
+    if (this.useBc7) {
+      this.bc7Encoder = new Bc7TileEncoder(device, VIRTUAL_TILE_SIZE, VIRTUAL_TILE_MIPS, 'rgba8unorm')
+    }
     const oldTextures: GPUTexture[] = [oldPool]
     for (const body of ['moon', 'mars'] as const) {
       const state = this.bodies[body]
@@ -238,8 +279,9 @@ export class PlanetTileCache {
   }
 
   /**
-   * Determine visible Moon or Mars tiles in body-local unit-sphere camera space
-   * and stream paired albedo + relief-normal tiles into the shared GPU LRU pool.
+   * Determine visible Moon or Mars tiles in body-local unit-sphere camera space,
+   * lazily load only the visible quadrant pack(s), and stream paired albedo +
+   * relief-normal tiles into the shared GPU LRU pool.
    */
   updateView(
     body: PlanetTileBody,
@@ -252,9 +294,8 @@ export class PlanetTileCache {
     physicalMetresPerPixel: number,
     loupe?: { lon: number; lat: number; zoom: number } | null,
   ) {
-    if (this.destroyed) return
+    if (!this.packsAttached || this.destroyed) return
     const state = this.bodies[body]
-    if (!state.indexed) return
 
     // Native 8K texel size = (2*pi*R) / 8192; L0 = (2*pi*R)/12192; L1 = (2*pi*R)/24384
     const l0TexelM = (2 * Math.PI * radiusMetres) / (PLANET_TILE_BASE_COLS * VIRTUAL_TILE_INNER)
@@ -268,8 +309,7 @@ export class PlanetTileCache {
       return
     }
 
-    // Lazily allocate the shared Moon/Mars pool on first actual zoom-in demand.
-    this.ensureGpuPool()
+    if (state.indexed) this.ensureGpuPool()
 
     const frame = ++this.frameCounter
     const needed = new Map<number, number>()
@@ -289,8 +329,14 @@ export class PlanetTileCache {
         for (let dy = -radius; dy <= radius; dy++) {
           const ty = cy + dy
           if (ty < 0 || ty >= rows) continue
+          const packRow = ty >= rows >> 1 ? 2 : 0
           for (let dx = -radius; dx <= radius; dx++) {
             const tx = (cx + dx + cols) % cols
+            const packId = packRow + (tx >= cols >> 1 ? 1 : 0)
+            if (!state.packs[packId]) {
+              this.ensurePackLoaded(body, packId)
+              continue
+            }
             const pk = tileKey(level, tx, ty)
             if (!state.index.has(planetTileKey(0, level, tx, ty)) || !state.index.has(planetTileKey(1, level, tx, ty)))
               continue
@@ -397,23 +443,42 @@ export class PlanetTileCache {
       if (signal.aborted || this.destroyed) return
       const slotIndex = this.allocateSlot()
       try {
-        const normalSlice = slotIndex + PLANET_TILE_PAIRS
+        const normalSlice = slotIndex + this.pairCapacity
         const device = this.device
-        device.queue.copyExternalImageToTexture(
-          { source: albedoBitmap! },
-          { texture: this.poolTexture, origin: [0, 0, slotIndex] },
-          [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE],
-        )
-        device.queue.copyExternalImageToTexture(
-          { source: normalBitmap! },
-          { texture: this.poolTexture, origin: [0, 0, normalSlice] },
-          [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE],
-        )
-        generateMipmaps(device, this.poolTexture, {
-          layers: [slotIndex, normalSlice],
-          mipLevelCount: VIRTUAL_TILE_MIPS,
-          label: 'Planetary tile mipmaps',
-        })
+        if (this.bc7Encoder) {
+          const uploadBc7Layer = (bitmap: ImageBitmap, layer: number) => {
+            device.queue.copyExternalImageToTexture({ source: bitmap }, { texture: this.bc7Encoder!.scratch }, [
+              VIRTUAL_TILE_SIZE,
+              VIRTUAL_TILE_SIZE,
+            ])
+            const encoder = device.createCommandEncoder({ label: 'Planetary tile BC7 upload' })
+            generateMipmaps(device, this.bc7Encoder!.scratch, {
+              mipLevelCount: VIRTUAL_TILE_MIPS,
+              label: 'Planetary tile mipmaps',
+              encoder,
+            })
+            this.bc7Encoder!.encodeIntoArrayLayer(encoder, this.poolTexture, layer)
+            device.queue.submit([encoder.finish()])
+          }
+          uploadBc7Layer(albedoBitmap!, slotIndex)
+          uploadBc7Layer(normalBitmap!, normalSlice)
+        } else {
+          device.queue.copyExternalImageToTexture(
+            { source: albedoBitmap! },
+            { texture: this.poolTexture, origin: [0, 0, slotIndex] },
+            [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE],
+          )
+          device.queue.copyExternalImageToTexture(
+            { source: normalBitmap! },
+            { texture: this.poolTexture, origin: [0, 0, normalSlice] },
+            [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE],
+          )
+          generateMipmaps(device, this.poolTexture, {
+            layers: [slotIndex, normalSlice],
+            mipLevelCount: VIRTUAL_TILE_MIPS,
+            label: 'Planetary tile mipmaps',
+          })
+        }
         this.slots[slotIndex] = {
           body: job.body,
           key: job.key,
@@ -465,6 +530,8 @@ export class PlanetTileCache {
     this.pendingQueue.length = 0
     this.tileListeners.clear()
     this.textureListeners.clear()
+    this.bc7Encoder?.destroy()
+    this.bc7Encoder = null
     this.poolTexture.destroy()
     for (const body of ['moon', 'mars'] as const) {
       const state = this.bodies[body]

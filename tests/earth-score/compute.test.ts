@@ -196,12 +196,19 @@ test('the packaged world matches all 36 frozen Zstd frames and packed hashes', a
     assert.equal(frame.length, shard.compressedBytes)
     assert.equal(hash(frame), reference.chunks[i].compressedSha256, shard.file)
     compressedBytes += frame.length
-    const packed = zstdDecompressSync(frame)
-    assert.equal(packed.length, shard.packedBytes)
-    assert.equal(hash(packed), reference.chunks[i].packedSha256, shard.file)
-    packedBytes += packed.length
+    const decoded = zstdDecompressSync(frame)
+    const view = new DataView(decoded.buffer, decoded.byteOffset, decoded.byteLength)
+    const magic = view.getUint32(0, true)
+    assert.ok(magic === 0x31425045 || magic === 0x32425045, `${shard.file}: unknown chunk magic`)
+    if (magic === 0x31425045) {
+      assert.equal(decoded.length, shard.packedBytes)
+    } else {
+      assert.equal(view.getUint32(16, true), shard.packedBytes)
+    }
+    assert.equal(hash(decoded), reference.chunks[i].packedSha256, shard.file)
+    packedBytes += shard.packedBytes
   }
-  assert.equal(compressedBytes, 183395621)
+  assert.equal(compressedBytes, 137978823)
   assert.equal(packedBytes, 384789304)
 })
 

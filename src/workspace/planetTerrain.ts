@@ -1,7 +1,6 @@
 import { contourDetail } from '../shader-test/contours.ts'
 import {
   joinWgsl,
-  loadBc7MipmappedTexture,
   loadSrgbMipmappedTexture,
   raceAbort,
   shaderModule,
@@ -36,8 +35,8 @@ import { VIRTUAL_TILE_GUTTER, VIRTUAL_TILE_INNER, VIRTUAL_TILE_SIZE } from '../s
 import {
   PLANET_TILE_BASE_COLS,
   PLANET_TILE_BASE_ROWS,
-  PLANET_TILE_PAIRS,
   PlanetTileCache,
+  planetTilePairCapacity,
   type PlanetTilePackLoader,
 } from './planetTiles.ts'
 import planetAnnotationWgsl from './shaders/planet-annotation.wgsl?raw'
@@ -222,7 +221,7 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
     const smallAnnotationPipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [smallAnnotationLayout] })
     const annotationPipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [annotationLayout] })
     const surfaceConstants = {
-      PLANET_TILE_PAIRS,
+      PLANET_TILE_PAIRS: planetTilePairCapacity(device),
       VIRTUAL_TILE_SIZE,
       VIRTUAL_TILE_INNER,
       VIRTUAL_TILE_GUTTER,
@@ -356,17 +355,14 @@ async function buildBodyAlbedo(
   body: TerrainBody,
   url: string,
   maxWidth: number | undefined,
-  isBc7: boolean,
 ): Promise<GPUTexture> {
-  const texture = isBc7
-    ? await loadBc7MipmappedTexture(device, url, cache.controller.signal, `${body} global albedo (BC7)`)
-    : await loadSrgbMipmappedTexture(device, url, cache.controller.signal, {
-        label: `${body} global albedo`,
-        mipLabel: `Build ${body} albedo mipmaps`,
-        downloadErrorMessage: `${body} albedo download failed.`,
-        maxWidth,
-        addressModeU: 'repeat',
-      })
+  const texture = await loadSrgbMipmappedTexture(device, url, cache.controller.signal, {
+    label: `${body} global albedo`,
+    mipLabel: `Build ${body} albedo mipmaps`,
+    downloadErrorMessage: `${body} albedo download failed.`,
+    maxWidth,
+    addressModeU: 'repeat',
+  })
   cache.createdAlbedos.add(texture)
   return texture
 }
@@ -377,14 +373,13 @@ function loadSharedBodyAlbedo(
   url: string,
   signal: AbortSignal,
   maxWidth?: number,
-  isBc7 = false,
 ): Promise<GPUTexture> {
   signal.throwIfAborted()
   const cache = getPlanetCache(device)
-  const key = `${isBc7 ? 'bc7:' : ''}${maxWidth ? `${url}@${maxWidth}` : url}`
+  const key = maxWidth ? `${url}@${maxWidth}` : url
   let pending = cache.albedos.get(key)
   if (!pending) {
-    pending = buildBodyAlbedo(device, cache, body, url, maxWidth, isBc7)
+    pending = buildBodyAlbedo(device, cache, body, url, maxWidth)
     cache.albedos.set(key, pending)
     void pending.catch(() => {
       if (cache.albedos.get(key) === pending) cache.albedos.delete(key)
@@ -556,21 +551,12 @@ export class PlanetTerrainRenderer {
           ? loadTerrain(terrainPath, 'rg8unorm', s => assetUrl(terrainPath, s), signal)
           : assetUrl(terrainPath, signal).then(url => loadPreparedTerrain(url, 'rg8unorm', signal))
         const maxWidth = albedoMaxWidths?.[body]
-        const albedoPromise = (async () => {
-          if (device.features.has('texture-compression-bc') && maxWidth) {
-            try {
-              const bc7Url = await assetUrl(`textures/${body}-albedo-${maxWidth}.bc7`, signal)
-              return await loadSharedBodyAlbedo(device, body, bc7Url, signal, maxWidth, true)
-            } catch {
-              signal.throwIfAborted()
-            }
-          }
-          const webpUrl = await assetUrl(`textures/${body}-albedo.webp`, signal)
-          return loadSharedBodyAlbedo(device, body, webpUrl, signal, maxWidth, false)
-        })().catch(() => {
-          if (signal.aborted) throw signal.reason
-          return getFallbackAlbedo(device)
-        })
+        const albedoPromise = assetUrl(`textures/${body}-albedo.webp`, signal)
+          .then(webpUrl => loadSharedBodyAlbedo(device, body, webpUrl, signal, maxWidth))
+          .catch(() => {
+            if (signal.aborted) throw signal.reason
+            return getFallbackAlbedo(device)
+          })
         const [prepared, albedo] = await Promise.all([terrainPromise, albedoPromise])
         signal.throwIfAborted()
         const reloadSource = async (reloadSignal: AbortSignal) =>

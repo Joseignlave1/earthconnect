@@ -91,9 +91,6 @@ const result = await build({
         ) {
           return resolve(root, 'src/shader-test/embedded-terrain-worker.ts')
         }
-        if (source === './bc7-worker-factory.ts' && importer === resolve(root, 'src/shader-test/gpu.ts')) {
-          return resolve(root, 'src/shader-test/embedded-bc7-worker.ts')
-        }
       },
     },
   ],

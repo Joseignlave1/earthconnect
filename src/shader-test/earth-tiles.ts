@@ -1,3 +1,4 @@
+import { Bc7TileEncoder } from './bc7-gpu.ts'
 import { cameraBasis, equalEarthInverse, FOV, type Camera, type Vec3 } from './geometry.ts'
 import { generateMipmaps } from './gpu.ts'
 import {
@@ -19,7 +20,10 @@ import {
 export { tileKey }
 
 const EARTH_TILE_PACKS = 8
-const EARTH_TILE_SLOTS = 96
+// BC7 uses 4× less VRAM than RGBA8, so we double the resident tile cache (192 vs 96 slots)
+// while still cutting tile pool VRAM in half (66 MB vs 132 MB).
+const EARTH_TILE_SLOTS_BC7 = 192
+const EARTH_TILE_SLOTS_RGBA = 96
 export const EARTH_TILE_PAGE_W = 160
 export const EARTH_TILE_PAGE_H = 80
 export const EARTH_TILE_BASE_COLS = 40
@@ -43,11 +47,16 @@ function keyTx(key: number) {
 
 export class EarthTileCache {
   private readonly controller = new AbortController()
+  private readonly useBc7: boolean
+  private readonly slotCapacity: number
   private readonly packs: (PackHandle | null)[] = Array(EARTH_TILE_PACKS).fill(null)
+  private readonly loadingPacks = new Set<number>()
+  private packLoader: EarthTilePackLoader | null = null
+  private bc7Encoder: Bc7TileEncoder | null = null
   private readonly index = new Map<number, TileEntry>()
   private readonly resident = new Map<number, number>()
   private readonly inFlight = new Set<number>()
-  private readonly slots: (TileSlot | null)[] = Array(EARTH_TILE_SLOTS).fill(null)
+  private readonly slots: (TileSlot | null)[]
   private readonly pageData = new Uint8Array(EARTH_TILE_PAGE_W * EARTH_TILE_PAGE_H * 4)
   private pendingQueue: TileJob[] = []
   private activeDecodes = 0
@@ -65,8 +74,11 @@ export class EarthTileCache {
 
   constructor(device: GPUDevice) {
     this.device = device
+    this.useBc7 = device.features.has('texture-compression-bc')
+    this.slotCapacity = this.useBc7 ? EARTH_TILE_SLOTS_BC7 : EARTH_TILE_SLOTS_RGBA
+    this.slots = Array(this.slotCapacity).fill(null)
     this.sampler = createTileSampler(device, 'Earth virtual tile sampler')
-    // Tiny 4-byte placeholders until at least one ECVT1 pack index loads.
+    // Tiny 4-byte placeholders until the user zooms in and a regional ECVT1 pack loads.
     this.pageTexture = device.createTexture({
       label: 'Earth tile page placeholder',
       size: [1, 1],
@@ -86,6 +98,9 @@ export class EarthTileCache {
 
   get ready() {
     return this.activated
+  }
+  get attached() {
+    return this.packsAttached
   }
   get residentCount() {
     return this.resident.size
@@ -114,24 +129,44 @@ export class EarthTileCache {
   attachPacks(loadPack: EarthTilePackLoader) {
     if (this.packsAttached || this.destroyed) return
     this.packsAttached = true
-    const { signal } = this.controller
-    for (let packId = 0; packId < EARTH_TILE_PACKS; packId++) {
-      void this.loadPackIndex(packId, loadPack, signal)
+    this.packLoader = loadPack
+  }
+
+  private ensurePackLoaded(packId: number) {
+    if (
+      this.destroyed ||
+      !this.packLoader ||
+      packId < 0 ||
+      packId >= EARTH_TILE_PACKS ||
+      this.packs[packId] ||
+      this.loadingPacks.has(packId)
+    ) {
+      return
     }
+    this.loadingPacks.add(packId)
+    void this.loadPackIndex(packId, this.packLoader, this.controller.signal)
   }
 
   private async loadPackIndex(packId: number, loadPack: EarthTilePackLoader, signal: AbortSignal) {
     try {
       const resource = await loadPack(packId, signal)
-      if (!resource || signal.aborted || this.destroyed) return
+      if (!resource || signal.aborted || this.destroyed) {
+        this.loadingPacks.delete(packId)
+        return
+      }
       const handle = toPackHandle(resource)
       const entries = await loadPackIndexEntries(handle, packId, signal)
-      if (!entries || signal.aborted || this.destroyed) return
+      if (!entries || signal.aborted || this.destroyed) {
+        this.loadingPacks.delete(packId)
+        return
+      }
       this.packs[packId] = handle
+      this.loadingPacks.delete(packId)
       for (const [key, entry] of entries) this.index.set(key, entry)
       if (!this.activated && this.index.size > 0) this.activateGpuPool()
       this.notifyTileReady()
     } catch {
+      this.loadingPacks.delete(packId)
       // Optional 500 m packs degrade seamlessly to the 8K base texture.
     }
   }
@@ -154,12 +189,17 @@ export class EarthTileCache {
       EARTH_TILE_PAGE_H,
     ])
     this.poolTexture = device.createTexture({
-      label: 'Earth 500m virtual tile cache',
-      size: [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE, EARTH_TILE_SLOTS],
+      label: this.useBc7 ? 'Earth 500m virtual tile cache (BC7)' : 'Earth 500m virtual tile cache',
+      size: [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE, this.slotCapacity],
       mipLevelCount: VIRTUAL_TILE_MIPS,
-      format: 'rgba8unorm-srgb',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      format: this.useBc7 ? 'bc7-rgba-unorm-srgb' : 'rgba8unorm-srgb',
+      usage: this.useBc7
+        ? GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+        : GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
     })
+    if (this.useBc7) {
+      this.bc7Encoder = new Bc7TileEncoder(device, VIRTUAL_TILE_SIZE, VIRTUAL_TILE_MIPS, 'rgba8unorm-srgb')
+    }
     this.notifyTexturesChanged()
     void device.queue
       .onSubmittedWorkDone()
@@ -171,8 +211,9 @@ export class EarthTileCache {
   }
 
   /**
-   * Determine which 500m tiles intersect the current camera (and optional loupe)
-   * and stream missing ones from IndexedDB into the GPU LRU tile pool.
+   * Determine which 500m tiles intersect the current camera (and optional loupe),
+   * lazily load only the visible 90°×90° octant pack(s), and stream missing tiles
+   * into the GPU LRU tile pool.
    */
   updateView(
     camera: Camera,
@@ -180,7 +221,7 @@ export class EarthTileCache {
     metresPerPixel: number,
     loupe?: { lon: number; lat: number; zoom: number } | null,
   ) {
-    if (!this.activated || this.destroyed) return
+    if (!this.packsAttached || this.destroyed) return
     const loupeMpp = loupe ? metresPerPixel / Math.max(1, loupe.zoom) : Infinity
     const minMpp = Math.min(metresPerPixel, loupeMpp)
     // Stay on the already-resident 8K texture until the viewport exceeds ~8K detail.
@@ -210,8 +251,14 @@ export class EarthTileCache {
         for (let dy = -radius; dy <= radius; dy++) {
           const ty = cy + dy
           if (ty < 0 || ty >= rows) continue
+          const packRow = ty >= rows >> 1 ? 4 : 0
           for (let dx = -radius; dx <= radius; dx++) {
             const tx = (cx + dx + cols) % cols
+            const packId = packRow + Math.floor((tx * 4) / cols)
+            if (!this.packs[packId]) {
+              this.ensurePackLoaded(packId)
+              continue
+            }
             const key = tileKey(level, tx, ty)
             if (!this.index.has(key)) continue
             const slotIndex = this.resident.get(key)
@@ -302,16 +349,31 @@ export class EarthTileCache {
       const slotIndex = this.allocateSlot()
       try {
         const device = this.device
-        device.queue.copyExternalImageToTexture(
-          { source: bitmap },
-          { texture: this.poolTexture, origin: [0, 0, slotIndex] },
-          [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE],
-        )
-        generateMipmaps(device, this.poolTexture, {
-          layers: [slotIndex],
-          mipLevelCount: VIRTUAL_TILE_MIPS,
-          label: 'Earth tile mipmaps',
-        })
+        if (this.bc7Encoder) {
+          device.queue.copyExternalImageToTexture({ source: bitmap }, { texture: this.bc7Encoder.scratch }, [
+            VIRTUAL_TILE_SIZE,
+            VIRTUAL_TILE_SIZE,
+          ])
+          const encoder = device.createCommandEncoder({ label: 'Earth tile BC7 upload' })
+          generateMipmaps(device, this.bc7Encoder.scratch, {
+            mipLevelCount: VIRTUAL_TILE_MIPS,
+            label: 'Earth tile mipmaps',
+            encoder,
+          })
+          this.bc7Encoder.encodeIntoArrayLayer(encoder, this.poolTexture, slotIndex)
+          device.queue.submit([encoder.finish()])
+        } else {
+          device.queue.copyExternalImageToTexture(
+            { source: bitmap },
+            { texture: this.poolTexture, origin: [0, 0, slotIndex] },
+            [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE],
+          )
+          generateMipmaps(device, this.poolTexture, {
+            layers: [slotIndex],
+            mipLevelCount: VIRTUAL_TILE_MIPS,
+            label: 'Earth tile mipmaps',
+          })
+        }
         this.slots[slotIndex] = { key: job.key, level: job.level, tx: job.tx, ty: job.ty, lastUsed: this.frameCounter }
         this.resident.set(job.key, slotIndex)
         this.flushPageTable()
@@ -351,6 +413,8 @@ export class EarthTileCache {
     this.index.clear()
     this.tileListeners.clear()
     this.textureListeners.clear()
+    this.bc7Encoder?.destroy()
+    this.bc7Encoder = null
     this.pageTexture.destroy()
     this.poolTexture.destroy()
   }

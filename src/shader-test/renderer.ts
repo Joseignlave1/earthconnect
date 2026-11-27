@@ -2014,7 +2014,7 @@ export class SurfaceRenderer {
       renderEarth &&
       this.solarFocus === 'earth' &&
       !flying &&
-      this.earthTiles?.ready &&
+      this.earthTiles?.attached &&
       (redraw || loupeOverlay)
     ) {
       const loupePick = loupeOverlay
