@@ -2,43 +2,31 @@
 // Runs on the resolved rgba16float HDR scene before bloom so stretched starlight and the
 // razor-thin critical photon ring naturally acquire true HDR optical bloom.
 
-struct BlackHoleUniform {
-  hole: vec4f,     // cx (uv), cy (uv), rh (viewport-height units), aspect (w / h)
-  params: vec4f,   // timeSeconds, scrollProgress (0..1), lensStrength, ringIntensity
-  viewport: vec4f, // widthPx, heightPx, dpr, unused
+struct HoleGeometry {
+  center: vec2f, // viewport UV (0..1)
+  rh: f32,       // event horizon radius in viewport-height units
+  aspect: f32,   // viewport aspect ratio (width / height)
 }
 
-struct ScreenVertex {
-  @builtin(position) position: vec4f,
-  @location(0) uv: vec2f,
+struct LensParams {
+  timeSeconds: f32,
+  scrollProgress: f32,
+  lensStrength: f32,
+  ringIntensity: f32,
+}
+
+struct BlackHoleUniform {
+  hole: HoleGeometry,
+  params: LensParams,
+  viewportHeightPx: f32,
+  _pad0: f32,
+  _pad1: f32,
+  _pad2: f32,
 }
 
 @group(0) @binding(0) var<uniform> bh: BlackHoleUniform;
 @group(0) @binding(1) var sceneTex: texture_2d<f32>;
 @group(0) @binding(2) var linearSampler: sampler;
-
-@vertex fn lensVertex(@builtin(vertex_index) index: u32) -> ScreenVertex {
-  let pos = array<vec2f, 3>(vec2f(-1., -1.), vec2f(3., -1.), vec2f(-1., 3.));
-  let p = pos[index];
-  return ScreenVertex(vec4f(p, 0., 1.), vec2f(p.x * .5 + .5, .5 - p.y * .5));
-}
-
-fn hash21(p: vec2f) -> f32 {
-  var q = fract(p * vec2f(123.34, 456.21));
-  q += dot(q, q + 45.32);
-  return fract(q.x * q.y);
-}
-
-fn valueNoise(p: vec2f) -> f32 {
-  let i = floor(p);
-  let f = fract(p);
-  let s = f * f * (3. - 2. * f);
-  let a = hash21(i);
-  let b = hash21(i + vec2f(1., 0.));
-  let c = hash21(i + vec2f(0., 1.));
-  let d = hash21(i + vec2f(1., 1.));
-  return mix(mix(a, b, s.x), mix(c, d, s.x), s.y);
-}
 
 fn fbm(p: vec2f) -> f32 {
   var v = 0.;
@@ -74,14 +62,14 @@ fn sampleLensedScene(uv: vec2f, offset: vec2f) -> vec3f {
 
 @fragment fn lensFragment(input: ScreenVertex) -> @location(0) vec4f {
   let uv = input.uv;
-  let cx = bh.hole.x;
-  let cy = bh.hole.y;
-  let rh = bh.hole.z;
-  let aspect = bh.hole.w;
-  let time = bh.params.x;
-  let scroll = bh.params.y;
-  let lensStrength = bh.params.z;
-  let ringIntensity = bh.params.w;
+  let cx = bh.hole.center.x;
+  let cy = bh.hole.center.y;
+  let rh = bh.hole.rh;
+  let aspect = bh.hole.aspect;
+  let time = bh.params.timeSeconds;
+  let scroll = bh.params.scrollProgress;
+  let lensStrength = bh.params.lensStrength;
+  let ringIntensity = bh.params.ringIntensity;
 
   // Aspect-corrected offset from black hole center (units of viewport height).
   let delta = vec2f((uv.x - cx) * aspect, uv.y - cy);
@@ -90,7 +78,7 @@ fn sampleLensedScene(uv: vec2f, offset: vec2f) -> vec3f {
   let dr = r - rh;
 
   // Pure pitch-black event horizon shadow void (#000000) with crisp sub-pixel anti-aliasing.
-  let aa = max(1.5 / max(bh.viewport.y, 1.), .0016);
+  let aa = max(1.5 / max(bh.viewportHeightPx, 1.), .0016);
   let outsideMask = smoothstep(-aa, aa * 1.35, dr);
   let voidColor = vec3f(0., 0., 0.);
 

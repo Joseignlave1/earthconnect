@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ConstellationLogo } from '../hero/ConstellationLogo.tsx'
-import { type createSurfaceDevicePool, WEBGPU_UNAVAILABLE_MESSAGE } from '../shader-test/surface-device.ts'
+import { WEBGPU_UNAVAILABLE_MESSAGE } from '../shader-test/surface-device.ts'
 import { markStartup, reportStartupTiming } from './startupTiming.ts'
 import type { WorkspaceAssets } from './workspaceAssets.ts'
 import { type DownloadProgress, loadWorkspaceRelease } from './workspaceRelease.ts'
@@ -13,17 +13,14 @@ export function WorkspaceStartup({
   open,
   embedded,
   loadInitialRelease,
-  devicePool,
 }: {
   open(assets: WorkspaceAssets, onReady: (ready?: boolean) => void, signal: AbortSignal): Promise<ReactNode>
   embedded?: () => WorkspaceAssets
   loadInitialRelease?: typeof loadWorkspaceRelease
-  devicePool?: ReturnType<typeof createSurfaceDevicePool>
 }) {
   const [attempt, setAttempt] = useState(0)
   const [progress, setProgress] = useState<DownloadProgress>()
   const [unsaved, setUnsaved] = useState(false)
-  const [authorized, setAuthorized] = useState(false)
   const [opening, setOpening] = useState(false)
   const [error, setError] = useState('')
   const [workspace, setWorkspace] = useState<{ id: number; view: ReactNode }>()
@@ -80,7 +77,7 @@ export function WorkspaceStartup({
     [open],
   )
 
-  const revealed = authorized && ready && !error
+  const revealed = opening && ready && !error
   const finalizing = !!progress?.total && progress.downloaded === progress.total
   // Keep the WebGPU logo alive through the 220ms fade-out so it never snaps back to blank,
   // then tear down its GPU resources & stop rAF completely once hidden.
@@ -127,7 +124,6 @@ export function WorkspaceStartup({
         await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
         signal.throwIfAborted()
         setOpening(true)
-        setAuthorized(true)
         const assets = embedded()
         signal.addEventListener('abort', assets.dispose, { once: true })
         await openView(assets, signal)
@@ -170,7 +166,6 @@ export function WorkspaceStartup({
       signal.throwIfAborted()
       if (release.saved) {
         setOpening(true)
-        setAuthorized(true)
       } else {
         setUnsaved(true)
       }
@@ -197,7 +192,6 @@ export function WorkspaceStartup({
     setError('')
     setProgress(undefined)
     setUnsaved(false)
-    setAuthorized(false)
     setOpening(false)
     setAttempt(value => value + 1)
   }
@@ -234,7 +228,7 @@ export function WorkspaceStartup({
         data-offline={offline || undefined}
       >
         <div className="workspace-startup-content" data-ready={startupContentVisible || undefined}>
-          {logoMounted && <ConstellationLogo key={logoCycle} devicePool={devicePool} onReady={handleLogoReady} />}
+          {logoMounted && <ConstellationLogo key={logoCycle} onReady={handleLogoReady} />}
           {!error && (!unsaved || opening) && (
             <progress
               aria-label="Earth data download"
@@ -263,7 +257,6 @@ export function WorkspaceStartup({
               type="button"
               onClick={() => {
                 setOpening(true)
-                setAuthorized(true)
               }}
             >
               Continue without saving

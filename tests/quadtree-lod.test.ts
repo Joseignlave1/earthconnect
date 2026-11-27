@@ -3,8 +3,9 @@ import test from 'node:test'
 import { cameraBasis, cameraMatrix } from '../src/shader-test/geometry.ts'
 import {
   createPatchMesh,
+  CUBE_INSTANCE_FLOATS,
+  EARTH_INSTANCE_FLOATS,
   EarthQuadtree,
-  INSTANCE_FLOATS,
   MAX_PATCH_INSTANCES,
   PATCH_SEGMENTS,
   PlanetCubeQuadtree,
@@ -59,7 +60,7 @@ test('Earth quadtree culls back hemisphere and refines mountain regions more tha
   )
   const oceanTree = EarthQuadtree.fromTerrain(flatOcean)
   const mountainTree = EarthQuadtree.fromTerrain(ruggedLand)
-  const out = new Float32Array(MAX_PATCH_INSTANCES * INSTANCE_FLOATS)
+  const out = new Float32Array(MAX_PATCH_INSTANCES * EARTH_INSTANCE_FLOATS)
 
   const cam = { yaw: 0, pitch: 0, distance: 3.0, aspect: 1.6 }
   const mat = cameraMatrix(cam)
@@ -81,7 +82,7 @@ test('Cube-sphere quadtree culls far side and subdivides closer views', () => {
   })
   const radiusKm = 3389.5
   const tree = PlanetCubeQuadtree.fromTerrain(terrain, radiusKm)
-  const out = new Float32Array(MAX_PATCH_INSTANCES * INSTANCE_FLOATS)
+  const out = new Float32Array(MAX_PATCH_INSTANCES * CUBE_INSTANCE_FLOATS)
 
   const camFar = { yaw: 0, pitch: 0, distance: radiusKm * 6, aspect: 1.6, near: 100 }
   const farCount = tree.selectPatches(out, cameraMatrix(camFar), cameraBasis(camFar).eye, 1440, 900, 3, 1)
@@ -90,4 +91,22 @@ test('Cube-sphere quadtree culls far side and subdivides closer views', () => {
 
   assert.ok(farCount > 0 && farCount <= 32, `expected few patches far away, got ${farCount}`)
   assert.ok(nearCount > farCount, `expected near view (${nearCount}) to refine more than far view (${farCount})`)
+})
+
+test('Earth quadtree covers 100% of UV area even when hitting MAX_PATCH_INSTANCES', () => {
+  const rough = makeSyntheticTerrain(256, 128, (lon, lat) => 8000 * Math.abs(Math.sin(lon * 37) * Math.cos(lat * 29)))
+  const tree = EarthQuadtree.fromTerrain(rough)
+  const out = new Float32Array(MAX_PATCH_INSTANCES * EARTH_INSTANCE_FLOATS)
+  const cam = { yaw: 0, pitch: 0, distance: 3.6, aspect: 2.0 }
+  const count = tree.selectPatches(out, cameraMatrix(cam), cameraBasis(cam).eye, 8192, 4096, 0, 14)
+
+  assert.ok(
+    count >= MAX_PATCH_INSTANCES - 4 && count <= MAX_PATCH_INSTANCES,
+    `expected cap-bounded count, got ${count}`,
+  )
+  let uvArea = 0
+  for (let i = 0; i < count; i++) {
+    uvArea += out[i * EARTH_INSTANCE_FLOATS + 2] * out[i * EARTH_INSTANCE_FLOATS + 3]
+  }
+  assert.ok(Math.abs(uvArea - 1.0) < 1e-6, `expected full UV coverage (1.0), got ${uvArea}`)
 })

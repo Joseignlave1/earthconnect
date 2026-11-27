@@ -295,27 +295,6 @@
   }
 }
 
-@container (max-width: 430px) {
-  .sky-earth-tools,
-  .sky-inspection {
-    bottom: 14px;
-  }
-  .sky-earth-tools {
-    width: min(43cqw, 172px);
-  }
-  .sky-legend,
-  .sky-inspection {
-    padding: 8px 10px;
-  }
-  .sky-inspection {
-    max-width: 48cqw;
-  }
-  .sky-inspection div {
-    flex-wrap: wrap;
-    gap: 5px;
-  }
-}
-
 @media (max-width: 420px) {
   .sky-inspection div {
     display: grid;

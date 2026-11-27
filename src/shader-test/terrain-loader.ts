@@ -1,9 +1,5 @@
 import {
-  elevationPyramid,
-  loadTerrain,
-  packRg32FloatLevels,
-  packRg8PyramidDirect,
-  poleElevations,
+  prepareTerrainData,
   type PackedTerrainLevel,
   type Terrain,
   type TerrainPackFormat,
@@ -24,13 +20,7 @@ async function prepareTerrainOnMainThread<F extends TerrainPackFormat>(
   signal: AbortSignal,
 ): Promise<PreparedTerrain<F>> {
   const { decompressZstd } = await import('../earth-score/decode.ts')
-  const terrain = await loadTerrain(url, signal, decompressZstd)
-  signal.throwIfAborted()
-  const poles = poleElevations(terrain)
-  const packed = (
-    format === 'rg8unorm' ? packRg8PyramidDirect(terrain) : packRg32FloatLevels(elevationPyramid(terrain, false))
-  ) as PreparedTerrain<F>['levels']
-  return { terrain, poles, levels: packed }
+  return prepareTerrainData(url, format, signal, decompressZstd)
 }
 
 /** Decode gzipped terrain and build its mipmap pyramid off the main thread. */

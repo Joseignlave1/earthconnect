@@ -1,8 +1,16 @@
 struct LoupeUniforms {
-  rect: vec4f,
-  viewport: vec4f,
-  state: vec4f,
-  selected: vec4f,
+  centerPx: vec2f,
+  radiusCss: f32,
+  pixelRatio: f32,
+  viewportPx: vec2f,
+  exposure: f32,
+  hdr: f32,
+  aimOffsetCss: vec2f,
+  locked: f32,
+  _padState: f32,
+  selectedOffsetCss: vec2f,
+  hasSelected: f32,
+  _padSelected: f32,
 }
 
 @group(0) @binding(0) var<uniform> loupe: LoupeUniforms;
@@ -15,28 +23,26 @@ struct LoupeVertex {
 }
 
 @vertex fn loupeVertex(@builtin(vertex_index) index: u32) -> LoupeVertex {
-  let corners = array<vec2f, 6>(vec2f(-1., -1.), vec2f(1., -1.), vec2f(-1., 1.), vec2f(-1., 1.), vec2f(1., -1.), vec2f(1., 1.));
-  let radiusCss = loupe.rect.z;
-  let extent = radiusCss + 12.;
-  let local = corners[index] * extent;
-  let screen = (loupe.rect.xy + local * loupe.rect.w) / loupe.viewport.xy;
+  let extent = loupe.radiusCss + 12.;
+  let local = unitQuadCorner(index) * extent;
+  let screen = (loupe.centerPx + local * loupe.pixelRatio) / loupe.viewportPx;
   return LoupeVertex(vec4f(screen * vec2f(2., -2.) + vec2f(-1., 1.), 0., 1.), local);
 }
 
 fn toneMapLoupe(uv: vec2f) -> vec3f {
   let s = textureSampleLevel(loupeTex, linearSampler, clamp(uv, vec2f(.002), vec2f(.998)), 0.);
   var c = s.rgb / max(s.a, .0001);
-  if (loupe.viewport.w > .5) {
-    c = toDisplay(acesToneMap(c * loupe.viewport.z));
+  if (loupe.hdr > .5) {
+    c = toDisplay(acesToneMap(c * loupe.exposure));
   }
   return c;
 }
 
 @fragment fn loupeFragment(input: LoupeVertex) -> @location(0) vec4f {
   let p = input.local;
-  let r = loupe.rect.z;
+  let r = loupe.radiusCss;
   let d = length(p);
-  let aa = max(.35, .6 / max(loupe.rect.w, 1.));
+  let aa = max(.35, .6 / max(loupe.pixelRatio, 1.));
   let inside = 1. - smoothstep(r - aa, r + aa, d);
   let uv = p / (2. * r) + .5;
   var lens = toneMapLoupe(uv);
@@ -47,8 +53,8 @@ fn toneMapLoupe(uv: vec2f) -> vec3f {
   let innerMask = 1. - smoothstep(r - 1.5 - aa, r - 1.5 + aa, d);
 
   // Selected Earth marker projected into loupe space (so clicked spots stay visible inside the lens).
-  if (loupe.selected.z > .5) {
-    let sd = length(p - loupe.selected.xy);
+  if (loupe.hasSelected > .5) {
+    let sd = length(p - loupe.selectedOffsetCss);
     let selRingDist = abs(sd - 6.8);
     let selCase = max(1. - smoothstep(1.75 - aa, 1.75 + aa, selRingDist), 1. - smoothstep(2.4 - aa, 2.4 + aa, sd)) * innerMask;
     let selCore = max(1. - smoothstep(.8 - aa, .8 + aa, selRingDist), 1. - smoothstep(1.45 - aa, 1.45 + aa, sd)) * innerMask;
@@ -56,8 +62,8 @@ fn toneMapLoupe(uv: vec2f) -> vec3f {
     lens = mix(lens, vec3f(.97, .98, 1.), selCore * .96);
   }
 
-  let locked = loupe.state.z > .5;
-  let aim = select(vec2f(0.), loupe.state.xy, locked);
+  let locked = loupe.locked > .5;
+  let aim = select(vec2f(0.), loupe.aimOffsetCss, locked);
   let ap = p - aim;
   let ad = length(ap);
   let aimUv = aim / (2. * r) + .5;

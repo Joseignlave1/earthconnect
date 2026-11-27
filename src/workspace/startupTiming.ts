@@ -22,14 +22,20 @@ export function endStartupSpan(name: string, detail?: string) {
   if (detail !== undefined) span.detail = detail
 }
 
-export function reportStartupTiming(note?: string) {
+export function reportStartupTiming() {
   if (reported) return
   reported = true
   const total = performance.now()
   const fmt = (ms: number) => `${Math.round(ms)} ms`
-  const rows: { phase: string; start: number; end: number; detail?: string }[] = []
+  const rows: { phase: string; start: number; end: number; open?: boolean; detail?: string }[] = []
   for (const [phase, span] of spans) {
-    rows.push({ phase, start: span.start, end: span.end ?? total, detail: span.detail })
+    rows.push({
+      phase,
+      start: span.start,
+      end: span.end ?? total,
+      open: span.end === undefined,
+      detail: span.detail,
+    })
   }
   for (const [phase, at] of marks) {
     rows.push({ phase, start: at, end: at })
@@ -38,11 +44,12 @@ export function reportStartupTiming(note?: string) {
   const width = Math.max(...rows.map(row => row.phase.length), 8)
   const lines = rows.map(row => {
     const label = row.phase.padEnd(width)
-    const timing =
-      row.end > row.start
+    const timing = row.open
+      ? `${fmt(row.end - row.start).padStart(7)}  (open since ${fmt(row.start)}, elapsed so far)`
+      : row.end > row.start
         ? `${fmt(row.end - row.start).padStart(7)}  (${fmt(row.start)} → ${fmt(row.end)})`
         : `      —  (at ${fmt(row.start)})`
     return `  ${label}  ${timing}${row.detail ? `  ${row.detail}` : ''}`
   })
-  console.log(`[Earth Connect] ready in ${fmt(total)}${note ? ` (${note})` : ''}\n${lines.join('\n')}`)
+  console.log(`[Earth Connect] ready in ${fmt(total)}\n${lines.join('\n')}`)
 }

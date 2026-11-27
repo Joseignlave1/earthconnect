@@ -1,6 +1,8 @@
-import { EARTH_AXIS, FOV } from '../shader-test/geometry.ts'
+import { EARTH_AXIS, FOV, sphericalNormal, wgs84UnitPoint } from '../shader-test/geometry.ts'
 import {
   add,
+  cross,
+  dot,
   geographicToWorld,
   normalized,
   scale,
@@ -9,69 +11,19 @@ import {
 } from '../workspace/solarCamera.ts'
 import { bodyRadius, type BodyId, type BodyRotation, type BodyState, type Vec3 } from '../workspace/solarSystem.ts'
 import type { BridgeEndpoints } from './bridgeOverlay.ts'
+import { HERO_BRIDGE_SCORE_SHADER, HERO_MARS_SITE } from './editorialData.ts'
+
+export { HERO_BRIDGE_SCORE_SHADER, HERO_MARS_SITE }
 
 const DEG = Math.PI / 180
 const EARTH_EQUATORIAL_KM = EARTH_AXIS / 1000
-const EARTH_E2 = 0.0066943799901413165
-
-/** Perseverance landing site in Jezero Crater, Mars. */
-export const HERO_MARS_SITE = {
-  name: 'Jezero Crater',
-  latitude: 18.4447,
-  longitude: 77.4508,
-} as const
-
-/**
- * Self-contained Jezero Crater terrain analogue shader that runs directly on
- * the resident WebGPU EarthScore dataset without needing an external API call.
- * Matches gently rolling arid basin floors enclosed by rugged regional relief.
- */
-export const HERO_BRIDGE_SCORE_SHADER = /* wgsl */ `// Jezero Crater arid basin analogue (local WebGPU hero query)
-fn score(cell: EarthCell) -> f32 {
-  if (cell.terrain_valid_fraction < 0.9 ||
-      cell.landcover_valid_fraction < 0.9 ||
-      !has_data(cell.relief_5km_m) ||
-      !has_data(cell.relief_21km_m) ||
-      !has_data(cell.tpi_21km_m) ||
-      !has_data(cell.annual_precip_mm) ||
-      !has_data(cell.bare_fraction)) {
-    return NO_SCORE;
-  }
-
-  let local_relief = (cell.relief_5km_m - 95.0) / 110.0;
-  let regional_relief = (cell.relief_21km_m - 420.0) / 360.0;
-  let basin_position = (cell.tpi_21km_m + 115.0) / 145.0;
-  let aridity = max(0.0, cell.annual_precip_mm - 180.0) / 260.0;
-  let terrain = exp(-0.5 * (
-    local_relief * local_relief +
-    regional_relief * regional_relief +
-    basin_position * basin_position +
-    aridity * aridity
-  ) * 0.55);
-  return terrain * smoothstep(0.15, 0.78, cell.bare_fraction);
-}`
-
-function cross(a: Vec3, b: Vec3): Vec3 {
-  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
-}
-
-function dot(a: Vec3, b: Vec3) {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
 
 function geoDirection(latDeg: number, lonDeg: number): Vec3 {
-  const lat = latDeg * DEG
-  const lon = lonDeg * DEG
-  return [Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat) * Math.cos(lon)]
+  return sphericalNormal(lonDeg * DEG, latDeg * DEG)
 }
 
 function earthSurfaceUnit(latDeg: number, lonDeg: number): Vec3 {
-  const lat = latDeg * DEG
-  const lon = lonDeg * DEG
-  const sinLat = Math.sin(lat)
-  const cosLat = Math.cos(lat)
-  const n = 1 / Math.sqrt(1 - EARTH_E2 * sinLat * sinLat)
-  return [n * cosLat * Math.sin(lon), n * (1 - EARTH_E2) * sinLat, n * cosLat * Math.cos(lon)]
+  return wgs84UnitPoint(lonDeg * DEG, latDeg * DEG)
 }
 
 /**
@@ -115,11 +67,6 @@ function camToWorld(cx: number, cy: number, cz: number): Vec3 {
 
 function camDirToWorld(cx: number, cy: number, cz: number): Vec3 {
   return normalized(camToWorld(cx, cy, cz))
-}
-
-export type BridgeLayout = {
-  bodies: SolarBodies
-  earthTarget: { latitude: number; longitude: number }
 }
 
 /**

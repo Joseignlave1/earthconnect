@@ -1,5 +1,10 @@
-import { shaderModule } from '../shader-test/gpu.ts'
+import { joinWgsl, shaderModule } from '../shader-test/gpu.ts'
+import fullscreenWgsl from '../shader-test/shaders/fullscreen.wgsl?raw'
 import blackHoleWgsl from './blackHole.wgsl?raw'
+import { smoothstep } from './constellationData.ts'
+import noiseWgsl from './noise.wgsl?raw'
+
+const blackHoleShader = joinWgsl(fullscreenWgsl, noiseWgsl, blackHoleWgsl)
 
 export type BlackHoleGeometry = {
   /** Horizontal center in normalized viewport UV (0..1). */
@@ -20,11 +25,6 @@ export type BlackHoleGeometry = {
 
 function clamp01(v: number) {
   return Math.max(0, Math.min(1, v))
-}
-
-function smoothstep(edge0: number, edge1: number, x: number) {
-  const t = clamp01((x - edge0) / (edge1 - edge0))
-  return t * t * (3 - 2 * t)
 }
 
 function applyBoundedOffset(u: number, delta: number) {
@@ -132,7 +132,7 @@ function getBlackHolePipeline(device: GPUDevice): Promise<BlackHolePipeline> {
   let pending = pipelineCache.get(device)
   if (!pending) {
     pending = (async () => {
-      const module = await shaderModule(device, 'Hero black hole gravitational lens shader', blackHoleWgsl)
+      const module = await shaderModule(device, 'Hero black hole gravitational lens shader', blackHoleShader)
       const layout = device.createBindGroupLayout({
         label: 'Hero black hole lens layout',
         entries: [
@@ -144,7 +144,7 @@ function getBlackHolePipeline(device: GPUDevice): Promise<BlackHolePipeline> {
       const pipeline = await device.createRenderPipelineAsync({
         label: 'Hero black hole gravitational lens',
         layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
-        vertex: { module, entryPoint: 'lensVertex' },
+        vertex: { module, entryPoint: 'screenVertex' },
         fragment: {
           module,
           entryPoint: 'lensFragment',
@@ -163,13 +163,14 @@ function getBlackHolePipeline(device: GPUDevice): Promise<BlackHolePipeline> {
 }
 
 export class BlackHoleLensPass {
-  private readonly uniformData = new Float32Array(12) // 3 x vec4f
+  private readonly uniformData = new Float32Array(12)
   private readonly uniformBuffer: GPUBuffer
   private readonly linearSampler: GPUSampler
-  private scratchTexture: GPUTexture | null = null
-  private scratchView: GPUTextureView | null = null
-  private scratchW = 0
-  private scratchH = 0
+  private outputTexture: GPUTexture | null = null
+  private outputView: GPUTextureView | null = null
+  private outputW = 0
+  private outputH = 0
+  private boundSourceView: GPUTextureView | null = null
   private bindGroup: GPUBindGroup | null = null
   private destroyed = false
 
@@ -196,66 +197,64 @@ export class BlackHoleLensPass {
     return new BlackHoleLensPass(device, gpu)
   }
 
-  private ensureScratch(width: number, height: number) {
-    const resized = !this.scratchTexture || this.scratchW !== width || this.scratchH !== height
-    if (resized) {
-      this.scratchTexture?.destroy()
-      this.scratchTexture = this.device.createTexture({
-        label: 'Hero black hole HDR scratch',
+  private ensureOutput(sceneView: GPUTextureView, width: number, height: number) {
+    if (!this.outputTexture || this.outputW !== width || this.outputH !== height) {
+      this.outputTexture?.destroy()
+      this.outputTexture = this.device.createTexture({
+        label: 'Hero black hole lensed HDR scene',
         size: [width, height],
         format: 'rgba16float',
-        usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
       })
-      this.scratchView = this.scratchTexture.createView()
-      this.scratchW = width
-      this.scratchH = height
+      this.outputView = this.outputTexture.createView()
+      this.outputW = width
+      this.outputH = height
+    }
+    if (!this.bindGroup || this.boundSourceView !== sceneView) {
       this.bindGroup = this.device.createBindGroup({
         layout: this.gpu.layout,
         entries: [
           { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: this.scratchView },
+          { binding: 1, resource: sceneView },
           { binding: 2, resource: this.linearSampler },
         ],
       })
+      this.boundSourceView = sceneView
     }
   }
 
   apply(
     encoder: GPUCommandEncoder,
-    sceneTexture: GPUTexture,
     sceneView: GPUTextureView,
     width: number,
     height: number,
-    ratio: number,
     timeSeconds: number,
     geom: BlackHoleGeometry,
-  ) {
-    if (this.destroyed || width < 2 || height < 2) return
-    if (geom.scroll <= 0.0005 && geom.lensStrength <= 0.0005 && geom.ringIntensity <= 0.0005) return
-    this.ensureScratch(width, height)
-
-    // Snapshot resolved pre-bloom HDR scene into scratch, then write lensed HDR + photon ring back to sceneView.
-    encoder.copyTextureToTexture({ texture: sceneTexture }, { texture: this.scratchTexture! }, [width, height, 1])
+  ): GPUTextureView | null {
+    if (this.destroyed || width < 2 || height < 2) return null
+    if (geom.scroll <= 0.0005 && geom.lensStrength <= 0.0005 && geom.ringIntensity <= 0.0005) return null
+    this.ensureOutput(sceneView, width, height)
 
     this.uniformData.set([geom.cx, geom.cy, geom.rh, geom.aspect], 0)
     this.uniformData.set([timeSeconds, geom.scroll, geom.lensStrength, geom.ringIntensity], 4)
-    this.uniformData.set([width, height, ratio, 0], 8)
+    this.uniformData.set([height, 0, 0, 0], 8)
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
 
     const pass = encoder.beginRenderPass({
       label: 'Hero black hole gravitational lens',
-      colorAttachments: [{ view: sceneView, loadOp: 'clear', storeOp: 'store' }],
+      colorAttachments: [{ view: this.outputView!, loadOp: 'clear', storeOp: 'store' }],
     })
     pass.setPipeline(this.gpu.pipeline)
     pass.setBindGroup(0, this.bindGroup!)
     pass.draw(3)
     pass.end()
+    return this.outputView
   }
 
   destroy() {
     if (this.destroyed) return
     this.destroyed = true
-    this.scratchTexture?.destroy()
+    this.outputTexture?.destroy()
     this.uniformBuffer.destroy()
   }
 }

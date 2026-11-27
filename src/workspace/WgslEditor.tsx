@@ -19,6 +19,7 @@ import {
   type ShaderFile,
   type ShaderFileKind,
 } from './shaderProject'
+import { EARTH_CELL_FIELDS } from '../earth-score/custom-shader.ts'
 import { wgslKeywords as keywords, wgslLanguageId as language, wgslTypes as types } from './wgslTheme'
 import { startWgslLanguageServer } from './wgslLanguageServer'
 import { registerSharedWgslAnalyzer } from './planetaryShaderAnalysis'
@@ -160,24 +161,15 @@ function editorSuggestion(
   }
 }
 
-function cellFields(prelude: string) {
-  const cell = prelude.match(/struct\s+EarthCell\s*\{([^}]*)\}/)?.[1] ?? ''
-  return Array.from(
-    cell.matchAll(/(?:\/\/([^\n]+)\n\s*)?\b([a-zA-Z_]\w*)\s*:\s*([a-zA-Z_]\w*)/g),
-    ([, doc, name, type]) => ({ name, type, doc: doc?.trim() }),
-  )
-}
+const earthCellFieldLookup = new Map(
+  EARTH_CELL_FIELDS.map(field => [field.name, { ...field, doc: `${field.description} (${field.unit})` }]),
+)
 
-function fallbackSuggestions(
-  model: monaco.editor.ITextModel,
-  position: monaco.Position,
-  range: monaco.IRange,
-  prelude: string,
-) {
+function fallbackSuggestions(model: monaco.editor.ITextModel, position: monaco.Position, range: monaco.IRange) {
   const kind = monaco.languages.CompletionItemKind
   const before = model.getLineContent(position.lineNumber).slice(0, position.column - 1)
   if (/\.\s*\w*$/.test(before)) {
-    return cellFields(prelude).map(({ name, type, doc }) => ({
+    return Array.from(earthCellFieldLookup.values(), ({ name, type, doc }) => ({
       label: name,
       insertText: name,
       kind: kind.Field,
@@ -201,15 +193,15 @@ function fallbackSuggestions(
 
 // The upstream server can return no hover information. Keep common shader
 // functions, declarations and EarthCell field documentation available locally.
-function localHover(model: monaco.editor.ITextModel, position: monaco.Position, prelude: string, program: string) {
+function localHover(model: monaco.editor.ITextModel, position: monaco.Position, program: string) {
   const token = model.getWordAtPosition(position)
   if (!token) return null
   const name = token.word
-  const field = cellFields(prelude).find(field => field.name === name)
+  const field = earthCellFieldLookup.get(name)
   if (field) {
-    const contents = [{ value: '`' + name + ': ' + field.type + '`' }]
-    if (field.doc) contents.push({ value: field.doc })
-    return { contents }
+    return {
+      contents: [{ value: '`' + name + ': ' + field.type + '`' }, { value: field.doc }],
+    }
   }
   if (Object.hasOwn(builtins, name)) return { contents: [{ value: builtins[name] }] }
   if (!/^[a-zA-Z_]\w*$/.test(name)) return null
@@ -253,7 +245,6 @@ export default function WgslEditor(props: Props) {
     activeFileId,
     diagnostics,
     insertion,
-    onInserted,
     prelude = '',
     label = 'WGSL score function',
     vim,
@@ -674,7 +665,7 @@ export default function WgslEditor(props: Props) {
                   incomplete: !Array.isArray(result) && result?.isIncomplete,
                 }
             }
-            return { suggestions: fallbackSuggestions(model, position, range, latest.current.prelude) }
+            return { suggestions: fallbackSuggestions(model, position, range) }
           },
         }),
       )
@@ -697,7 +688,6 @@ export default function WgslEditor(props: Props) {
             return localHover(
               model,
               position,
-              latest.current.prelude,
               segment ? virtualProgram : virtualSource(latest.current.prelude, assemble(fileId).source),
             )
           },
@@ -882,7 +872,7 @@ export default function WgslEditor(props: Props) {
   }, [diagnostics])
   useEffect(() => {
     instance.current?.updateEditors()
-  }, [vim, label, insertion, onInserted])
+  }, [vim, label, insertion])
   useEffect(() => {
     if (analyzerEnabled) instance.current?.maybeStartAnalyzer()
   }, [analyzerEnabled])

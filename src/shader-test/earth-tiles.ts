@@ -20,10 +20,10 @@ export { tileKey }
 
 const EARTH_TILE_PACKS = 8
 const EARTH_TILE_SLOTS = 96
-const EARTH_TILE_PAGE_W = 160
-const EARTH_TILE_PAGE_H = 80
-const EARTH_TILE_BASE_COLS = 40
-const EARTH_TILE_BASE_ROWS = 20
+export const EARTH_TILE_PAGE_W = 160
+export const EARTH_TILE_PAGE_H = 80
+export const EARTH_TILE_BASE_COLS = 40
+export const EARTH_TILE_BASE_ROWS = 20
 const LEVEL_COUNT = 3
 
 type TileSlot = { key: number; level: number; tx: number; ty: number; lastUsed: number }
@@ -52,7 +52,6 @@ export class EarthTileCache {
   private pendingQueue: TileJob[] = []
   private activeDecodes = 0
   private frameCounter = 0
-  private pageDirty = false
   private destroyed = false
   private activated = false
   private packsAttached = false
@@ -185,7 +184,10 @@ export class EarthTileCache {
     const loupeMpp = loupe ? metresPerPixel / Math.max(1, loupe.zoom) : Infinity
     const minMpp = Math.min(metresPerPixel, loupeMpp)
     // Stay on the already-resident 8K texture until the viewport exceeds ~8K detail.
-    if (minMpp > 3900) return
+    if (minMpp > 3900) {
+      this.pendingQueue.length = 0
+      return
+    }
 
     const frame = ++this.frameCounter
     const needed = new Map<number, number>() // key -> priority (lower is higher priority)
@@ -248,7 +250,10 @@ export class EarthTileCache {
       requestPoint(loupe.lon, loupe.lat, loupeMpp, -2, 1)
     }
 
-    if (needed.size === 0) return
+    if (needed.size === 0) {
+      this.pendingQueue.length = 0
+      return
+    }
     const nextQueue: TileJob[] = []
     for (const [key, priority] of needed) {
       if (this.inFlight.has(key)) continue
@@ -295,22 +300,26 @@ export class EarthTileCache {
       bitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' })
       if (signal.aborted || this.destroyed) return
       const slotIndex = this.allocateSlot()
-      const device = this.device
-      device.queue.copyExternalImageToTexture(
-        { source: bitmap },
-        { texture: this.poolTexture, origin: [0, 0, slotIndex] },
-        [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE],
-      )
-      generateMipmaps(device, this.poolTexture, {
-        layers: [slotIndex],
-        mipLevelCount: VIRTUAL_TILE_MIPS,
-        label: 'Earth tile mipmaps',
-      })
-      this.slots[slotIndex] = { key: job.key, level: job.level, tx: job.tx, ty: job.ty, lastUsed: this.frameCounter }
-      this.resident.set(job.key, slotIndex)
-      this.pageDirty = true
-      this.flushPageTable()
-      this.notifyTileReady()
+      try {
+        const device = this.device
+        device.queue.copyExternalImageToTexture(
+          { source: bitmap },
+          { texture: this.poolTexture, origin: [0, 0, slotIndex] },
+          [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE],
+        )
+        generateMipmaps(device, this.poolTexture, {
+          layers: [slotIndex],
+          mipLevelCount: VIRTUAL_TILE_MIPS,
+          label: 'Earth tile mipmaps',
+        })
+        this.slots[slotIndex] = { key: job.key, level: job.level, tx: job.tx, ty: job.ty, lastUsed: this.frameCounter }
+        this.resident.set(job.key, slotIndex)
+        this.flushPageTable()
+        this.notifyTileReady()
+      } catch (uploadError) {
+        this.flushPageTable()
+        throw uploadError
+      }
     } catch {
       // Transient aborts/decode errors degrade gracefully to parent/8K texture.
     } finally {
@@ -322,8 +331,7 @@ export class EarthTileCache {
   }
 
   private flushPageTable() {
-    if (!this.pageDirty || !this.activated || this.destroyed) return
-    this.pageDirty = false
+    if (!this.activated || this.destroyed) return
     paintTilePageTable(this.pageData, EARTH_TILE_PAGE_W, LEVEL_COUNT, this.slots)
     this.device.queue.writeTexture(
       { texture: this.pageTexture },

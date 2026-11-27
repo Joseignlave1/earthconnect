@@ -286,11 +286,10 @@ export type BayerAnchor = {
   x: number
   y: number
   z: number
-  letterIndex: number | null
 }
 
 export const BAYER_ANCHORS: readonly BayerAnchor[] = [
-  ...CONSTELLATION_LETTERS.flatMap((letter, letterIndex) =>
+  ...CONSTELLATION_LETTERS.flatMap(letter =>
     letter.stars
       .filter(star => Boolean(star.label))
       .map((star, idx) => ({
@@ -299,7 +298,6 @@ export const BAYER_ANCHORS: readonly BayerAnchor[] = [
         x: star.x,
         y: star.y,
         z: star.z,
-        letterIndex,
       })),
   ),
   ...COMPANION_STARS.filter(star => Boolean(star.label)).map((star, idx) => ({
@@ -308,7 +306,6 @@ export const BAYER_ANCHORS: readonly BayerAnchor[] = [
     x: star.x,
     y: star.y,
     z: star.z,
-    letterIndex: null,
   })),
 ]
 

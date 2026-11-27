@@ -1,17 +1,36 @@
 override PLANET_TILE_PAIRS: u32 = 48u;
+override VIRTUAL_TILE_SIZE: f32 = 512.0;
+override VIRTUAL_TILE_INNER: f32 = 508.0;
+override VIRTUAL_TILE_GUTTER: f32 = 2.0;
+override PLANET_TILE_BASE_COLS: f32 = 24.0;
+override PLANET_TILE_BASE_ROWS: f32 = 12.0;
 
 struct View {
   camera: mat4x4f,
-  sun: vec4f,        // body-fixed sun direction, HDR flag
-  terrain: vec4f,    // reference radius metres, vertical exaggeration, major contours, DPR
-  low: vec4f,        // sRGB low albedo, minor contour detail
-  high: vec4f,       // sRGB high albedo, fine contour detail
-  tiles: vec4f,      // x: virtual tile pool active (0/1), y: reserved, z: small-planet radial pad, w: relief fade
-  eye: vec4f,        // body-local camera position (km), w: body kind (0 = Moon, 1 = Mars)
-  camRight: vec4f,   // body-local camera right, w: tan(FOV/2) * aspect
-  camUp: vec4f,      // body-local camera up, w: tan(FOV/2)
-  camBack: vec4f,    // body-local camera back, w: view depth of body center (km)
-  centerInfo: vec4f, // centerNdcX, centerNdcY, 2 / outWidth, 2 / outHeight
+  sunDirection: vec3f,
+  hdr: f32,
+  radiusMeters: f32,
+  relief: f32,
+  majorContourInterval: f32,
+  pixelRatio: f32,
+  lowAlbedo: vec3f,
+  minorContourDetail: f32,
+  highAlbedo: vec3f,
+  fineContourDetail: f32,
+  tilesReady: f32,
+  _padTiles0: f32,
+  _padTiles1: f32,
+  reliefFade: f32,
+  eyeKm: vec3f,
+  bodyKind: f32, // 0 = Moon, 1 = Mars
+  camRight: vec3f,
+  tanHalfFovX: f32,
+  camUp: vec3f,
+  tanHalfFovY: f32,
+  camBack: vec3f,
+  centerDepthKm: f32,
+  centerNdc: vec2f,
+  invViewportPx: vec2f,
 }
 
 @group(0) @binding(0) var<uniform> u: View;
@@ -28,38 +47,8 @@ struct Vertex {
   @location(0) local: vec3f,
 }
 
-fn cubeFaceDir(face: u32, fx: f32, fy: f32) -> vec3f {
-  let qpi = 0.7853981633974483;
-  let tx = tan(fx * qpi);
-  let ty = tan(fy * qpi);
-  switch face {
-    case 0u: { return normalize(vec3f(1., ty, -tx)); }
-    case 1u: { return normalize(vec3f(-1., ty, tx)); }
-    case 2u: { return normalize(vec3f(tx, 1., -ty)); }
-    case 3u: { return normalize(vec3f(tx, -1., ty)); }
-    case 4u: { return normalize(vec3f(tx, ty, 1.)); }
-    default: { return normalize(vec3f(-tx, ty, -1.)); }
-  }
-}
-
-@vertex fn vertexMain(
-  @location(0) local: vec3f,
-  @location(1) patchRect: vec4f,
-  @location(2) patchMeta: vec4f,
-) -> Vertex {
-  let fx = patchRect.x + local.x * patchRect.z;
-  let fy = patchRect.y + local.y * patchRect.w;
-  let dir = cubeFaceDir(u32(round(patchMeta.x)), fx, fy);
-  let uv = dirToUv(dir);
-  let maxLod = max(0., f32(textureNumLevels(heights)) - 1.);
-  let demMip = clamp(patchMeta.y, 0., maxLod);
-  let elevM = decode(textureSampleLevel(heights, gridSampler, uv, demMip));
-  let rSurf = u.terrain.x * .001;
-  let reliefFade = u.tiles.w;
-  let smallPad = u.tiles.z;
-  let skirt = local.z * patchMeta.z;
-  let dispR = rSurf + (elevM * u.terrain.y * .001) * reliefFade - skirt;
-  let pos = select(dir * dispR, dir * rSurf * (1. + smallPad), smallPad > 0.);
+@vertex fn vertexMain(input: CubePatchIn) -> Vertex {
+  let pos = displacedCubePatchPos(input, heights, gridSampler, u.radiusMeters * .001, u.relief, u.reliefFade);
   return Vertex(u.camera * vec4f(pos, 1.), pos);
 }
 
@@ -68,23 +57,22 @@ struct SmallVertex {
 }
 
 @vertex fn smallVertex(@builtin(vertex_index) vertex: u32) -> SmallVertex {
-  let corners = array<vec2f, 6>(vec2f(-1., -1.), vec2f(1., -1.), vec2f(-1., 1.), vec2f(-1., 1.), vec2f(1., -1.), vec2f(1., 1.));
-  let rSurf = u.terrain.x * .001;
-  let depth = u.camBack.w;
+  let rSurf = u.radiusMeters * .001;
+  let depth = u.centerDepthKm;
   if (depth <= rSurf * 1.001) { return SmallVertex(vec4f(2., 2., 0., 1.)); }
   let clipCenter = u.camera * vec4f(0., 0., 0., 1.);
   if (clipCenter.w <= 0.) { return SmallVertex(vec4f(2., 2., 0., 1.)); }
   let center = clipCenter.xy / clipCenter.w;
-  let cx = -dot(u.eye.xyz, u.camRight.xyz);
-  let cy = -dot(u.eye.xyz, u.camUp.xyz);
+  let cx = -dot(u.eyeKm, u.camRight);
+  let cy = -dot(u.eyeKm, u.camUp);
   let r2 = rSurf * rSurf;
   let d2x = cx * cx + depth * depth;
   let d2y = cy * cy + depth * depth;
   let denom = max(depth * depth - r2, 1e-6);
-  let extX = (rSurf * sqrt(max(0., d2x - r2)) + abs(cx) * r2 / depth) / (denom * u.camRight.w);
-  let extY = (rSurf * sqrt(max(0., d2y - r2)) + abs(cy) * r2 / depth) / (denom * u.camUp.w);
-  let pad = vec2f(3. * u.centerInfo.z, 3. * u.centerInfo.w);
-  let corner = center + corners[vertex] * (vec2f(extX, extY) + pad);
+  let extX = (rSurf * sqrt(max(0., d2x - r2)) + abs(cx) * r2 / depth) / (denom * u.tanHalfFovX);
+  let extY = (rSurf * sqrt(max(0., d2y - r2)) + abs(cy) * r2 / depth) / (denom * u.tanHalfFovY);
+  let pad = 3. * u.invViewportPx;
+  let corner = center + unitQuadCorner(vertex) * (vec2f(extX, extY) + pad);
   return SmallVertex(vec4f(corner, 0., 1.));
 }
 
@@ -94,19 +82,8 @@ struct SmallOut {
   @builtin(sample_mask) mask: u32,
 }
 
-fn dirToUv(dir: vec3f) -> vec2f {
-  let pi = 3.141592653589793;
-  let lon = atan2(dir.x, dir.z);
-  let lat = atan2(dir.y, length(dir.xz));
-  return vec2f(lon / (2. * pi) + .5, .5 - lat / pi);
-}
-
 fn wrappedGrad(g: vec2f) -> vec2f {
   return vec2f(g.x - round(g.x), g.y);
-}
-
-fn decode(sample: vec4f) -> f32 {
-  return dot(sample.rg, vec2f(65280., 255.)) - 32768.;
 }
 
 // 5-tap Catmull-Rom bicubic height filter for smooth zoomed-in crater rims & contours.
@@ -126,11 +103,11 @@ fn sampleHeightBicubic(uv: vec2f) -> f32 {
   let tc0 = (tc1 - 1.) * invSize;
   let tc3 = (tc1 + 2.) * invSize;
   let tc12 = (tc1 + w2 / w12) * invSize;
-  let s0 = decode(textureSampleLevel(heights, gridSampler, vec2f(tc12.x, tc0.y), 0.));
-  let s1 = decode(textureSampleLevel(heights, gridSampler, vec2f(tc0.x, tc12.y), 0.));
-  let s2 = decode(textureSampleLevel(heights, gridSampler, vec2f(tc12.x, tc12.y), 0.));
-  let s3 = decode(textureSampleLevel(heights, gridSampler, vec2f(tc3.x, tc12.y), 0.));
-  let s4 = decode(textureSampleLevel(heights, gridSampler, vec2f(tc12.x, tc3.y), 0.));
+  let s0 = decodeHeight(textureSampleLevel(heights, gridSampler, vec2f(tc12.x, tc0.y), 0.));
+  let s1 = decodeHeight(textureSampleLevel(heights, gridSampler, vec2f(tc0.x, tc12.y), 0.));
+  let s2 = decodeHeight(textureSampleLevel(heights, gridSampler, vec2f(tc12.x, tc12.y), 0.));
+  let s3 = decodeHeight(textureSampleLevel(heights, gridSampler, vec2f(tc3.x, tc12.y), 0.));
+  let s4 = decodeHeight(textureSampleLevel(heights, gridSampler, vec2f(tc12.x, tc3.y), 0.));
   let sum = s0 * (w12.x * w0.y) + s1 * (w0.x * w12.y) + s2 * (w12.x * w12.y)
     + s3 * (w3.x * w12.y) + s4 * (w12.x * w3.y);
   let total = w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y;
@@ -138,53 +115,84 @@ fn sampleHeightBicubic(uv: vec2f) -> f32 {
 }
 
 fn samplePlanetHeight(uv: vec2f, rawLod: f32, maxLod: f32) -> f32 {
-  var h = decode(textureSampleLevel(heights, gridSampler, uv, clamp(rawLod, 0., maxLod)));
+  var h = decodeHeight(textureSampleLevel(heights, gridSampler, uv, clamp(rawLod, 0., maxLod)));
   if (rawLod < -1.) {
     h = mix(h, sampleHeightBicubic(uv), 1. - smoothstep(-2., -1., rawLod));
   }
   return h;
 }
 
-fn shadePlanet(
-  p: vec3f, localPos: vec3f, smallAngle: f32,
-  pDx: vec3f, pDy: vec3f, uv: vec2f, uvDx: vec2f, uvDy: vec2f,
-  texelAngle: f32, pixelAngle: f32, lod: f32, height: f32, hGrad: vec2f,
-) -> vec3f {
-  let pi = 3.141592653589793;
+struct PlanetLod {
+  texelAngle: f32,
+  pixelAngle: f32,
+  maxLod: f32,
+  rawLod: f32,
+  lod: f32,
+}
+
+fn computePlanetLod(pDx: vec3f, pDy: vec3f) -> PlanetLod {
+  let size = vec2f(textureDimensions(heights));
+  let texelAngle = PLANET_PI / size.y;
+  let pixelAngle = max(length(pDx), length(pDy));
+  let maxLod = f32(textureNumLevels(heights) - 1u);
+  let rawLod = log2(max(1e-4, pixelAngle / texelAngle));
+  let lod = clamp(rawLod, 0., maxLod);
+  return PlanetLod(texelAngle, pixelAngle, maxLod, rawLod, lod);
+}
+
+struct PlanetShadeInput {
+  p: vec3f,
+  localPos: vec3f,
+  smallAngle: f32,
+  pDx: vec3f,
+  pDy: vec3f,
+  uv: vec2f,
+  uvDx: vec2f,
+  uvDy: vec2f,
+  lod: PlanetLod,
+  height: f32,
+  hGrad: vec2f,
+}
+
+fn shadePlanet(s: PlanetShadeInput) -> vec3f {
+  let p = s.p;
+  let uv = s.uv;
   // Minor singular value of dp/d(screen) gives the un-foreshortened angular scale everywhere.
-  let pxx = dot(pDx, pDx);
-  let pyy = dot(pDy, pDy);
-  let pxy = dot(pDx, pDy);
+  let pxx = dot(s.pDx, s.pDx);
+  let pyy = dot(s.pDy, s.pDy);
+  let pxy = dot(s.pDx, s.pDy);
   let pDet = max(0., pxx * pyy - pxy * pxy);
   let pMax = max(1e-12, .5 * (pxx + pyy + length(vec2f(pxx - pyy, 2. * pxy))));
-  let minorAngle = max(sqrt(pDet / pMax), smallAngle);
+  let minorAngle = max(sqrt(pDet / pMax), s.smallAngle);
   var tileAlbedo = vec3f(0.);
   var tileWeight = 0.;
   var tileNormal = p;
   var tileNormalWeight = 0.;
-  if (u.tiles.x > .5) {
+  if (u.tilesReady > .5) {
     let tileCoord = vec2f(fract(uv.x), clamp(uv.y, 0., .999999));
-    let cell = vec2i(clamp(floor(tileCoord * vec2f(48., 24.)), vec2f(0.), vec2f(47., 23.)));
+    let pageDims = vec2f(textureDimensions(tilePage));
+    let cell = vec2i(clamp(floor(tileCoord * pageDims), vec2f(0.), pageDims - 1.));
     let entry = textureLoad(tilePage, cell, 0);
     if (entry.r < 255u) {
-      let innerScale = 508. / 512.;
+      let innerScale = VIRTUAL_TILE_INNER / VIRTUAL_TILE_SIZE;
+      let baseGrid = vec2f(PLANET_TILE_BASE_COLS, PLANET_TILE_BASE_ROWS);
       var slot = entry.r;
-      var grid = vec2f(24., 12.) * exp2(f32(entry.g));
+      var grid = baseGrid * exp2(f32(entry.g));
       var gradScale = grid * innerScale;
-      var dx = uvDx * gradScale;
-      var dy = uvDy * gradScale;
-      var tileMip = log2(max(1., max(length(dx), length(dy)) * 512.));
+      var dx = s.uvDx * gradScale;
+      var dy = s.uvDy * gradScale;
+      var tileMip = log2(max(1., max(length(dx), length(dy)) * VIRTUAL_TILE_SIZE));
       if (tileMip > 1.75 && entry.b < 255u) {
         slot = entry.b;
-        grid = vec2f(24., 12.) * exp2(f32(entry.a));
+        grid = baseGrid * exp2(f32(entry.a));
         gradScale = grid * innerScale;
-        dx = uvDx * gradScale;
-        dy = uvDy * gradScale;
-        tileMip = log2(max(1., max(length(dx), length(dy)) * 512.));
+        dx = s.uvDx * gradScale;
+        dy = s.uvDy * gradScale;
+        tileMip = log2(max(1., max(length(dx), length(dy)) * VIRTUAL_TILE_SIZE));
       }
       if (tileMip < 2.8) {
         let localUv = fract(tileCoord * grid);
-        let tileUv = localUv * innerScale + (2. / 512.);
+        let tileUv = localUv * innerScale + (VIRTUAL_TILE_GUTTER / VIRTUAL_TILE_SIZE);
         tileWeight = 1. - smoothstep(2.0, 2.8, tileMip);
         tileAlbedo = textureSampleGrad(tilePool, tileSampler, tileUv, i32(slot), dx, dy).rgb;
         let polarSafe = smoothstep(.04, .14, length(p.xz));
@@ -203,43 +211,43 @@ fn shadePlanet(
   if (tileNormalWeight < .999) {
     // 4-tap bilinear tangent central differences (linearly interpolates per-texel slopes)
     // instead of 6x5 bicubic taps; falls back to 3D direction steps near the poles.
-    let lon = (uv.x - .5) * 2. * pi;
-    let lat = (.5 - uv.y) * pi;
+    let lon = (uv.x - .5) * 2. * PLANET_PI;
+    let lat = (.5 - uv.y) * PLANET_PI;
     let cosLon = cos(lon);
     let sinLon = sin(lon);
     let cosLat = cos(lat);
     let sinLat = sin(lat);
     let east = vec3f(cosLon, 0., -sinLon);
     let north = vec3f(-sinLat * sinLon, cosLat, -sinLat * cosLon);
-    let s = min(.25, texelAngle * exp2(lod));
+    let step = min(.25, s.lod.texelAngle * exp2(s.lod.lod));
     var hE: f32;
     var hW: f32;
     var hN: f32;
     var hS: f32;
     if (abs(lat) < 1.48) {
-      let du = s / (2. * pi * max(cosLat, .05));
-      let dv = s / pi;
-      hE = decode(textureSampleLevel(heights, gridSampler, uv + vec2f(du, 0.), lod));
-      hW = decode(textureSampleLevel(heights, gridSampler, uv - vec2f(du, 0.), lod));
-      hN = decode(textureSampleLevel(heights, gridSampler, uv - vec2f(0., dv), lod));
-      hS = decode(textureSampleLevel(heights, gridSampler, uv + vec2f(0., dv), lod));
+      let du = step / (2. * PLANET_PI * max(cosLat, .05));
+      let dv = step / PLANET_PI;
+      hE = decodeHeight(textureSampleLevel(heights, gridSampler, uv + vec2f(du, 0.), s.lod.lod));
+      hW = decodeHeight(textureSampleLevel(heights, gridSampler, uv - vec2f(du, 0.), s.lod.lod));
+      hN = decodeHeight(textureSampleLevel(heights, gridSampler, uv - vec2f(0., dv), s.lod.lod));
+      hS = decodeHeight(textureSampleLevel(heights, gridSampler, uv + vec2f(0., dv), s.lod.lod));
     } else {
-      hE = decode(textureSampleLevel(heights, gridSampler, dirToUv(p + east * s), lod));
-      hW = decode(textureSampleLevel(heights, gridSampler, dirToUv(p - east * s), lod));
-      hN = decode(textureSampleLevel(heights, gridSampler, dirToUv(p + north * s), lod));
-      hS = decode(textureSampleLevel(heights, gridSampler, dirToUv(p - north * s), lod));
+      hE = decodeHeight(textureSampleLevel(heights, gridSampler, dirToUv(p + east * step), s.lod.lod));
+      hW = decodeHeight(textureSampleLevel(heights, gridSampler, dirToUv(p - east * step), s.lod.lod));
+      hN = decodeHeight(textureSampleLevel(heights, gridSampler, dirToUv(p + north * step), s.lod.lod));
+      hS = decodeHeight(textureSampleLevel(heights, gridSampler, dirToUv(p - north * step), s.lod.lod));
     }
-    let scale = u.terrain.y / (2. * s * u.terrain.x);
+    let scale = u.relief / (2. * step * u.radiusMeters);
     let baseNormal = normalize(p - (east * (hE - hW) + north * (hN - hS)) * scale);
     hillNormal = normalize(mix(baseNormal, tileNormal, tileNormalWeight));
   }
-  let sun = normalize(u.sun.xyz);
-  let viewDir = normalize(u.eye.xyz - localPos);
+  let sun = normalize(u.sunDirection);
+  let viewDir = normalize(u.eyeKm - s.localPos);
   let pDotL = dot(p, sun);
   let daylight = smoothstep(-.035, .045, pDotL);
   let ndotl = max(0., dot(hillNormal, sun));
   let ndotv = max(.04, dot(hillNormal, viewDir));
-  let isMars = u.eye.w > .5;
+  let isMars = u.bodyKind > .5;
   var diffuse = ndotl;
   if (!isMars) {
     // Lommel-Seeliger lunar regolith BRDF: flat dusty opposition brightness + punchy crater relief near the terminator.
@@ -263,7 +271,7 @@ fn shadePlanet(
   // background (e.g. Moon seen from Earth), while lifting linear ambient smoothly by the
   // focused orbital view (~200 CSS px radius) so night-side craters & dark basalt stay readable
   // and strictly darker than any sunlit pixel across the terminator.
-  let inspect = 1. - smoothstep(.0040, .022, minorAngle * u.terrain.w);
+  let inspect = 1. - smoothstep(.0040, .022, minorAngle * u.pixelRatio);
   let fillSide = normalize(cross(viewDir, vec3f(0., 1., 0.)) + vec3f(1e-4, 0., 0.));
   let fillDir = normalize(p + .45 * viewDir + .22 * fillSide + .18 * vec3f(0., 1., 0.));
   let fill = max(0., dot(hillNormal, fillDir));
@@ -279,17 +287,17 @@ fn shadePlanet(
   ) * daylight * diffuse;
   let ambientTint = select(vec3f(.86, .93, 1.06), vec3f(1., .95, .91), isMars);
   let contours = terrainContours(
-    height,
-    hGrad,
-    u.terrain.z,
-    vec2f(u.low.w, u.high.w),
-    u.terrain.w,
+    s.height,
+    s.hGrad,
+    u.majorContourInterval,
+    vec2f(u.minorContourDetail, u.fineContourDetail),
+    u.pixelRatio,
     0.,
   );
-  let tone = clamp((height + 6000.) / 16500., 0., 1.);
-  var surfaceLinear = toLinear(mix(u.low.rgb, u.high.rgb, tone));
+  let tone = clamp((s.height + 6000.) / 16500., 0., 1.);
+  var surfaceLinear = toLinear(mix(u.lowAlbedo, u.highAlbedo, tone));
   let albedoSize = vec2f(textureDimensions(albedo));
-  let albedoLod = clamp(log2(max(1., pixelAngle / (pi / albedoSize.y))), 0., f32(textureNumLevels(albedo) - 1u));
+  let albedoLod = clamp(log2(max(1., s.lod.pixelAngle / (PLANET_PI / albedoSize.y))), 0., f32(textureNumLevels(albedo) - 1u));
   let albedoSample = textureSampleLevel(albedo, albedoSampler, uv, albedoLod);
   let hasAlbedo = albedoSample.a > .5 || tileWeight > .001;
   if (albedoSample.a > .5) {
@@ -316,26 +324,20 @@ fn shadePlanet(
       + vec3f(.10, .06, .04) * horizon * .08 * (1. - sunDay);
   }
   let totalLinear = litLinear + marsAtmo;
-  return select(toDisplay(totalLinear), totalLinear, u.sun.w > .5);
+  return select(toDisplay(totalLinear), totalLinear, u.hdr > .5);
 }
 
 @fragment fn fragmentMain(input: Vertex) -> @location(0) vec4f {
-  let pi = 3.141592653589793;
   let p = normalize(input.local);
   let uv = dirToUv(p);
   let pDx = dpdx(p);
   let pDy = dpdy(p);
   let uvDx = wrappedGrad(dpdx(uv));
   let uvDy = wrappedGrad(dpdy(uv));
-  let size = vec2f(textureDimensions(heights));
-  let texelAngle = pi / size.y;
-  let pixelAngle = max(length(pDx), length(pDy));
-  let maxLod = f32(textureNumLevels(heights) - 1u);
-  let rawLod = log2(max(1e-4, pixelAngle / texelAngle));
-  let lod = clamp(rawLod, 0., maxLod);
-  let height = samplePlanetHeight(uv, rawLod, maxLod);
+  let lod = computePlanetLod(pDx, pDy);
+  let height = samplePlanetHeight(uv, lod.rawLod, lod.maxLod);
   let hGrad = vec2f(dpdx(height), dpdy(height));
-  return vec4f(shadePlanet(p, input.local, 0., pDx, pDy, uv, uvDx, uvDy, texelAngle, pixelAngle, lod, height, hGrad), 1.);
+  return vec4f(shadePlanet(PlanetShadeInput(p, input.local, 0., pDx, pDy, uv, uvDx, uvDy, lod, height, hGrad)), 1.);
 }
 
 struct PlanetRayHit {
@@ -346,13 +348,13 @@ struct PlanetRayHit {
 }
 
 fn evalPlanetRay(destPos: vec2f, rSurf: f32) -> PlanetRayHit {
-  let ndc = vec2f(destPos.x * u.centerInfo.z - 1., 1. - destPos.y * u.centerInfo.w);
-  let tanX = u.camRight.w;
-  let tanY = u.camUp.w;
-  let depth = u.camBack.w;
-  let dNdc = ndc - u.centerInfo.xy;
-  let evalLocal = u.camRight.xyz * (dNdc.x * depth * tanX) + u.camUp.xyz * (dNdc.y * depth * tanY);
-  let dir = normalize(u.camRight.xyz * (ndc.x * tanX) + u.camUp.xyz * (ndc.y * tanY) - u.camBack.xyz);
+  let ndc = vec2f(destPos.x * u.invViewportPx.x - 1., 1. - destPos.y * u.invViewportPx.y);
+  let tanX = u.tanHalfFovX;
+  let tanY = u.tanHalfFovY;
+  let depth = u.centerDepthKm;
+  let dNdc = ndc - u.centerNdc;
+  let evalLocal = u.camRight * (dNdc.x * depth * tanX) + u.camUp * (dNdc.y * depth * tanY);
+  let dir = normalize(u.camRight * (ndc.x * tanX) + u.camUp * (ndc.y * tanY) - u.camBack);
   let q = evalLocal - dir * dot(evalLocal, dir);
   let disc = rSurf * rSurf - dot(q, q);
   let hit = disc >= 0.;
@@ -361,12 +363,39 @@ fn evalPlanetRay(destPos: vec2f, rSurf: f32) -> PlanetRayHit {
   return PlanetRayHit(hitPos, p, dirToUv(p), hit);
 }
 
+struct SmallAxisGrad {
+  pD: vec3f,
+  uvD: vec2f,
+}
+
+fn computeSmallAxisGrad(h0: PlanetRayHit, hPos: PlanetRayHit, hNeg: PlanetRayHit) -> SmallAxisGrad {
+  if (hPos.hit != hNeg.hit) {
+    let pD = select(h0.p - hNeg.p, hPos.p - h0.p, hPos.hit) * 2.;
+    let uvD = select(wrappedGrad(h0.uv - hNeg.uv), wrappedGrad(hPos.uv - h0.uv), hPos.hit) * 2.;
+    return SmallAxisGrad(pD, uvD);
+  }
+  return SmallAxisGrad(hPos.p - hNeg.p, wrappedGrad(hPos.uv - hNeg.uv));
+}
+
+fn computeSmallHeightDiff(
+  height0: f32,
+  hPos: PlanetRayHit,
+  hNeg: PlanetRayHit,
+  rawLod: f32,
+  maxLod: f32,
+) -> f32 {
+  if (hPos.hit != hNeg.hit) {
+    let hSide = samplePlanetHeight(select(hNeg.uv, hPos.uv, hPos.hit), rawLod, maxLod);
+    return select(height0 - hSide, hSide - height0, hPos.hit) * 2.;
+  }
+  return samplePlanetHeight(hPos.uv, rawLod, maxLod) - samplePlanetHeight(hNeg.uv, rawLod, maxLod);
+}
+
 @fragment fn smallFragment(
   input: SmallVertex,
   @builtin(sample_index) sampleIdx: u32,
 ) -> SmallOut {
-  let pi = 3.141592653589793;
-  let rSurf = u.terrain.x * .001;
+  let rSurf = u.radiusMeters * .001;
   // Evaluate analytical per-sample sphere raycasts and neighbor rays directly from framebuffer
   // coordinates for crisp sub-pixel silhouettes and quad-independent gradients, with explicit
   // sample_mask guaranteeing WebGPU per-sample execution.
@@ -377,49 +406,20 @@ fn evalPlanetRay(destPos: vec2f, rSurf: f32) -> PlanetRayHit {
   let hXm = evalPlanetRay(destPos - vec2f(.5, 0.), rSurf);
   let hYp = evalPlanetRay(destPos + vec2f(0., .5), rSurf);
   let hYm = evalPlanetRay(destPos - vec2f(0., .5), rSurf);
-  var pDx = hXp.p - hXm.p;
-  var uvDx = wrappedGrad(hXp.uv - hXm.uv);
-  if (hXp.hit != hXm.hit) {
-    pDx = select(h0.p - hXm.p, hXp.p - h0.p, hXp.hit) * 2.;
-    uvDx = select(wrappedGrad(h0.uv - hXm.uv), wrappedGrad(hXp.uv - h0.uv), hXp.hit) * 2.;
-  }
-  var pDy = hYp.p - hYm.p;
-  var uvDy = wrappedGrad(hYp.uv - hYm.uv);
-  if (hYp.hit != hYm.hit) {
-    pDy = select(h0.p - hYm.p, hYp.p - h0.p, hYp.hit) * 2.;
-    uvDy = select(wrappedGrad(h0.uv - hYm.uv), wrappedGrad(hYp.uv - h0.uv), hYp.hit) * 2.;
-  }
-  let size = vec2f(textureDimensions(heights));
-  let texelAngle = pi / size.y;
-  let pixelAngle = max(length(pDx), length(pDy));
-  let maxLod = f32(textureNumLevels(heights) - 1u);
-  let rawLod = log2(max(1e-4, pixelAngle / texelAngle));
-  let lod = clamp(rawLod, 0., maxLod);
-  let height0 = samplePlanetHeight(h0.uv, rawLod, maxLod);
-  var hDx: f32;
-  if (hXp.hit != hXm.hit) {
-    let hSide = samplePlanetHeight(select(hXm.uv, hXp.uv, hXp.hit), rawLod, maxLod);
-    hDx = select(height0 - hSide, hSide - height0, hXp.hit) * 2.;
-  } else {
-    hDx = samplePlanetHeight(hXp.uv, rawLod, maxLod) - samplePlanetHeight(hXm.uv, rawLod, maxLod);
-  }
-  var hDy: f32;
-  if (hYp.hit != hYm.hit) {
-    let hSide = samplePlanetHeight(select(hYm.uv, hYp.uv, hYp.hit), rawLod, maxLod);
-    hDy = select(height0 - hSide, hSide - height0, hYp.hit) * 2.;
-  } else {
-    hDy = samplePlanetHeight(hYp.uv, rawLod, maxLod) - samplePlanetHeight(hYm.uv, rawLod, maxLod);
-  }
-  let hGrad = vec2f(hDx, hDy);
-  let smallAngle = max(u.camBack.w * u.camUp.w * u.centerInfo.w, 1e-4) / rSurf;
-  let color = shadePlanet(h0.p, h0.hitPos, smallAngle, pDx, pDy, h0.uv, uvDx, uvDy, texelAngle, pixelAngle, lod, height0, hGrad);
+  let gx = computeSmallAxisGrad(h0, hXp, hXm);
+  let gy = computeSmallAxisGrad(h0, hYp, hYm);
+  let lod = computePlanetLod(gx.pD, gy.pD);
+  let height0 = samplePlanetHeight(h0.uv, lod.rawLod, lod.maxLod);
+  let hGrad = vec2f(
+    computeSmallHeightDiff(height0, hXp, hXm, lod.rawLod, lod.maxLod),
+    computeSmallHeightDiff(height0, hYp, hYm, lod.rawLod, lod.maxLod),
+  );
+  let smallAngle = max(u.centerDepthKm * u.tanHalfFovY * u.invViewportPx.y, 1e-4) / rSurf;
+  let color = shadePlanet(PlanetShadeInput(
+    h0.p, h0.hitPos, smallAngle, gx.pD, gy.pD, h0.uv, gx.uvD, gy.uvD, lod, height0, hGrad,
+  ));
   let clip = u.camera * vec4f(h0.hitPos, 1.);
   return SmallOut(vec4f(color, 1.), clip.z / clip.w, 1u << sampleIdx);
-}
-
-fn packSplit16Small(x: f32) -> vec2f {
-  let hi = round(x * 256.) / 256.;
-  return vec2f(hi, x - hi);
 }
 
 struct SmallAnnotationOut {
@@ -429,13 +429,13 @@ struct SmallAnnotationOut {
 }
 
 fn evalSmallAnnotation(input: SmallVertex, sampleIdx: u32) -> SmallAnnotationOut {
-  let rSurf = u.terrain.x * .001;
+  let rSurf = u.radiusMeters * .001;
   let h0 = evalPlanetRay(input.position.xy, rSurf);
   if (!h0.hit) { discard; }
-  let bodyOffset = select(2., 4., u.eye.w > .5);
+  let bodyOffset = select(2., 4., u.bodyKind > .5);
   let clip = u.camera * vec4f(h0.hitPos, 1.);
   return SmallAnnotationOut(
-    vec4f(packSplit16Small(h0.uv.x + bodyOffset), packSplit16Small(1. - h0.uv.y)),
+    vec4f(packSplit16(h0.uv.x + bodyOffset), packSplit16(1. - h0.uv.y)),
     clip.z / clip.w,
     1u << sampleIdx,
   );

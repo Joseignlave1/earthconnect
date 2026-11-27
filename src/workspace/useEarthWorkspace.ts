@@ -10,7 +10,7 @@ import type { BodyId } from '../explorerData.ts'
 import { SurfaceRenderer } from '../shader-test/renderer.ts'
 import { earthTilePath } from '../shader-test/earth-tiles.ts'
 import { planetTilePath, type PlanetTileBody } from './planetTiles.ts'
-import { scoreManifestUrl, type WorkspaceAssets } from './workspaceAssets.ts'
+import { loadWorkspaceTilePack, scoreManifestUrl, type WorkspaceAssets } from './workspaceAssets.ts'
 import type { SolarFocus } from './solarCamera.ts'
 import { SolarScene } from './solarScene.ts'
 import { canonicalPoint, coordinatesValid, pointKey } from './planetaryPointCache.ts'
@@ -94,7 +94,6 @@ export function useEarthWorkspace(
   assets: WorkspaceAssets,
   onSourcePick?: (body: BodyId, latitude: number, longitude: number) => void,
   resources?: EarthWorkspaceResources,
-  preloadWorld = true,
   initialView = defaultInitialView,
 ) {
   const [state, setState] = useState(initial)
@@ -310,7 +309,7 @@ export function useEarthWorkspace(
         })
         return
       }
-      if (preloadWorld) prepareWorld(device)
+      prepareWorld(device)
       mapStatus()
       if (resume) {
         const job = resume
@@ -329,17 +328,7 @@ export function useEarthWorkspace(
         delete canvas!.dataset.scoreName
         delete canvas!.dataset.source
         delete canvas!.dataset.frameSource
-        const loadTilePack = async (path: string, signal: AbortSignal) => {
-          try {
-            if (import.meta.env.DEV) {
-              const url = await assets.url(path, signal)
-              if (!url.startsWith('blob:')) return url
-            }
-            return await assets.blob(path, signal)
-          } catch {
-            return null
-          }
-        }
+        const loadTilePack = (path: string, signal: AbortSignal) => loadWorkspaceTilePack(assets, path, signal)
         const instance = await SurfaceRenderer.create(
           canvas!,
           (selection, score) => {
@@ -371,7 +360,7 @@ export function useEarthWorkspace(
             assets: assets.url,
             loadTerrain: shared.acquireTerrain,
             loadEarthTilePack: (packId, signal) => loadTilePack(earthTilePath(packId), signal),
-            onDevice: preloadWorld ? prepareWorld : undefined,
+            onDevice: prepareWorld,
             initialView,
           },
         )
@@ -533,7 +522,7 @@ export function useEarthWorkspace(
         } else {
           update({ error: '' })
           renderer.retrySolarTerrain()
-          if (preloadWorld) prepareWorld(renderer.computeDevice)
+          prepareWorld(renderer.computeDevice)
         }
       },
     }
@@ -550,7 +539,7 @@ export function useEarthWorkspace(
       releaseWorld()
       renderer?.destroy()
     }
-  }, [canvasRef, assets, resources, preloadWorld, initialView])
+  }, [canvasRef, assets, resources, initialView])
 
   return { ...state, place, pickSourceAt, freezePoint, retry, setProjection, focus, runShader, cancelShader }
 }

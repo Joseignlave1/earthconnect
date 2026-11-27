@@ -18,9 +18,10 @@ export function startWorkspacePrewarm(
   devicePool?: ReturnType<typeof createSurfaceDevicePool>,
   existingDeviceLease?: ReturnType<ReturnType<typeof createSurfaceDevicePool>>,
 ): WorkspacePrewarm {
-  const controller = new AbortController()
-  const { signal } = controller
-  const resources = createEarthWorkspaceResources(devicePool)
+  const ownerController = new AbortController()
+  const prewarmController = new AbortController()
+  const { signal } = prewarmController
+  const resources = createEarthWorkspaceResources(devicePool, ownerController.signal)
   const deviceLease = existingDeviceLease ?? resources.acquireDevice()
   if (!existingDeviceLease) {
     startStartupSpan('gpu-device')
@@ -42,7 +43,8 @@ export function startWorkspacePrewarm(
   }
 
   const dispose = () => {
-    controller.abort()
+    prewarmController.abort()
+    ownerController.abort()
     handoff()
   }
 

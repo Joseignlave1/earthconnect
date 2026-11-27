@@ -5,10 +5,10 @@
 }
 
 .startup-constellation-canvas {
-  position: absolute;
-  inset: -56px;
-  width: calc(100% + 112px);
-  height: calc(100% + 112px);
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   display: block;
   pointer-events: none;
   opacity: 0;
@@ -104,13 +104,6 @@
     visibility 0s 220ms;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .workspace-startup[data-revealed],
-  .workspace-startup-content {
-    transition: none;
-  }
-}
-
 .workspace-startup-content {
   position: relative;
   width: min(100%, 440px);
@@ -120,6 +113,13 @@
 
 .workspace-startup-content[data-ready] {
   opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-startup[data-revealed],
+  .workspace-startup-content {
+    transition: none;
+  }
 }
 
 .workspace-startup progress {

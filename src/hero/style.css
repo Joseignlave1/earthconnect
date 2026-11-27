@@ -318,7 +318,7 @@
   outline: none;
 }
 
-.atlas-site-btn[data-active="true"] {
+.atlas-site-btn[aria-selected="true"] {
   color: #f6f0e6;
   border-bottom-color: #e6c28b;
 }
@@ -408,7 +408,7 @@
   outline: none;
 }
 
-.atlas-toggle-btn[data-active="true"] {
+.atlas-toggle-btn[aria-pressed="true"] {
   color: #f0cc92;
 }
 
@@ -624,7 +624,7 @@
   outline: none;
 }
 
-.copilot-switch-btn[data-active="true"] {
+.copilot-switch-btn[aria-selected="true"] {
   color: #f0cc92;
   border-bottom-color: rgba(230, 194, 139, 0.65);
 }
@@ -754,7 +754,7 @@
   outline: none;
 }
 
-.crew-name-btn[data-active="true"] {
+.crew-name-btn[aria-selected="true"] {
   color: #f6f0e6;
   border-bottom-color: #e6c28b;
 }

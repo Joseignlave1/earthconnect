@@ -8,78 +8,233 @@ import {
   type PlanetaryShaderData,
 } from './planetShaderSchema.ts'
 import { TILE_SIZE, WORKGROUP_SIZE, type ScoreManifest } from './manifest.ts'
-import { SCORE_MAX, SCORE_MISSING, sourceCodeWGSL } from './scoring.ts'
+import { SCORE_MAX, SCORE_MISSING, scoreLookupLayout, sourceCodeWGSL } from './scoring.ts'
+
+export type ScoreShaderFieldDescriptor = Readonly<{
+  name: string
+  type: 'f32'
+  kind: 'measurement' | 'coverage'
+  unit: string
+  description: string
+}>
+
+export type EarthCellFieldDescriptor = Readonly<{
+  name: string
+  type: 'f32' | 'u32'
+  kind: 'measurement' | 'coverage' | 'coordinate'
+  unit: string
+  description: string
+}>
 
 export const SCORE_SHADER_FIELDS = [
-  { name: 'elevation_median_m', unit: 'm', description: 'Median terrain elevation' },
-  { name: 'slope_mean_deg', unit: '°', description: 'Mean terrain slope' },
-  { name: 'relief_5km_m', unit: 'm', description: 'Elevation range across a 5 km neighborhood' },
-  { name: 'relief_21km_m', unit: 'm', description: 'Elevation range across a 21 km neighborhood' },
-  { name: 'tpi_5km_m', unit: 'm', description: 'Elevation relative to the surrounding 5 km terrain' },
-  { name: 'tpi_21km_m', unit: 'm', description: 'Elevation relative to the surrounding 21 km terrain' },
-  { name: 'annual_precip_mm', unit: 'mm/year', description: 'Annual total precipitation' },
-  { name: 'coldest_month_air_c', unit: '°C', description: 'Mean air temperature in the coldest month' },
-  { name: 'warmest_month_air_c', unit: '°C', description: 'Mean air temperature in the warmest month' },
-  { name: 'bare_fraction', unit: '0–1', description: 'Fraction of the cell with bare ground' },
-  { name: 'permanent_snow_ice_fraction', unit: '0–1', description: 'Fraction with permanent snow or ice' },
-  { name: 'permafrost_fraction', unit: '0–1', description: 'Fraction with mapped permafrost' },
+  { name: 'elevation_median_m', type: 'f32', kind: 'measurement', unit: 'm', description: 'Median terrain elevation' },
+  { name: 'slope_mean_deg', type: 'f32', kind: 'measurement', unit: '°', description: 'Mean terrain slope' },
+  {
+    name: 'relief_5km_m',
+    type: 'f32',
+    kind: 'measurement',
+    unit: 'm',
+    description: 'Elevation range across a 5 km neighborhood',
+  },
+  {
+    name: 'relief_21km_m',
+    type: 'f32',
+    kind: 'measurement',
+    unit: 'm',
+    description: 'Elevation range across a 21 km neighborhood',
+  },
+  {
+    name: 'tpi_5km_m',
+    type: 'f32',
+    kind: 'measurement',
+    unit: 'm',
+    description: 'Elevation relative to the surrounding 5 km terrain',
+  },
+  {
+    name: 'tpi_21km_m',
+    type: 'f32',
+    kind: 'measurement',
+    unit: 'm',
+    description: 'Elevation relative to the surrounding 21 km terrain',
+  },
+  {
+    name: 'annual_precip_mm',
+    type: 'f32',
+    kind: 'measurement',
+    unit: 'mm/year',
+    description: 'Annual total precipitation',
+  },
+  {
+    name: 'coldest_month_air_c',
+    type: 'f32',
+    kind: 'measurement',
+    unit: '°C',
+    description: 'Mean air temperature in the coldest month',
+  },
+  {
+    name: 'warmest_month_air_c',
+    type: 'f32',
+    kind: 'measurement',
+    unit: '°C',
+    description: 'Mean air temperature in the warmest month',
+  },
+  {
+    name: 'bare_fraction',
+    type: 'f32',
+    kind: 'measurement',
+    unit: '0–1',
+    description: 'Fraction of the cell with bare ground',
+  },
+  {
+    name: 'permanent_snow_ice_fraction',
+    type: 'f32',
+    kind: 'measurement',
+    unit: '0–1',
+    description: 'Fraction with permanent snow or ice',
+  },
+  {
+    name: 'permafrost_fraction',
+    type: 'f32',
+    kind: 'measurement',
+    unit: '0–1',
+    description: 'Fraction with mapped permafrost',
+  },
   {
     name: 'dominant_lithology_code',
+    type: 'f32',
+    kind: 'measurement',
     unit: 'category code',
     description: 'Dominant lithology class. Compare codes for equality.',
   },
-  { name: 'surface_day_c', unit: '°C', description: 'Daytime land surface temperature' },
-  { name: 'surface_night_c', unit: '°C', description: 'Nighttime land surface temperature' },
-  { name: 'surface_mean_c', unit: '°C', description: 'Mean land surface temperature' },
-  { name: 'surface_low_c', unit: '°C', description: 'Coldest land surface temperature composite' },
-  { name: 'surface_high_c', unit: '°C', description: 'Hottest land surface temperature composite' },
-  { name: 'surface_range_c', unit: '°C', description: 'Land surface temperature range' },
-  { name: 'landcover_valid_fraction', unit: '0–1', description: 'Valid land-cover observations' },
-  { name: 'terrain_valid_fraction', unit: '0–1', description: 'Valid terrain observations' },
-  { name: 'permafrost_valid_fraction', unit: '0–1', description: 'Valid permafrost observations' },
-  { name: 'surface_day_valid_fraction', unit: '0–1', description: 'Valid daytime surface temperature observations' },
+  {
+    name: 'surface_day_c',
+    type: 'f32',
+    kind: 'measurement',
+    unit: '°C',
+    description: 'Daytime land surface temperature',
+  },
+  {
+    name: 'surface_night_c',
+    type: 'f32',
+    kind: 'measurement',
+    unit: '°C',
+    description: 'Nighttime land surface temperature',
+  },
+  {
+    name: 'surface_mean_c',
+    type: 'f32',
+    kind: 'measurement',
+    unit: '°C',
+    description: 'Mean land surface temperature',
+  },
+  {
+    name: 'surface_low_c',
+    type: 'f32',
+    kind: 'measurement',
+    unit: '°C',
+    description: 'Coldest land surface temperature composite',
+  },
+  {
+    name: 'surface_high_c',
+    type: 'f32',
+    kind: 'measurement',
+    unit: '°C',
+    description: 'Hottest land surface temperature composite',
+  },
+  {
+    name: 'surface_range_c',
+    type: 'f32',
+    kind: 'measurement',
+    unit: '°C',
+    description: 'Land surface temperature range',
+  },
+  {
+    name: 'landcover_valid_fraction',
+    type: 'f32',
+    kind: 'coverage',
+    unit: '0–1',
+    description: 'Valid land-cover observations',
+  },
+  {
+    name: 'terrain_valid_fraction',
+    type: 'f32',
+    kind: 'coverage',
+    unit: '0–1',
+    description: 'Valid terrain observations',
+  },
+  {
+    name: 'permafrost_valid_fraction',
+    type: 'f32',
+    kind: 'coverage',
+    unit: '0–1',
+    description: 'Valid permafrost observations',
+  },
+  {
+    name: 'surface_day_valid_fraction',
+    type: 'f32',
+    kind: 'coverage',
+    unit: '0–1',
+    description: 'Valid daytime surface temperature observations',
+  },
   {
     name: 'surface_night_valid_fraction',
+    type: 'f32',
+    kind: 'coverage',
     unit: '0–1',
     description: 'Valid nighttime surface temperature observations',
   },
   {
     name: 'surface_paired_valid_fraction',
+    type: 'f32',
+    kind: 'coverage',
     unit: '0–1',
     description: 'Valid paired daytime and nighttime observations',
   },
-] as const
+] as const satisfies readonly ScoreShaderFieldDescriptor[]
+
+export const SCORE_MEASUREMENT_FIELDS: ReadonlySet<string> = new Set(
+  SCORE_SHADER_FIELDS.filter(field => field.kind === 'measurement').map(field => field.name),
+)
+
+export const SCORE_COVERAGE_FIELDS: ReadonlySet<string> = new Set(
+  SCORE_SHADER_FIELDS.filter(field => field.kind === 'coverage').map(field => field.name),
+)
 
 const coordinateFields = [
   {
     name: 'latitude_deg',
     type: 'f32',
+    kind: 'coordinate',
     unit: '°',
     description: 'Cell-center latitude, positive north. NO_DATA outside the Earth footprint.',
   },
   {
     name: 'longitude_deg',
     type: 'f32',
+    kind: 'coordinate',
     unit: '°',
     description: 'Cell-center longitude, positive east. NO_DATA outside the Earth footprint.',
   },
   {
     name: 'grid_x',
     type: 'u32',
+    kind: 'coordinate',
     unit: 'column',
     description: 'Zero-based column of the full sinusoidal raster, increasing rightward.',
   },
   {
     name: 'grid_y',
     type: 'u32',
+    kind: 'coordinate',
     unit: 'row',
     description: 'Zero-based row of the full sinusoidal raster, increasing southward.',
   },
-] as const
+] as const satisfies readonly EarthCellFieldDescriptor[]
+
+export const EARTH_CELL_FIELDS: readonly EarthCellFieldDescriptor[] = [...SCORE_SHADER_FIELDS, ...coordinateFields]
 
 const earthScorePrelude = /* wgsl */ `struct EarthCell {
-${SCORE_SHADER_FIELDS.map(({ name, unit, description }) => `  // ${description} (${unit})\n  ${name}: f32,`).join('\n')}
-${coordinateFields.map(({ name, type, unit, description }) => `  // ${description} (${unit})\n  ${name}: ${type},`).join('\n')}
+${EARTH_CELL_FIELDS.map(({ name, type, unit, description }) => `  // ${description} (${unit})\n  ${name}: ${type},`).join('\n')}
 }
 const NO_DATA = ${PLANET_NO_DATA.toExponential()};
 const NO_SCORE = -1.0;
@@ -240,22 +395,22 @@ fn ${internal}value(rows: u32, field: u32, row: u32, origin: i32, denominator: f
   return f32(i32(code) - origin) / denominator;
 }`
     : ''
-  const geometry = manifest.columns.length * 65536
+  const lookupLayout = scoreLookupLayout(manifest)
   const gridCode = needsGrid
     ? `
   let site = ${internal}first_site + row / ${PIXELS_PER_SITE}u;
   let pixel = row % ${PIXELS_PER_SITE}u;
-  let origin = ${internal}lookup[${geometry}u + site];
+  let origin = ${internal}lookup[${lookupLayout.siteOriginsOffset}u + site];
   let grid_x = origin % ${GRID_WIDTH}u + pixel % ${TILE_SIZE}u;
   let grid_y = origin / ${GRID_WIDTH}u + pixel / ${TILE_SIZE}u;`
     : ''
   const geoCode = needsGeo
     ? `
-  let location = ${geometry + manifest.sites.length}u + grid_y * 3u;
+  let location = ${lookupLayout.rowGeometryOffset}u + grid_y * ${lookupLayout.rowStride}u;
   let x_offset = f32(grid_x) + 0.5 - ${GRID_WIDTH / 2}.0;
-  let inside = abs(x_offset) < f32(${internal}lookup[location + 2u]);
-  let latitude = select(NO_DATA, bitcast<f32>(${internal}lookup[location]), inside);
-  let longitude = select(NO_DATA, x_offset * bitcast<f32>(${internal}lookup[location + 1u]), inside);`
+  let inside = abs(x_offset) < f32(${internal}lookup[location + ${lookupLayout.validHalfWidthOffset}u]);
+  let latitude = select(NO_DATA, bitcast<f32>(${internal}lookup[location + ${lookupLayout.latitudeOffset}u]), inside);
+  let longitude = select(NO_DATA, x_offset * bitcast<f32>(${internal}lookup[location + ${lookupLayout.lonScaleOffset}u]), inside);`
     : ''
   const bindings = [
     readsColumns && `@group(0) @binding(0) var<storage, read> ${internal}packed_input: array<u32>;`,

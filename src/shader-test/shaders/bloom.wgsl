@@ -1,5 +1,7 @@
 struct BloomUniforms {
-  step: vec4f, // x, y: texel step, z: downsample flag (> 0.5), w: reserved
+  texelStep: vec2f,
+  downsample: f32, // > 0.5 selects 4-tap threshold downsample
+  _pad: f32,
 }
 
 @group(0) @binding(0) var<uniform> p: BloomUniforms;
@@ -18,13 +20,13 @@ fn bright(uv: vec2f) -> vec3f {
 @fragment fn bloomFragment(input: ScreenVertex) -> @location(0) vec4f {
   let uv = input.uv;
   var c = vec3f(0.);
-  if (p.step.z > .5) {
-    c = (bright(uv + p.step.xy * vec2f(-.5, -.5)) + bright(uv + p.step.xy * vec2f(.5, -.5))
-      + bright(uv + p.step.xy * vec2f(-.5, .5)) + bright(uv + p.step.xy * vec2f(.5, .5))) * .25;
+  if (p.downsample > .5) {
+    c = (bright(uv + p.texelStep * vec2f(-.5, -.5)) + bright(uv + p.texelStep * vec2f(.5, -.5))
+      + bright(uv + p.texelStep * vec2f(-.5, .5)) + bright(uv + p.texelStep * vec2f(.5, .5))) * .25;
   } else {
     c = textureSampleLevel(source, linearSampler, uv, 0.).rgb * .227027;
-    c += (textureSampleLevel(source, linearSampler, uv + p.step.xy * 1.384615, 0.).rgb + textureSampleLevel(source, linearSampler, uv - p.step.xy * 1.384615, 0.).rgb) * .316216;
-    c += (textureSampleLevel(source, linearSampler, uv + p.step.xy * 3.230769, 0.).rgb + textureSampleLevel(source, linearSampler, uv - p.step.xy * 3.230769, 0.).rgb) * .070270;
+    c += (textureSampleLevel(source, linearSampler, uv + p.texelStep * 1.384615, 0.).rgb + textureSampleLevel(source, linearSampler, uv - p.texelStep * 1.384615, 0.).rgb) * .316216;
+    c += (textureSampleLevel(source, linearSampler, uv + p.texelStep * 3.230769, 0.).rgb + textureSampleLevel(source, linearSampler, uv - p.texelStep * 3.230769, 0.).rgb) * .070270;
   }
   return vec4f(c, 1.);
 }

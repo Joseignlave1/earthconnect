@@ -1,9 +1,10 @@
-import { EARTH_AXIS, EARTH_FLATTENING, equalEarthProject, type Vec3 } from './geometry.ts'
+import { EARTH_AXIS, EARTH_E2, EARTH_FLATTENING, equalEarthProject, type Vec3 } from './geometry.ts'
 import { elevationAt, type Terrain } from './terrain.ts'
 
 export const PATCH_SEGMENTS = 16
 export const MAX_PATCH_INSTANCES = 1024
-export const INSTANCE_FLOATS = 8 // 2 × vec4f = 32 bytes per visible patch
+export const EARTH_INSTANCE_FLOATS = 6 // patchOrigin (2), patchSize (2), demMip (1), skirtDepth (1)
+export const CUBE_INSTANCE_FLOATS = 6 // patchOrigin (2), patchSize (1), face (u32), demMip (1), skirtDepthKm (1)
 
 export type PatchMesh = {
   /** Interleaved float32x3: (s, t, skirt) where s, t ∈ [0, 1] and skirt ∈ {0, 1}. */
@@ -228,6 +229,34 @@ function pixelsPerUnitForSphere(view: CameraView, cx: number, cy: number, cz: nu
   return view.projScale / wNear
 }
 
+/**
+ * Measure a terrain cell's roughness via a 5×5 bilinear-plane deviation probe,
+ * combining peak-to-bilinear error and peak-to-valley amplitude so narrow mountain
+ * chains always refine while flat plains/oceans stay at 0.
+ */
+function probeCellRoughness(sample: (fx: number, fy: number) => number) {
+  const h00 = sample(0, 0)
+  const h10 = sample(1, 0)
+  const h01 = sample(0, 1)
+  const h11 = sample(1, 1)
+  let maxH = Math.max(h00, h10, h01, h11)
+  let minH = Math.min(h00, h10, h01, h11)
+  let maxErr = 0
+  for (let sy = 0; sy <= 4; sy++) {
+    const fy = sy * 0.25
+    for (let sx = 0; sx <= 4; sx++) {
+      const fx = sx * 0.25
+      const h = sample(fx, fy)
+      if (h > maxH) maxH = h
+      if (h < minH) minH = h
+      const interp = (h00 * (1 - fx) + h10 * fx) * (1 - fy) + (h01 * (1 - fx) + h11 * fx) * fy
+      const err = Math.abs(h - interp)
+      if (err > maxErr) maxErr = err
+    }
+  }
+  return { roughness: Math.max(maxErr, (maxH - minH) * 0.65), maxH, minH }
+}
+
 // ---------------------------------------------------------------------------
 // 1. Earth: Latitude-Coarsened UV Error-Metric Quadtree (supports Equal Earth morph)
 // ---------------------------------------------------------------------------
@@ -236,7 +265,6 @@ const EARTH_PYRAMID_LEVELS = 5 // level 0: 4×2 ... level 4: 64×32
 const EARTH_ROOT_COLS = 4
 const EARTH_ROOT_ROWS = 2
 const EARTH_MAX_DEPTH = 6 // up to 256×128 patches × 16 = 4096×2048 effective vertices
-const EARTH_E2 = EARTH_FLATTENING * (2 - EARTH_FLATTENING)
 
 type EarthRoughnessLevel = {
   cols: number
@@ -294,34 +322,11 @@ export class EarthQuadtree {
     const dv = 1 / leafRows
     for (let row = 0; row < leafRows; row++) {
       const v0 = row * dv
-      const v1 = v0 + dv
       for (let col = 0; col < leafCols; col++) {
         const u0 = col * du
-        const u1 = u0 + du
-        const h00 = sampleLand(u0, v0)
-        const h10 = sampleLand(u1, v0)
-        const h01 = sampleLand(u0, v1)
-        const h11 = sampleLand(u1, v1)
-        let maxH = Math.max(h00, h10, h01, h11)
-        let minH = Math.min(h00, h10, h01, h11)
-        let maxErr = 0
-        for (let sy = 0; sy <= 4; sy++) {
-          const fy = sy * 0.25
-          const v = v0 + dv * fy
-          for (let sx = 0; sx <= 4; sx++) {
-            const fx = sx * 0.25
-            const h = sampleLand(u0 + du * fx, v)
-            if (h > maxH) maxH = h
-            if (h < minH) minH = h
-            const interp = (h00 * (1 - fx) + h10 * fx) * (1 - fy) + (h01 * (1 - fx) + h11 * fx) * fy
-            const err = Math.abs(h - interp)
-            if (err > maxErr) maxErr = err
-          }
-        }
+        const { roughness, maxH } = probeCellRoughness((fx, fy) => sampleLand(u0 + du * fx, v0 + dv * fy))
         const idx = row * leafCols + col
-        // Capture both local peak deviation and peak-to-valley amplitude so narrow chains
-        // (Andes, Alps, Himalayas) always refine while flat oceans (maxH == minH == 0) stay 0.
-        leafRough[idx] = Math.max(maxErr, (maxH - minH) * 0.65)
+        leafRough[idx] = roughness
         leafMax[idx] = maxH
       }
     }
@@ -395,7 +400,7 @@ export class EarthQuadtree {
   }
 
   /**
-   * Select visible Earth patches into `out` (8 floats per patch: u0, v0, du, dv, demMip, skirtDepth, 0, 0).
+   * Select visible Earth patches into `out` (6 floats per patch: u0, v0, du, dv, demMip, skirtDepth).
    * Returns number of emitted patch instances.
    */
   selectPatches(
@@ -422,6 +427,9 @@ export class EarthQuadtree {
     const isFlat = morph < 0.005
 
     let count = 0
+    // Reserve one slot per unvisited visible node (starting with all root patches) so an
+    // early subtree can never exhaust MAX_PATCH_INSTANCES and drop later visible terrain.
+    let reserved = EARTH_ROOT_COLS * EARTH_ROOT_ROWS
     const emit = (u0: number, v0: number, du: number, dv: number, rough: number, curvatureErr: number) => {
       if (count >= MAX_PATCH_INSTANCES) return
       const texelsPerVert = Math.max(du * this.demWidth, dv * this.demHeight) / PATCH_SEGMENTS
@@ -433,15 +441,13 @@ export class EarthQuadtree {
         curvatureErr * 4.0 + roughUnit * 1.35,
         isFlat ? 0.002 : 0.0012 * Math.max(du, dv) * Math.PI,
       )
-      const o = count * INSTANCE_FLOATS
+      const o = count * EARTH_INSTANCE_FLOATS
       out[o] = u0
       out[o + 1] = v0
       out[o + 2] = du
       out[o + 3] = dv
       out[o + 4] = demMip
       out[o + 5] = skirtDepth
-      out[o + 6] = 0
-      out[o + 7] = 0
       count++
     }
 
@@ -468,8 +474,6 @@ export class EarthQuadtree {
     }
 
     const visit = (u0: number, v0: number, du: number, dv: number, depth: number) => {
-      if (count >= MAX_PATCH_INSTANCES) return
-
       const { rough, maxH } = this.lookupMetrics(u0, v0, du, dv)
       const maxHUnit = maxH * reliefScale
       const uMid = u0 + du * 0.5
@@ -506,7 +510,10 @@ export class EarthQuadtree {
       const radius = Math.sqrt(r2) + maxHUnit + 0.004
 
       // 1. Frustum cull
-      if (sphereOutsideFrustum(view, cx, cy, cz, radius)) return
+      if (sphereOutsideFrustum(view, cx, cy, cz, radius)) {
+        reserved--
+        return
+      }
 
       // 2. Horizon cone cull (globe mode only)
       const lat0 = (v0 - 0.5) * Math.PI
@@ -524,7 +531,10 @@ export class EarthQuadtree {
           const elevHorizon = Math.acos(Math.min(1, rMin / (1 + maxHUnit + 0.002)))
           const maxVisAngle = Math.min(Math.PI, baseHorizonAngle + elevHorizon + halfCone + 0.05)
           const cosDot = (cx * eyeDirX + cy * eyeDirY + cz * eyeDirZ) / cLen
-          if (cosDot < Math.cos(maxVisAngle)) return
+          if (cosDot < Math.cos(maxVisAngle)) {
+            reserved--
+            return
+          }
         }
       }
 
@@ -543,9 +553,13 @@ export class EarthQuadtree {
       const cellWorldSpan = isGlobe ? maxArc / PATCH_SEGMENTS : Math.max(du * 5.4, dv * 2.65) / PATCH_SEGMENTS
       const cellPx = cellWorldSpan * pxPerUnit
 
+      // Latitude-coarsened splitting: near the poles in globe mode, split 1×2 in latitude only
+      // so triangles stay near-isotropic instead of bunching 512 columns into polar slivers.
+      const splitU = !isGlobe || arcU >= arcV * 0.55
+      const extraSlots = splitU ? 3 : 1
       const shouldSplit =
         depth < EARTH_MAX_DEPTH &&
-        count + 4 < MAX_PATCH_INSTANCES &&
+        reserved + extraSlots <= MAX_PATCH_INSTANCES &&
         ((cellPx > 6.5 && screenErrorPx > targetErrorPx) || cellPx > 32)
 
       if (!shouldSplit) {
@@ -553,9 +567,7 @@ export class EarthQuadtree {
         return
       }
 
-      // Latitude-coarsened splitting: near the poles in globe mode, split 1×2 in latitude only
-      // so triangles stay near-isotropic instead of bunching 512 columns into polar slivers.
-      const splitU = !isGlobe || arcU >= arcV * 0.55
+      reserved += extraSlots
       const halfV = dv * 0.5
       if (!splitU) {
         visit(u0, v0, du, halfV, depth + 1)
@@ -651,32 +663,13 @@ export class PlanetCubeQuadtree {
 
       for (let ry = 0; ry < leafDim; ry++) {
         const fy0 = -1 + ry * cellSpan
-        const fy1 = fy0 + cellSpan
         for (let rx = 0; rx < leafDim; rx++) {
           const fx0 = -1 + rx * cellSpan
-          const fx1 = fx0 + cellSpan
-          const h00 = sampleElevKm(cubeFaceDir(face, fx0, fy0))
-          const h10 = sampleElevKm(cubeFaceDir(face, fx1, fy0))
-          const h01 = sampleElevKm(cubeFaceDir(face, fx0, fy1))
-          const h11 = sampleElevKm(cubeFaceDir(face, fx1, fy1))
-          let maxH = Math.max(h00, h10, h01, h11)
-          let minH = Math.min(h00, h10, h01, h11)
-          let maxErr = 0
-          for (let sy = 0; sy <= 4; sy++) {
-            const ty = sy * 0.25
-            const fy = fy0 + cellSpan * ty
-            for (let sx = 0; sx <= 4; sx++) {
-              const tx = sx * 0.25
-              const h = sampleElevKm(cubeFaceDir(face, fx0 + cellSpan * tx, fy))
-              if (h > maxH) maxH = h
-              if (h < minH) minH = h
-              const interp = (h00 * (1 - tx) + h10 * tx) * (1 - ty) + (h01 * (1 - tx) + h11 * tx) * ty
-              const err = Math.abs(h - interp)
-              if (err > maxErr) maxErr = err
-            }
-          }
+          const { roughness, maxH, minH } = probeCellRoughness((tx, ty) =>
+            sampleElevKm(cubeFaceDir(face, fx0 + cellSpan * tx, fy0 + cellSpan * ty)),
+          )
           const idx = ry * leafDim + rx
-          leafRough[idx] = Math.max(maxErr, (maxH - minH) * 0.65)
+          leafRough[idx] = roughness
           leafMax[idx] = maxH
           leafMin[idx] = minH
         }
@@ -733,7 +726,7 @@ export class PlanetCubeQuadtree {
 
   /**
    * Select visible cube-sphere patches into `out`
-   * (8 floats per patch: fx0, fy0, size, size, face, demMip, skirtDepthKm, 0).
+   * (6 words per patch: fx0, fy0, size, face [u32], demMip, skirtDepthKm).
    */
   selectPatches(
     out: Float32Array,
@@ -745,6 +738,7 @@ export class PlanetCubeQuadtree {
     reliefFade: number,
     targetErrorPx = 0.75,
   ): number {
+    const outU32 = new Uint32Array(out.buffer, out.byteOffset, out.length)
     const view = extractCameraView(matrix, width, height)
     const eyeDist = Math.hypot(eyeKm[0], eyeKm[1], eyeKm[2])
     const invEye = eyeDist > 1e-6 ? 1 / eyeDist : 0
@@ -757,6 +751,9 @@ export class PlanetCubeQuadtree {
     const baseHorizonAngle = useHorizon ? Math.acos(Math.min(1, rMinSphere / eyeDist)) : Math.PI
 
     let count = 0
+    // Reserve one slot per unvisited visible node (starting with all 6 cube faces) so an
+    // early face can never exhaust MAX_PATCH_INSTANCES and drop later visible terrain.
+    let reserved = 6
     const emit = (face: number, fx0: number, fy0: number, size: number, roughKm: number, curvatureErrKm: number) => {
       if (count >= MAX_PATCH_INSTANCES) return
       const angularSpan = size * (Math.PI * 0.25)
@@ -767,20 +764,17 @@ export class PlanetCubeQuadtree {
         curvatureErrKm * 4.5 + roughKm * effRelief * 1.5,
         this.radiusKm * angularSpan * 0.008,
       )
-      const o = count * INSTANCE_FLOATS
+      const o = count * CUBE_INSTANCE_FLOATS
       out[o] = fx0
       out[o + 1] = fy0
       out[o + 2] = size
-      out[o + 3] = size
-      out[o + 4] = face
-      out[o + 5] = demMip
-      out[o + 6] = skirtDepthKm
-      out[o + 7] = 0
+      outU32[o + 3] = face
+      out[o + 4] = demMip
+      out[o + 5] = skirtDepthKm
       count++
     }
 
     const visit = (face: number, depth: number, ix: number, iy: number, fx0: number, fy0: number, size: number) => {
-      if (count >= MAX_PATCH_INSTANCES) return
       const lvlIdx = Math.min(depth, CUBE_PYRAMID_LEVELS - 1)
       const shift = depth - lvlIdx
       const lvl = this.levels[face][lvlIdx]
@@ -815,14 +809,20 @@ export class PlanetCubeQuadtree {
       const radius = chordRadius + radialPad + 2.0
 
       // 1. Frustum cull
-      if (sphereOutsideFrustum(view, cx, cy, cz, radius)) return
+      if (sphereOutsideFrustum(view, cx, cy, cz, radius)) {
+        reserved--
+        return
+      }
 
       // 2. Horizon cone cull
       if (useHorizon) {
         const elevHorizon = Math.acos(Math.min(1, rMinSphere / Math.max(rMinSphere, rTop)))
         const maxVisAngle = Math.min(Math.PI, baseHorizonAngle + elevHorizon + halfCone + 0.05)
         const cosDot = dMid[0] * eyeDirX + dMid[1] * eyeDirY + dMid[2] * eyeDirZ
-        if (cosDot < Math.cos(maxVisAngle)) return
+        if (cosDot < Math.cos(maxVisAngle)) {
+          reserved--
+          return
+        }
       }
 
       // 3. Projected screen-space geometric error (curvature + full terrain roughness).
@@ -835,7 +835,7 @@ export class PlanetCubeQuadtree {
 
       const shouldSplit =
         depth < CUBE_MAX_DEPTH &&
-        count + 4 < MAX_PATCH_INSTANCES &&
+        reserved + 3 <= MAX_PATCH_INSTANCES &&
         ((cellPx > 6.5 && screenErrorPx > targetErrorPx) || cellPx > 32)
 
       if (!shouldSplit) {
@@ -843,6 +843,7 @@ export class PlanetCubeQuadtree {
         return
       }
 
+      reserved += 3
       const half = size * 0.5
       const cx2 = ix * 2
       const cy2 = iy * 2

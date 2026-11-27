@@ -38,10 +38,12 @@ export function motionBlurUniforms(
     if (!inputDriven) return
     elapsed = 1000 / 60
   }
-  if (!cameraChanged(previous, current)) return
   const delta = current.eye.map((value, index) => value - previous.eye[index])
   const before = [previous.right, previous.up, previous.back]
   const after = [current.right, current.up, current.back]
+  const moved = delta.some(value => Math.abs(value) > Math.max(1e-7, current.near * 1e-8))
+  const turned = after.some((axis, column) => axis.some((value, row) => Math.abs(value - before[column][row]) > 1e-9))
+  if (!moved && !turned) return
 
   // Subtract heliocentric eye positions in double precision before upload.
   // Transform current view-space coordinates directly into the previous view.
@@ -58,7 +60,7 @@ export function motionBlurUniforms(
     12,
   )
   packed[15] = current.near
-  packed.set([tangent * current.aspect, tangent, tangent * previous.aspect, tangent], 16)
+  packed.set([tangent * current.aspect, tangent, 0, 0], 16)
   packed.set([Math.min(3.5, shutterMilliseconds / elapsed), 20 * pixelRatio, 0.7 * pixelRatio, 0], 20)
   return packed
 }

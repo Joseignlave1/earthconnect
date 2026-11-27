@@ -1,42 +1,73 @@
+struct BridgeViewport {
+  sizePx: vec2f,
+  tanFov: vec2f,
+}
+
+struct BridgeTiming {
+  near: f32,
+  timeSeconds: f32,
+  reducedMotion: f32,
+  opacity: f32,
+}
+
 struct BridgeUniform {
-  viewport: vec4f, // width, height, tanX, tanY
-  timing: vec4f,   // near, timeSeconds, reducedMotion (0/1), opacity
-  marsColor: vec4f,
-  earthColor: vec4f,
+  viewport: BridgeViewport,
+  timing: BridgeTiming,
+  marsColor: vec3f,
+  arcHalfWidthPx: f32,
+  earthColor: vec3f,
+  _pad: f32,
 }
 
 @group(0) @binding(0) var<uniform> u: BridgeUniform;
 
+struct ArcInstance {
+  @location(0) startPos: vec3f,
+  @location(1) startT: f32,
+  @location(2) endPos: vec3f,
+  @location(3) endT: f32,
+}
+
 struct ArcVertex {
   @builtin(position) position: vec4f,
-  @location(0) uv: vec2f, // x: t along arc [0,1], y: signed cross-width [-1,1]
-  @location(1) halfWidthPx: f32,
+  @location(0) t: f32,
+  @location(1) crossSide: f32,
+  @location(2) halfWidthPx: f32,
 }
 
 fn projectView(p: vec3f) -> vec4f {
-  let w = max(-p.z, u.timing.x * 1.001);
-  return vec4f(p.x / u.viewport.z, p.y / u.viewport.w, u.timing.x, w);
+  let w = max(-p.z, u.timing.near * 1.001);
+  return vec4f(p.x / u.viewport.tanFov.x, p.y / u.viewport.tanFov.y, u.timing.near, w);
 }
 
 @vertex fn arcVertex(
-  @location(0) a: vec4f,      // xyz: camera-space start, w: tA
-  @location(1) b: vec4f,      // xyz: camera-space end, w: tB
-  @location(2) corner: vec4f, // x: end (0/1), y: side (-1/+1), z: halfWidthPx, w: unused
+  @builtin(vertex_index) vIdx: u32,
+  seg: ArcInstance,
 ) -> ArcVertex {
-  let clipA = projectView(a.xyz);
-  let clipB = projectView(b.xyz);
+  let corners = array<vec2f, 6>(
+    vec2f(0., -1.),
+    vec2f(1., -1.),
+    vec2f(0., 1.),
+    vec2f(0., 1.),
+    vec2f(1., -1.),
+    vec2f(1., 1.),
+  );
+  let corner = corners[vIdx];
+  let clipA = projectView(seg.startPos);
+  let clipB = projectView(seg.endPos);
   let ndcA = clipA.xy / clipA.w;
   let ndcB = clipB.xy / clipB.w;
-  let deltaPx = (ndcB - ndcA) * u.viewport.xy * .5;
+  let deltaPx = (ndcB - ndcA) * u.viewport.sizePx * .5;
   let lenPx = max(length(deltaPx), 1e-4);
   let perpPx = vec2f(-deltaPx.y, deltaPx.x) / lenPx;
   let isEnd = corner.x > .5;
   var clip = select(clipA, clipB, isEnd);
-  let t = select(a.w, b.w, isEnd);
-  let offsetNdc = perpPx * (corner.y * corner.z * 2.) / u.viewport.xy;
+  let t = select(seg.startT, seg.endT, isEnd);
+  let halfW = u.arcHalfWidthPx;
+  let offsetNdc = perpPx * (corner.y * halfW * 2.) / u.viewport.sizePx;
   clip.x += offsetNdc.x * clip.w;
   clip.y += offsetNdc.y * clip.w;
-  return ArcVertex(clip, vec2f(t, corner.y), corner.z);
+  return ArcVertex(clip, t, corner.y, halfW);
 }
 
 fn cometPulse(t: f32, head: f32, leadSigma: f32, tailSigma: f32) -> f32 {
@@ -46,8 +77,8 @@ fn cometPulse(t: f32, head: f32, leadSigma: f32, tailSigma: f32) -> f32 {
 }
 
 @fragment fn arcFragment(input: ArcVertex) -> @location(0) vec4f {
-  let t = input.uv.x;
-  let distPx = abs(input.uv.y) * input.halfWidthPx;
+  let t = input.t;
+  let distPx = abs(input.crossSide) * input.halfWidthPx;
   let endFade = smoothstep(0., .028, t) * smoothstep(1., .972, t);
 
   // Whisper-thin astronomical hairline core pre-filtered to avoid 1x DPR diagonal staircasing.
@@ -58,8 +89,8 @@ fn cometPulse(t: f32, head: f32, leadSigma: f32, tailSigma: f32) -> f32 {
   let halo = exp(-pow(distPx / (2.5 * spanFocus), 2.)) * .17;
 
   // Smooth C1 traveling pulses gliding from Mars (t=0) to Earth (t=1) with no wrap discontinuity.
-  let time = u.timing.y;
-  let staticMode = u.timing.z > .5;
+  let time = u.timing.timeSeconds;
+  let staticMode = u.timing.reducedMotion > .5;
   let phaseA = select(fract(time / 8.8) * 1.44 - .22, .44, staticMode);
   let phaseB = select(fract(time / 8.8 + .5) * 1.44 - .22, .82, staticMode);
   let pulseA = cometPulse(t, phaseA, .026, .13);
@@ -69,14 +100,20 @@ fn cometPulse(t: f32, head: f32, leadSigma: f32, tailSigma: f32) -> f32 {
   // Warm Martian amber-ivory -> cool celestial silver -> Earth Magma gold-coral.
   let midTint = vec3f(.96, .89, .84);
   let baseTint = select(
-    mix(u.marsColor.rgb, midTint, smoothstep(0., .5, t)),
-    mix(midTint, u.earthColor.rgb, smoothstep(.5, 1., t)),
+    mix(u.marsColor, midTint, smoothstep(0., .5, t)),
+    mix(midTint, u.earthColor, smoothstep(.5, 1., t)),
     t > .5,
   );
   let pulseTint = mix(vec3f(1.55, 1.18, .85), vec3f(1.9, 1.04, .64), t);
   let energy = (core * .46 + halo) * baseTint + (core * 1.25 + halo * 1.65) * pulse * pulseTint;
-  let intensity = energy * endFade * u.timing.w;
+  let intensity = energy * endFade * u.timing.opacity;
   return vec4f(intensity, 0.);
+}
+
+struct AnchorInstance {
+  @location(0) point: vec3f,
+  @location(1) kind: f32,
+  @location(2) radiusPx: f32,
 }
 
 struct AnchorVertex {
@@ -87,25 +124,37 @@ struct AnchorVertex {
 }
 
 @vertex fn anchorVertex(
-  @location(0) point: vec4f, // xyz: camera-space position, w: kind (0 = Mars, 1 = Earth)
-  @location(1) quad: vec4f,  // xy: corner (-1/+1), z: radiusPx, w: unused
+  @builtin(vertex_index) vIdx: u32,
+  anchor: AnchorInstance,
 ) -> AnchorVertex {
-  var clip = projectView(point.xyz);
-  let offsetNdc = quad.xy * (quad.z * 2.) / u.viewport.xy;
+  let corners = array<vec2f, 6>(
+    vec2f(-1., -1.),
+    vec2f(1., -1.),
+    vec2f(-1., 1.),
+    vec2f(-1., 1.),
+    vec2f(1., -1.),
+    vec2f(1., 1.),
+  );
+  let corner = corners[vIdx];
+  var clip = projectView(anchor.point);
+  let offsetNdc = corner * (anchor.radiusPx * 2.) / u.viewport.sizePx;
   clip.x += offsetNdc.x * clip.w;
   clip.y += offsetNdc.y * clip.w;
-  return AnchorVertex(clip, quad.xy * quad.z, point.w, quad.z);
+  return AnchorVertex(clip, corner * anchor.radiusPx, anchor.kind, anchor.radiusPx);
 }
 
 @fragment fn anchorFragment(input: AnchorVertex) -> @location(0) vec4f {
   let r = length(input.localPx);
   if (r > input.radiusPx) { discard; }
-  let tint = select(u.marsColor.rgb, u.earthColor.rgb, input.kind > .5);
-  let core = exp(-pow(r / 1.35, 2.)) * 1.35;
-  let glow = exp(-pow(r / 4.2, 2.)) * .24;
+  let tint = select(u.marsColor, u.earthColor, input.kind > .5);
+  let coreD = r / 1.35;
+  let core = exp(-(coreD * coreD)) * 1.35;
+  let glowD = r / 4.2;
+  let glow = exp(-(glowD * glowD)) * .24;
   let ringR = select(5.8, 4.8, input.kind > .5);
-  let ring = exp(-pow((r - ringR) / .78, 2.)) * .46;
-  let breath = select(.90 + .10 * sin(u.timing.y * 1.2 + input.kind * 2.1), 1., u.timing.z > .5);
-  let color = tint * (core + glow + ring) * breath * u.timing.w;
+  let ringD = (r - ringR) / .78;
+  let ring = exp(-(ringD * ringD)) * .46;
+  let breath = select(.90 + .10 * sin(u.timing.timeSeconds * 1.2 + input.kind * 2.1), 1., u.timing.reducedMotion > .5);
+  let color = tint * (core + glow + ring) * breath * u.timing.opacity;
   return vec4f(color, 0.);
 }

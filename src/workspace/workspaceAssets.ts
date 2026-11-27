@@ -55,3 +55,20 @@ export function workspaceAssets(
     },
   }
 }
+
+/** Shared tile-pack loader used by both the landing atlas and the full workspace. */
+export async function loadWorkspaceTilePack(
+  assets: WorkspaceAssets,
+  path: string,
+  signal: AbortSignal,
+): Promise<Blob | string | null> {
+  try {
+    if (import.meta.env.DEV) {
+      const url = await assets.url(path, signal)
+      if (!url.startsWith('blob:')) return url
+    }
+    return await assets.blob(path, signal)
+  } catch {
+    return null
+  }
+}

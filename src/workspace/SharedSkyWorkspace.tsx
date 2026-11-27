@@ -36,6 +36,7 @@ import {
   type ShaderProject,
 } from './shaderProject'
 import { formatPointCall, type PlanetaryCoordinates } from './planetaryPointCache.ts'
+import { initialPreviewFileId } from './shaderLayout.ts'
 import { endStartupSpan, startStartupSpan } from './startupTiming.ts'
 import './SharedSkyWorkspace.css'
 
@@ -301,17 +302,15 @@ function SkyScene({
   onInsert,
   footer,
   onReady,
-  preloadWorld = true,
   initialView,
 }: {
-  onReady: (computed: boolean) => void
-  preloadWorld?: boolean
+  onReady: () => void
   initialView?: { latitude: number; longitude: number }
   footer?: boolean
   assets: WorkspaceAssets
   resources?: EarthWorkspaceResources
   fileId?: string
-  assembled?: SceneShader
+  assembled: SceneShader
   run?: SceneRun
   onDiagnostics?: (diagnostics: WgslDiagnostic[] | undefined) => void
   onInsert?: (text: string) => void
@@ -321,24 +320,22 @@ function SkyScene({
   const [body, setBody] = useState<World>('earth')
   const [projection, setProjection] = useState<Projection>('globe')
   const [points, setPoints] = useState<Partial<Record<BodyId, Point>>>({})
-  const engine = useEarthWorkspace(canvas, assets, pickPoint, resources, preloadWorld, initialView)
+  const engine = useEarthWorkspace(canvas, assets, pickPoint, resources, initialView)
   const pendingPreview = useRef<number>(undefined)
   const previousProgram = useRef<{ source?: string }>(undefined)
   const previousRun = useRef<number | undefined>(undefined)
   const queuedProgram = useRef<{ source: string; delay: number }>(undefined)
   const diagnostics = engine.shaderDiagnostics
-  const failed = engine.shaderSource === assembled?.source && diagnostics.find(item => item.severity === 'error')
+  const failed = engine.shaderSource === assembled.source && diagnostics.find(item => item.severity === 'error')
   const { runShader, cancelShader } = engine
   const computed = engine.frameSource === 'computed' && engine.shaderActive
-  const populated =
-    assembled !== undefined ? computed || (Boolean(engine.frameSource) && Boolean(failed)) : Boolean(engine.frameSource)
-  const dataSettled = !preloadWorld || engine.worldSettled
+  const populated = computed || (Boolean(engine.frameSource) && Boolean(failed))
   useEffect(() => {
-    if ((populated && dataSettled) || engine.surfaceFailed) onReady(computed)
-  }, [populated, dataSettled, computed, engine.surfaceFailed, onReady])
+    if ((populated && engine.worldSettled) || engine.surfaceFailed) onReady()
+  }, [populated, engine.worldSettled, engine.surfaceFailed, onReady])
 
   useEffect(() => {
-    if (!assembled || engine.shaderSource !== assembled.source) {
+    if (engine.shaderSource !== assembled.source) {
       onDiagnostics?.(undefined)
       return
     }
@@ -350,7 +347,7 @@ function SkyScene({
     )
   }, [engine.shaderSource, assembled, diagnostics, fileId, onDiagnostics])
 
-  const sourceCode = assembled?.source
+  const sourceCode = assembled.source
   useEffect(() => {
     const forced = run && previousRun.current !== run.id
     const previous = previousProgram.current
@@ -625,6 +622,7 @@ type WorkspaceProps = {
   assets: WorkspaceAssets
   resources?: EarthWorkspaceResources
   initialProject?: ShaderProject
+  onProjectChange?: (project: ShaderProject) => void
   onReady: () => void
 }
 
@@ -639,42 +637,32 @@ function StandaloneSkyWorkspace({ assets, onReady }: WorkspaceProps) {
   )
 }
 
-export default function SharedSkyWorkspace({ assets, resources, initialProject, onReady }: WorkspaceProps) {
+export default function SharedSkyWorkspace({
+  assets,
+  resources,
+  initialProject,
+  onProjectChange,
+  onReady,
+}: WorkspaceProps) {
   if (!WgslEditor) return <StandaloneSkyWorkspace assets={assets} onReady={onReady} />
-  return <ShaderWorkspace assets={assets} resources={resources} initialProject={initialProject} onReady={onReady} />
+  return (
+    <ShaderWorkspace
+      assets={assets}
+      resources={resources}
+      initialProject={initialProject}
+      onProjectChange={onProjectChange}
+      onReady={onReady}
+    />
+  )
 }
 
-function initialPreviewFileId(files: readonly { id: string }[], activeFileId: string): string | undefined {
-  const valid = new Set(files.map(file => file.id))
-  try {
-    const saved = JSON.parse(localStorage.getItem('earth-connect-wgsl-editor-layout') ?? 'null') as {
-      groups?: {
-        active?: string | { previewFileId?: string } | null
-        tabs?: (string | { previewFileId?: string } | null)[]
-      }[]
-    } | null
-    if (saved && Array.isArray(saved.groups)) {
-      for (const group of saved.groups) {
-        if (
-          group?.active &&
-          typeof group.active === 'object' &&
-          typeof group.active.previewFileId === 'string' &&
-          valid.has(group.active.previewFileId)
-        ) {
-          return group.active.previewFileId
-        }
-        if (group?.active === null && valid.has(activeFileId)) return activeFileId
-      }
-      // Saved layout explicitly exists with no active preview tab; don't prewarm one.
-      return undefined
-    }
-  } catch {
-    /* Storage may be unavailable. */
-  }
-  return valid.has(activeFileId) ? activeFileId : undefined
-}
-
-function ShaderWorkspace({ assets, resources: sharedResources, initialProject, onReady }: WorkspaceProps) {
+function ShaderWorkspace({
+  assets,
+  resources: sharedResources,
+  initialProject,
+  onProjectChange,
+  onReady,
+}: WorkspaceProps) {
   const [resources] = useState(() => sharedResources ?? createEarthWorkspaceResources())
   const [workbenchFailed, setWorkbenchFailed] = useState(false)
   const [projectFiles, setProjectFiles] = useState<ShaderProject>(() => initialProject ?? defaultShaderProject())
@@ -683,6 +671,11 @@ function ShaderWorkspace({ assets, resources: sharedResources, initialProject, o
   const persistedProject = useRef(projectFiles)
   const [vim, setVim] = useState(readVim)
   const [insertion, setInsertion] = useState<{ id: number; fileId: string; text: string }>()
+  const clearInsertion = useCallback(
+    (id: number) => setInsertion(previous => (previous?.id === id ? undefined : previous)),
+    [],
+  )
+  const toggleVim = useCallback(() => setVim(previous => !previous), [])
   const sequence = useRef(0)
   const [hosts, setHosts] = useState(new Map<string, HTMLElement>())
   const [openPreviews, setOpenPreviews] = useState<readonly string[]>([])
@@ -715,13 +708,21 @@ function ShaderWorkspace({ assets, resources: sharedResources, initialProject, o
     parking.append(host)
     const map = prewarmedHosts.current
     map.set(initialPreview, host)
-    setHosts(previous => (previous.has(initialPreview) ? previous : new Map(previous).set(initialPreview, host)))
+    setHosts(previous =>
+      previous.get(initialPreview) === host ? previous : new Map(previous).set(initialPreview, host),
+    )
     setOpenPreviews(previous => (previous.includes(initialPreview) ? previous : [...previous, initialPreview]))
     setStartedPreviews(previous => (previous.has(initialPreview) ? previous : new Set([...previous, initialPreview])))
     return () => {
       if (map.get(initialPreview) === host) {
         map.delete(initialPreview)
         host.remove()
+        setHosts(previous => {
+          if (previous.get(initialPreview) !== host) return previous
+          const next = new Map(previous)
+          next.delete(initialPreview)
+          return next
+        })
       }
     }
   }, [initialPreview])
@@ -809,11 +810,12 @@ function ShaderWorkspace({ assets, resources: sharedResources, initialProject, o
       persistedProject.current = loaded
       currentProject.current = loaded
       setProjectFiles(loaded)
+      onProjectChange?.(loaded)
     })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [onProjectChange])
   useEffect(() => {
     if (!projectLoaded.current || projectFiles === persistedProject.current) return
     persistedProject.current = projectFiles
@@ -831,6 +833,7 @@ function ShaderWorkspace({ assets, resources: sharedResources, initialProject, o
     projectLoaded.current = true
     currentProject.current = next
     setProjectFiles(next)
+    onProjectChange?.(next)
   }
 
   function changeShader(id: string, source: string) {
@@ -982,13 +985,13 @@ function ShaderWorkspace({ assets, resources: sharedResources, initialProject, o
                   onNewFile={addFile}
                   onRenameFile={renameFile}
                   onReopenFile={showFile}
-                  onToggleVim={() => setVim(previous => !previous)}
+                  onToggleVim={toggleVim}
                   prelude={SCORE_SHADER_PRELUDE}
                   label="Earth score WGSL"
                   vim={vim}
                   onRun={previewShader}
                   insertion={insertion}
-                  onInserted={id => setInsertion(previous => (previous?.id === id ? undefined : previous))}
+                  onInserted={clearInsertion}
                 />
               </Suspense>
             </ShaderEditorBoundary>

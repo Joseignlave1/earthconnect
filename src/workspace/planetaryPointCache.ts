@@ -1,12 +1,23 @@
-import type { SampleMeasurement, SampleResult } from '../earthIndexApi.ts'
+import type { PlanetaryShaderMeasurement } from '../earth-score/planetShaderSchema.ts'
 import type { BodyId } from '../explorerData.ts'
 
+export type CachedPlanetarySample = Readonly<{
+  measurements: readonly PlanetaryShaderMeasurement[]
+  partial: boolean
+  cached: boolean
+}>
+
 export type PlanetaryCoordinates = { body: BodyId; latitude: number; longitude: number }
-type LoadPoint = (body: BodyId, latitude: number, longitude: number, signal: AbortSignal) => Promise<SampleResult>
+type LoadPoint = (
+  body: BodyId,
+  latitude: number,
+  longitude: number,
+  signal: AbortSignal,
+) => Promise<CachedPlanetarySample>
 
 export type PersistedPointRecord = {
   key: string
-  sample: SampleResult
+  sample: CachedPlanetarySample
   bytes: number
   score: number
   lastUsed: number
@@ -56,24 +67,23 @@ export function formatPointCall({ body, latitude, longitude }: PlanetaryCoordina
   return `${body}_point(${literal(latitude)}, ${literal(longitude)})`
 }
 
-function compactSample(sample: SampleResult): SampleResult {
+function compactSample(sample: CachedPlanetarySample): CachedPlanetarySample {
   return {
     partial: sample.partial,
     cached: true,
     measurements: sample.measurements.map(
-      item =>
-        ({
-          variableId: item.variableId,
-          unit: item.unit,
-          status: item.status,
-          qualityFlags: [...item.qualityFlags],
-          decoded: item.decoded,
-        }) as SampleMeasurement,
+      (item): PlanetaryShaderMeasurement => ({
+        variableId: item.variableId,
+        unit: item.unit,
+        status: item.status,
+        qualityFlags: [...item.qualityFlags],
+        decoded: item.decoded,
+      }),
     ),
   }
 }
 
-function estimateBytes(key: string, sample: SampleResult): number {
+function estimateBytes(key: string, sample: CachedPlanetarySample): number {
   try {
     return new TextEncoder().encode(JSON.stringify({ key, sample })).byteLength
   } catch {
@@ -166,7 +176,7 @@ function createIndexedDbStorage(): PlanetaryPointStorage | null {
 }
 
 type Pending = {
-  request: Promise<SampleResult>
+  request: Promise<CachedPlanetarySample>
   controller: AbortController
   consumers: number
   abortTimer?: ReturnType<typeof setTimeout>
@@ -174,7 +184,7 @@ type Pending = {
 
 type CacheEntry = {
   key: string
-  sample: SampleResult
+  sample: CachedPlanetarySample
   expires: number
   bytes: number
   score: number
@@ -253,20 +263,19 @@ export function createPlanetaryPointCache(
               typeof record.score === 'number' && Number.isFinite(record.score) && record.score > 0 ? record.score : 1
             const lastUsed =
               typeof record.lastUsed === 'number' && Number.isFinite(record.lastUsed) ? record.lastUsed : now
-            insertEntry(
-              {
-                key: record.key,
-                sample: record.sample,
-                expires: Infinity,
-                bytes,
-                score,
-                lastUsed,
-                persistent: true,
-              },
-              now,
-              false,
-            )
+            completed.set(record.key, {
+              key: record.key,
+              sample: record.sample,
+              expires: Infinity,
+              bytes,
+              score,
+              lastUsed,
+              persistent: true,
+            })
+            totalBytes += bytes
           }
+          // Evict once across all hydrated records without protecting the last enumerated key.
+          evictIfNeeded(now)
         })
         .catch(() => {})
         .finally(() => {
@@ -274,7 +283,7 @@ export function createPlanetaryPointCache(
         })
     : undefined
 
-  return async (reference: PlanetaryCoordinates, signal: AbortSignal): Promise<SampleResult> => {
+  return async (reference: PlanetaryCoordinates, signal: AbortSignal): Promise<CachedPlanetarySample> => {
     signal.throwIfAborted()
     lifetime.throwIfAborted()
     if (!coordinatesValid(reference.latitude, reference.longitude)) {
@@ -353,7 +362,7 @@ export function createPlanetaryPointCache(
     active.consumers++
     let abort: () => void = () => {}
     try {
-      return await new Promise<SampleResult>((resolve, reject) => {
+      return await new Promise<CachedPlanetarySample>((resolve, reject) => {
         abort = () => reject(signal.reason)
         signal.addEventListener('abort', abort, { once: true })
         if (signal.aborted) abort()

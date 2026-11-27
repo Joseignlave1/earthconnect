@@ -338,6 +338,19 @@ function orderedPaths(files: Record<string, Asset>) {
   return [...priority, ...chunks, ...tiles]
 }
 
+function sameRelease(a: Release | undefined, b: Release | undefined): boolean {
+  if (!a || !b) return a === b
+  if (a.etag && b.etag) return a.etag === b.etag
+  const aKeys = Object.keys(a.files)
+  const bKeys = Object.keys(b.files)
+  if (aKeys.length !== bKeys.length) return false
+  return aKeys.every(path => {
+    const af = a.files[path]
+    const bf = b.files[path]
+    return Boolean(bf) && af.sha256 === bf.sha256 && af.bytes === bf.bytes && af.key === bf.key
+  })
+}
+
 async function revalidateInBackground(saved: Release) {
   const controller = new AbortController()
   const { signal } = controller
@@ -350,25 +363,43 @@ async function revalidateInBackground(saved: Release) {
     })
     if (response.status === 304 || !response.ok) return
     const next = parseRelease(await response.json(), response.headers.get('ETag'))
-    if (next.etag && next.etag === saved.etag) return
+    if (sameRelease(next, saved)) return
+    const worldFiles = new Map<string, Asset>()
+    for (const [path, asset] of Object.entries(next.files)) {
+      if (path.startsWith(world) && path !== scorePath) worldFiles.set(asset.key, asset)
+    }
     const update = async (exclusive: boolean) => {
       const cache = await openCache()
       if (!cache) return
       try {
+        // Re-check under the release lock so a slower tab never overwrites a newer release.
+        const active = await accessCache<Release>(cache, 'releases', manifestUrl)
+        if (!sameRelease(active, saved)) return
+
         const entries = orderedPaths(next.files).map(path => [path, next.files[path]] as const)
         const existing = await readCachedBlobs(cache, entries)
+        let scoreBlob = existing.get(scorePath)
         const missing = entries.filter(([path]) => !existing.has(path))
         let cursor = 0
         let persisted = true
         const workers = Array.from({ length: Math.min(4, missing.length) }, async () => {
-          while (cursor < missing.length) {
-            const [, asset] = missing[cursor++]
+          while (!signal.aborted && cursor < missing.length) {
+            const [path, asset] = missing[cursor++]
             const bytes = await downloadBytes(asset, signal, () => {})
             const blob = await verifyAsset(asset, bytes, signal)
+            if (path === scorePath) scoreBlob = blob
             if (!(await accessCache(cache, 'files', asset.sha256, blob))) persisted = false
           }
         })
-        await Promise.all(workers)
+        try {
+          await Promise.all(workers)
+        } catch (error) {
+          controller.abort()
+          await Promise.allSettled(workers)
+          throw error
+        }
+        if (!scoreBlob) throw new Error('The Earth scoring release is missing its score manifest.')
+        await validateScoreManifest(scoreBlob, worldFiles)
         if (persisted && (await accessCache(cache, 'releases', manifestUrl, next)) && exclusive) {
           await pruneCache(cache, next)
         }

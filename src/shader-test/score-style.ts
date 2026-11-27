@@ -29,7 +29,6 @@ export type ScoreStyle = {
   anchors: [number, number, number, number]
   topRange: number
   contrast: number
-  focus: number
   eligible: number
   // A query-wide budget limits glow when many cells tie at the top.
   emissionScale: number
@@ -86,12 +85,15 @@ export function scorePalette(score: number, style: ScoreStyle) {
   if (score <= style.cutoff || style.best <= style.cutoff) return 0
   if (style.kind === 'manual')
     return palettePosition(normalizedScore(score, style.cutoff, style.best), style.topRange, style.contrast)
-  const scores = [style.cutoff, ...style.anchors]
-  for (let i = 1; i < scores.length; i++)
-    if (score < scores[i]) {
-      const t = clamp((score - scores[i - 1]) / (scores[i] - scores[i - 1]))
-      return AUTO_POSITIONS[i - 1] + (AUTO_POSITIONS[i] - AUTO_POSITIONS[i - 1]) * t
+  let prev = style.cutoff
+  for (let i = 0; i < 4; i++) {
+    const curr = style.anchors[i]
+    if (score < curr) {
+      const t = clamp((score - prev) / (curr - prev))
+      return AUTO_POSITIONS[i] + (AUTO_POSITIONS[i + 1] - AUTO_POSITIONS[i]) * t
     }
+    prev = curr
+  }
   return 1
 }
 
@@ -108,14 +110,14 @@ export function scoreAtPalette(position: number, style: ScoreStyle) {
         : knee + style.topRange * ((value - context) / (1 - context)) ** (1 / style.contrast)
     return style.cutoff + normalized * (style.best - style.cutoff)
   }
-  const scores = [style.cutoff, ...style.anchors]
-  for (let i = 1; i < scores.length; i++)
-    if (value <= AUTO_POSITIONS[i]) {
-      return (
-        scores[i - 1] +
-        ((scores[i] - scores[i - 1]) * (value - AUTO_POSITIONS[i - 1])) / (AUTO_POSITIONS[i] - AUTO_POSITIONS[i - 1])
-      )
+  let prev = style.cutoff
+  for (let i = 0; i < 4; i++) {
+    const curr = style.anchors[i]
+    if (value <= AUTO_POSITIONS[i + 1]) {
+      return prev + ((curr - prev) * (value - AUTO_POSITIONS[i])) / (AUTO_POSITIONS[i + 1] - AUTO_POSITIONS[i])
     }
+    prev = curr
+  }
   return style.best
 }
 
@@ -134,7 +136,6 @@ export function resolveScoreStyle(
     anchors: [cutoff, cutoff, cutoff, best],
     topRange: options.topRange,
     contrast: options.emphasis,
-    focus: options.focus,
     eligible: distribution?.candidates(cutoff) ?? 0,
     emissionScale: 1,
   }

@@ -1,8 +1,7 @@
 import { contourDetail } from '../shader-test/contours.ts'
 import {
-  copyExternalImageChunked,
-  generateMipmaps,
   joinWgsl,
+  loadSrgbMipmappedTexture,
   raceAbort,
   shaderModule,
   uploadBuffer,
@@ -10,34 +9,75 @@ import {
 } from '../shader-test/gpu.ts'
 import {
   createPatchMesh,
-  INSTANCE_FLOATS,
+  CUBE_INSTANCE_FLOATS,
   MAX_PATCH_INSTANCES,
   PlanetCubeQuadtree,
 } from '../shader-test/quadtreeLod.ts'
 import colorWgsl from '../shader-test/shaders/color.wgsl?raw'
 import contoursWgsl from '../shader-test/shaders/contours.wgsl?raw'
+import quadWgsl from '../shader-test/shaders/quad.wgsl?raw'
 import { elevationPyramid, packRg8Levels, type Terrain } from '../shader-test/terrain.ts'
 import { loadPreparedTerrain, type PreparedTerrain } from '../shader-test/terrain-loader.ts'
 import type { TerrainLoader } from './earthWorkspaceResources.ts'
 import {
+  buildPlanetPickingMesh,
   buildPlanetTerrain,
   PLANET_TERRAIN_SETTINGS as settings,
+  type PlanetPickingMesh,
   type PlanetTerrain,
   type TerrainBody,
 } from './planetTerrainMesh.ts'
-import { PLANET_TILE_PAIRS, PlanetTileCache, type PlanetTilePackLoader } from './planetTiles.ts'
+import { VIRTUAL_TILE_GUTTER, VIRTUAL_TILE_INNER, VIRTUAL_TILE_SIZE } from '../shader-test/virtual-tiles.ts'
+import {
+  PLANET_TILE_BASE_COLS,
+  PLANET_TILE_BASE_ROWS,
+  PLANET_TILE_PAIRS,
+  PlanetTileCache,
+  type PlanetTilePackLoader,
+} from './planetTiles.ts'
 import planetAnnotationWgsl from './shaders/planet-annotation.wgsl?raw'
+import planetCommonWgsl from './shaders/planet-common.wgsl?raw'
 import planetTerrainWgsl from './shaders/planet-terrain.wgsl?raw'
 import type { WorkspaceAssets } from './workspaceAssets.ts'
 
-export { buildPlanetTerrain, type PlanetTerrain, type TerrainBody }
+export { buildPlanetPickingMesh, buildPlanetTerrain, type PlanetPickingMesh, type PlanetTerrain, type TerrainBody }
 
-const surfaceShader = joinWgsl(colorWgsl, contoursWgsl, planetTerrainWgsl)
-const annotationShader = planetAnnotationWgsl
+const surfaceShader = joinWgsl(colorWgsl, contoursWgsl, quadWgsl, planetCommonWgsl, planetTerrainWgsl)
+const annotationShader = joinWgsl(planetCommonWgsl, planetAnnotationWgsl)
 const sharedPatchMesh = createPatchMesh()
 
+type PlanetViewUniformParams = {
+  matrix: Float32Array
+  sunlight?: readonly [number, number, number]
+  hdr?: boolean
+  pixelRatio?: number
+  minorDetail?: number
+  fineDetail?: number
+  tilesReady?: boolean
+  reliefFade?: number
+  eye?: readonly [number, number, number]
+  isMars: boolean
+  smallView?: Float32Array
+}
+
+function writePlanetViewUniform(out: Float32Array, p: PlanetViewUniformParams) {
+  out.set(p.matrix, 0)
+  if (p.sunlight) out.set(p.sunlight, 16)
+  if (p.hdr !== undefined) out[19] = Number(p.hdr)
+  if (p.pixelRatio !== undefined) out[23] = p.pixelRatio
+  if (p.minorDetail !== undefined) out[27] = p.minorDetail
+  if (p.fineDetail !== undefined) out[31] = p.fineDetail
+  if (p.tilesReady !== undefined) out[32] = Number(p.tilesReady)
+  out[33] = 0
+  out[34] = 0
+  if (p.reliefFade !== undefined) out[35] = p.reliefFade
+  if (p.eye) out.set(p.eye, 36)
+  out[39] = p.isMars ? 1 : 0
+  if (p.smallView) out.set(p.smallView, 40)
+}
+
 type SharedBodyTerrain = {
-  mesh: PlanetTerrain
+  mesh: PlanetPickingMesh
   quadtree: PlanetCubeQuadtree
   patchVertices: GPUBuffer
   patchIndices: GPUBuffer
@@ -62,6 +102,12 @@ type GpuTerrain = {
   smallAnnotationBindGroup: GPUBindGroup
   patchInstances: Float32Array<ArrayBuffer>
   patchInstanceBuffer: GPUBuffer
+  lastPatchMatrix: Float32Array
+  lastPatchEye: [number, number, number]
+  lastPatchWidth: number
+  lastPatchHeight: number
+  lastPatchReliefFade: number
+  lastPatchCount: number
   loupePatchInstances: Float32Array<ArrayBuffer>
   loupePatchInstanceBuffer: GPUBuffer
 }
@@ -69,6 +115,7 @@ type GpuTerrain = {
 type PlanetPipelines = {
   layout: GPUBindGroupLayout
   annotationLayout: GPUBindGroupLayout
+  smallAnnotationLayout: GPUBindGroupLayout
   surface: GPURenderPipeline
   surfaceSmall: GPURenderPipeline
   annotation: GPURenderPipeline
@@ -125,11 +172,14 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
     const vertexBuffers: GPUVertexBufferLayout[] = [
       { arrayStride: 12, stepMode: 'vertex', attributes: [{ shaderLocation: 0, format: 'float32x3', offset: 0 }] },
       {
-        arrayStride: INSTANCE_FLOATS * 4,
+        arrayStride: CUBE_INSTANCE_FLOATS * 4,
         stepMode: 'instance',
         attributes: [
-          { shaderLocation: 1, format: 'float32x4', offset: 0 },
-          { shaderLocation: 2, format: 'float32x4', offset: 16 },
+          { shaderLocation: 1, format: 'float32x2', offset: 0 },
+          { shaderLocation: 2, format: 'float32', offset: 8 },
+          { shaderLocation: 3, format: 'uint32', offset: 12 },
+          { shaderLocation: 4, format: 'float32', offset: 16 },
+          { shaderLocation: 5, format: 'float32', offset: 20 },
         ],
       },
     ]
@@ -151,7 +201,20 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
         { binding: 7, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
       ],
     })
+    const smallAnnotationLayout = device.createBindGroupLayout({
+      label: 'Planetary analytic annotation resources',
+      entries: [{ binding: 0, visibility: vf, buffer: { type: 'uniform' } }],
+    })
     const layout = device.createPipelineLayout({ bindGroupLayouts: [bindLayout] })
+    const smallAnnotationPipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [smallAnnotationLayout] })
+    const surfaceConstants = {
+      PLANET_TILE_PAIRS,
+      VIRTUAL_TILE_SIZE,
+      VIRTUAL_TILE_INNER,
+      VIRTUAL_TILE_GUTTER,
+      PLANET_TILE_BASE_COLS,
+      PLANET_TILE_BASE_ROWS,
+    }
     const pending = Promise.all([
       shaderModule(device, 'Planetary DEM terrain shader', surfaceShader).then(module =>
         Promise.all([
@@ -163,7 +226,7 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
               module,
               entryPoint: 'fragmentMain',
               targets: [{ format: 'rgba16float' }],
-              constants: { PLANET_TILE_PAIRS },
+              constants: surfaceConstants,
             },
             primitive: { topology: 'triangle-list', cullMode: 'back' },
             multisample: { count: 4 },
@@ -177,7 +240,7 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
               module,
               entryPoint: 'smallFragment',
               targets: [{ format: 'rgba16float' }],
-              constants: { PLANET_TILE_PAIRS },
+              constants: surfaceConstants,
             },
             primitive: { topology: 'triangle-list', cullMode: 'none' },
             multisample: { count: 4 },
@@ -185,7 +248,7 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
           }),
           device.createRenderPipelineAsync({
             label: 'Planetary DEM small per-sample annotations',
-            layout,
+            layout: smallAnnotationPipelineLayout,
             vertex: { module, entryPoint: 'smallVertex' },
             fragment: { module, entryPoint: 'smallAnnotationFragment', targets: [{ format: 'rgba16float' }] },
             primitive: { topology: 'triangle-list', cullMode: 'none' },
@@ -194,7 +257,7 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
           }),
           device.createRenderPipelineAsync({
             label: 'Planetary DEM small per-sample annotations with coverage mask',
-            layout,
+            layout: smallAnnotationPipelineLayout,
             vertex: { module, entryPoint: 'smallVertex' },
             fragment: {
               module,
@@ -249,6 +312,7 @@ function getPlanetPipelines(device: GPUDevice): Promise<PlanetPipelines> {
       ]) => ({
         layout: bindLayout,
         annotationLayout,
+        smallAnnotationLayout,
         surface,
         surfaceSmall,
         annotation,
@@ -287,37 +351,15 @@ async function buildBodyAlbedo(
   url: string,
   maxWidth?: number,
 ): Promise<GPUTexture> {
-  const { signal } = cache.controller
-  const response = await fetch(url, { signal })
-  if (!response.ok) throw new Error(`${body} albedo download failed (${response.status}).`)
-  const blob = await response.blob()
-  const bitmap = await createImageBitmap(
-    blob,
-    maxWidth
-      ? { colorSpaceConversion: 'none', resizeWidth: maxWidth, resizeHeight: maxWidth >> 1, resizeQuality: 'high' }
-      : { colorSpaceConversion: 'none' },
-  )
-  let texture: GPUTexture | undefined
-  try {
-    signal.throwIfAborted()
-    const mipLevelCount = Math.floor(Math.log2(Math.max(bitmap.width, bitmap.height))) + 1
-    texture = device.createTexture({
-      label: `${body} global albedo`,
-      size: [bitmap.width, bitmap.height],
-      mipLevelCount,
-      format: 'rgba8unorm-srgb',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    })
-    await copyExternalImageChunked(device.queue, bitmap, texture, signal)
-    generateMipmaps(device, texture, { addressModeU: 'repeat', label: `Build ${body} albedo mipmaps` })
-    cache.createdAlbedos.add(texture)
-    return texture
-  } catch (error) {
-    texture?.destroy()
-    throw error
-  } finally {
-    bitmap.close()
-  }
+  const texture = await loadSrgbMipmappedTexture(device, url, cache.controller.signal, {
+    label: `${body} global albedo`,
+    mipLabel: `Build ${body} albedo mipmaps`,
+    downloadErrorMessage: `${body} albedo download failed.`,
+    maxWidth,
+    addressModeU: 'repeat',
+  })
+  cache.createdAlbedos.add(texture)
+  return texture
 }
 
 function loadSharedBodyAlbedo(
@@ -345,16 +387,21 @@ async function getSharedBodyTerrain(
   device: GPUDevice,
   body: TerrainBody,
   prepared: PreparedTerrain<'rg8unorm'>,
+  reloadSource: (signal: AbortSignal) => Promise<PreparedTerrain<'rg8unorm'>>,
   signal: AbortSignal,
 ): Promise<SharedBodyTerrain> {
   signal.throwIfAborted()
   const cache = getPlanetCache(device)
-  let pending = cache.bodies.get(prepared.terrain)
+  // Always key by the original prepared.terrain identity so recovery re-decoding on a replacement
+  // device is deduplicated across concurrent and subsequent scenes.
+  const cacheKey = prepared.terrain
+  let pending = cache.bodies.get(cacheKey)
   if (!pending) {
     pending = (async () => {
-      const { terrain } = prepared
-      const levels = prepared.levels ?? packRg8Levels(elevationPyramid(terrain, true))
-      const mesh = buildPlanetTerrain(body, terrain, false)
+      const source = cacheKey.pixels.byteLength ? prepared : await reloadSource(cache.controller.signal)
+      const { terrain } = source
+      const levels = source.levels ?? packRg8Levels(elevationPyramid(terrain, true))
+      const mesh = buildPlanetPickingMesh(body, terrain)
       const quadtree = PlanetCubeQuadtree.fromTerrain(terrain, mesh.radius)
       const heights = device.createTexture({
         label: `${body} numeric terrain grid`,
@@ -401,14 +448,14 @@ async function getSharedBodyTerrain(
       const shared: SharedBodyTerrain = { mesh, quadtree, heights, patchVertices, patchIndices, sampler }
       cache.created.push(shared)
       // Mip levels and raw CPU elevation bytes are no longer needed once resident on the GPU.
-      // Keeping the terrain object itself as the WeakMap key avoids re-uploading on the same device.
-      prepared.levels = null
-      if (prepared.terrain.pixels.byteLength) prepared.terrain.pixels = new Uint8ClampedArray(0)
+      // Keeping the original terrain object as the WeakMap key avoids re-uploading on the same device.
+      source.levels = null
+      if (source.terrain.pixels.byteLength) source.terrain.pixels = new Uint8ClampedArray(0)
       return shared
     })()
-    cache.bodies.set(prepared.terrain, pending)
+    cache.bodies.set(cacheKey, pending)
     void pending.catch(() => {
-      if (cache.bodies.get(prepared.terrain) === pending) cache.bodies.delete(prepared.terrain)
+      if (cache.bodies.get(cacheKey) === pending) cache.bodies.delete(cacheKey)
     })
   }
   return raceAbort(pending, signal)
@@ -419,6 +466,7 @@ export class PlanetTerrainRenderer {
   private readonly device: GPUDevice
   private readonly bindLayout: GPUBindGroupLayout
   private readonly annotationLayout: GPUBindGroupLayout
+  private readonly smallAnnotationLayout: GPUBindGroupLayout
   private readonly pipeline: GPURenderPipeline
   private readonly smallPipeline: GPURenderPipeline
   private readonly annotationPipeline: GPURenderPipeline
@@ -438,6 +486,7 @@ export class PlanetTerrainRenderer {
     this.device = device
     this.bindLayout = pipelines.layout
     this.annotationLayout = pipelines.annotationLayout
+    this.smallAnnotationLayout = pipelines.smallAnnotationLayout
     this.pipeline = pipelines.surface
     this.smallPipeline = pipelines.surfaceSmall
     this.annotationPipeline = pipelines.annotation
@@ -475,13 +524,9 @@ export class PlanetTerrainRenderer {
       // or two 8K RGBA ImageBitmaps (~128 MiB each) in RAM at the same instant.
       for (const body of bodies) {
         const terrainPath = `textures/${body}-terrain.bin`
-        let prepared = loadTerrain
+        const prepared = loadTerrain
           ? await loadTerrain(terrainPath, 'rg8unorm', s => assetUrl(terrainPath, s), signal)
           : await loadPreparedTerrain(await assetUrl(terrainPath, signal), 'rg8unorm', signal)
-        if (!prepared.terrain.pixels.byteLength && !cache.bodies.has(prepared.terrain)) {
-          // Device recovered after an earlier upload freed CPU pixels; re-decode once.
-          prepared = await loadPreparedTerrain(await assetUrl(terrainPath, signal), 'rg8unorm', signal)
-        }
         signal.throwIfAborted()
         let albedo: GPUTexture
         try {
@@ -492,7 +537,9 @@ export class PlanetTerrainRenderer {
           albedo = getFallbackAlbedo(device)
         }
         signal.throwIfAborted()
-        const shared = await getSharedBodyTerrain(device, body, prepared, signal)
+        const reloadSource = async (reloadSignal: AbortSignal) =>
+          loadPreparedTerrain(await assetUrl(terrainPath, reloadSignal), 'rg8unorm', reloadSignal)
+        const shared = await getSharedBodyTerrain(device, body, prepared, reloadSource, signal)
         signal.throwIfAborted()
         renderer.attach(body, shared, albedo)
       }
@@ -531,13 +578,6 @@ export class PlanetTerrainRenderer {
       data.loupeBindGroup = this.createBodyBindGroup(
         body,
         data.loupeUniform,
-        data.shared,
-        data.albedo,
-        data.albedoSampler,
-      )
-      data.smallAnnotationBindGroup = this.createBodyBindGroup(
-        body,
-        data.smallAnnotationUniform,
         data.shared,
         data.albedo,
         data.albedoSampler,
@@ -593,20 +633,17 @@ export class PlanetTerrainRenderer {
       size: smallAnnotationParameters.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     })
-    const smallAnnotationBindGroup = this.createBodyBindGroup(
-      body,
-      smallAnnotationUniform,
-      shared,
-      albedo,
-      albedoSampler,
-    )
-    const patchInstances = new Float32Array(MAX_PATCH_INSTANCES * INSTANCE_FLOATS)
+    const smallAnnotationBindGroup = device.createBindGroup({
+      layout: this.smallAnnotationLayout,
+      entries: [{ binding: 0, resource: { buffer: smallAnnotationUniform } }],
+    })
+    const patchInstances = new Float32Array(MAX_PATCH_INSTANCES * CUBE_INSTANCE_FLOATS)
     const patchInstanceBuffer = device.createBuffer({
       label: `${body} quadtree patch instances`,
       size: patchInstances.byteLength,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     })
-    const loupePatchInstances = new Float32Array(MAX_PATCH_INSTANCES * INSTANCE_FLOATS)
+    const loupePatchInstances = new Float32Array(MAX_PATCH_INSTANCES * CUBE_INSTANCE_FLOATS)
     const loupePatchInstanceBuffer = device.createBuffer({
       label: `${body} loupe quadtree patch instances`,
       size: loupePatchInstances.byteLength,
@@ -629,6 +666,12 @@ export class PlanetTerrainRenderer {
       smallAnnotationBindGroup,
       patchInstances,
       patchInstanceBuffer,
+      lastPatchMatrix: new Float32Array(16),
+      lastPatchEye: [NaN, NaN, NaN],
+      lastPatchWidth: -1,
+      lastPatchHeight: -1,
+      lastPatchReliefFade: -1,
+      lastPatchCount: 0,
       loupePatchInstances,
       loupePatchInstanceBuffer,
     })
@@ -673,6 +716,60 @@ export class PlanetTerrainRenderer {
     return this.bodies.get(body)?.shared.mesh
   }
 
+  private prepareMainPatches(
+    data: GpuTerrain,
+    body: TerrainBody,
+    matrix: Float32Array,
+    eyeKm: readonly [number, number, number],
+    viewportWidth: number,
+    viewportHeight: number,
+    reliefFade: number,
+  ) {
+    let same =
+      data.lastPatchWidth === viewportWidth &&
+      data.lastPatchHeight === viewportHeight &&
+      data.lastPatchReliefFade === reliefFade &&
+      data.lastPatchEye[0] === eyeKm[0] &&
+      data.lastPatchEye[1] === eyeKm[1] &&
+      data.lastPatchEye[2] === eyeKm[2]
+    if (same) {
+      for (let i = 0; i < 16; i++) {
+        if (data.lastPatchMatrix[i] !== matrix[i]) {
+          same = false
+          break
+        }
+      }
+    }
+    if (same) return data.lastPatchCount
+    const patchCount = data.shared.quadtree.selectPatches(
+      data.patchInstances,
+      matrix,
+      eyeKm,
+      viewportWidth,
+      viewportHeight,
+      settings[body].relief,
+      reliefFade,
+    )
+    if (patchCount > 0) {
+      this.device.queue.writeBuffer(
+        data.patchInstanceBuffer,
+        0,
+        data.patchInstances,
+        0,
+        patchCount * CUBE_INSTANCE_FLOATS,
+      )
+    }
+    data.lastPatchMatrix.set(matrix)
+    data.lastPatchEye[0] = eyeKm[0]
+    data.lastPatchEye[1] = eyeKm[1]
+    data.lastPatchEye[2] = eyeKm[2]
+    data.lastPatchWidth = viewportWidth
+    data.lastPatchHeight = viewportHeight
+    data.lastPatchReliefFade = reliefFade
+    data.lastPatchCount = patchCount
+    return patchCount
+  }
+
   drawAnnotation(
     pass: GPURenderPassEncoder,
     body: TerrainBody,
@@ -681,20 +778,20 @@ export class PlanetTerrainRenderer {
     includeCoverage = false,
     viewportWidth = 1024,
     viewportHeight = 1024,
-    smallPad = 0,
+    isSmall = false,
     smallView?: Float32Array,
     eye?: readonly [number, number, number],
   ) {
     const data = this.bodies.get(body)
     if (!data) return
-    if (smallPad > 0 && smallView) {
+    if (isSmall && smallView) {
       const { smallAnnotationParameters, smallAnnotationUniform, smallAnnotationBindGroup } = data
-      smallAnnotationParameters.set(matrix, 0)
-      smallAnnotationParameters[34] = smallPad
-      smallAnnotationParameters[35] = reliefFade
-      if (eye) smallAnnotationParameters.set(eye, 36)
-      smallAnnotationParameters[39] = body === 'mars' ? 1 : 0
-      smallAnnotationParameters.set(smallView, 40)
+      writePlanetViewUniform(smallAnnotationParameters, {
+        matrix,
+        eye,
+        isMars: body === 'mars',
+        smallView,
+      })
       this.device.queue.writeBuffer(smallAnnotationUniform, 0, smallAnnotationParameters)
       pass.setPipeline(includeCoverage ? this.annotationSmallCoveragePipeline : this.annotationSmallPipeline)
       pass.setBindGroup(0, smallAnnotationBindGroup)
@@ -702,25 +799,15 @@ export class PlanetTerrainRenderer {
       return
     }
     const {
-      shared: { mesh, quadtree, patchVertices, patchIndices },
+      shared: { mesh, patchVertices, patchIndices },
       annotationUniform,
       annotationBindGroup,
-      patchInstances,
       patchInstanceBuffer,
     } = data
     const relief = settings[body].relief
     const eyeKm = eye ?? [0, 0, mesh.radius * 4]
-    const patchCount = quadtree.selectPatches(
-      patchInstances,
-      matrix,
-      eyeKm,
-      viewportWidth,
-      viewportHeight,
-      relief,
-      reliefFade,
-    )
+    const patchCount = this.prepareMainPatches(data, body, matrix, eyeKm, viewportWidth, viewportHeight, reliefFade)
     if (patchCount === 0) return
-    this.device.queue.writeBuffer(patchInstanceBuffer, 0, patchInstances, 0, patchCount * INSTANCE_FLOATS)
     this.annotationScratch.set(matrix, 0)
     this.annotationScratch[16] = body === 'moon' ? 2 : 4
     this.annotationScratch[17] = reliefFade
@@ -746,51 +833,41 @@ export class PlanetTerrainRenderer {
     pixelRatio: number,
     viewportWidth: number,
     viewportHeight: number,
-    smallPad = 0,
+    isSmall = false,
     reliefFade = 1,
     smallView?: Float32Array,
   ) {
     const data = this.bodies.get(body)
     if (!data) return
     const {
-      shared: { quadtree, patchVertices, patchIndices },
+      shared: { patchVertices, patchIndices },
       parameters,
       uniform,
       bindGroup,
-      patchInstances,
       patchInstanceBuffer,
     } = data
     const [minor, fine] = contourDetail(metresPerPixel)
-    parameters.set(matrix, 0)
-    parameters.set(sunlight, 16)
-    parameters[19] = Number(hdr)
-    parameters[23] = pixelRatio
-    parameters[27] = minor
-    parameters[31] = fine
-    parameters[32] = Number(this.tiles.ready(body))
-    parameters[33] = 0
-    parameters[34] = smallPad
-    parameters[35] = reliefFade
-    parameters.set(eye, 36)
-    parameters[39] = body === 'mars' ? 1 : 0
-    if (smallView) parameters.set(smallView, 40)
+    writePlanetViewUniform(parameters, {
+      matrix,
+      sunlight,
+      hdr,
+      pixelRatio,
+      minorDetail: minor,
+      fineDetail: fine,
+      tilesReady: this.tiles.ready(body),
+      reliefFade,
+      eye,
+      isMars: body === 'mars',
+      smallView,
+    })
     this.device.queue.writeBuffer(uniform, 0, parameters)
-    if (smallPad > 0) {
+    if (isSmall) {
       pass.setPipeline(this.smallPipeline)
       pass.setBindGroup(0, bindGroup)
       pass.draw(6)
     } else {
-      const patchCount = quadtree.selectPatches(
-        patchInstances,
-        matrix,
-        eye,
-        viewportWidth,
-        viewportHeight,
-        settings[body].relief,
-        reliefFade,
-      )
+      const patchCount = this.prepareMainPatches(data, body, matrix, eye, viewportWidth, viewportHeight, reliefFade)
       if (patchCount === 0) return
-      this.device.queue.writeBuffer(patchInstanceBuffer, 0, patchInstances, 0, patchCount * INSTANCE_FLOATS)
       pass.setPipeline(this.pipeline)
       pass.setBindGroup(0, bindGroup)
       pass.setVertexBuffer(0, patchVertices)
@@ -832,20 +909,26 @@ export class PlanetTerrainRenderer {
     )
     if (patchCount === 0) return
     const [minor, fine] = contourDetail(metresPerPixel)
-    loupeParameters.set(matrix, 0)
-    loupeParameters.set(sunlight, 16)
-    loupeParameters[19] = Number(hdr)
-    loupeParameters[23] = pixelRatio
-    loupeParameters[27] = minor
-    loupeParameters[31] = fine
-    loupeParameters[32] = Number(this.tiles.ready(body))
-    loupeParameters[33] = 0
-    loupeParameters[34] = 0
-    loupeParameters[35] = 1
-    loupeParameters.set(eye, 36)
-    loupeParameters[39] = body === 'mars' ? 1 : 0
+    writePlanetViewUniform(loupeParameters, {
+      matrix,
+      sunlight,
+      hdr,
+      pixelRatio,
+      minorDetail: minor,
+      fineDetail: fine,
+      tilesReady: this.tiles.ready(body),
+      reliefFade: 1,
+      eye,
+      isMars: body === 'mars',
+    })
     this.device.queue.writeBuffer(loupeUniform, 0, loupeParameters)
-    this.device.queue.writeBuffer(loupePatchInstanceBuffer, 0, loupePatchInstances, 0, patchCount * INSTANCE_FLOATS)
+    this.device.queue.writeBuffer(
+      loupePatchInstanceBuffer,
+      0,
+      loupePatchInstances,
+      0,
+      patchCount * CUBE_INSTANCE_FLOATS,
+    )
     pass.setPipeline(this.pipeline)
     pass.setBindGroup(0, loupeBindGroup)
     pass.setVertexBuffer(0, patchVertices)

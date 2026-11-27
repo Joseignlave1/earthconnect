@@ -3,10 +3,12 @@ import colorWgsl from './shaders/color.wgsl?raw'
 import contoursWgsl from './shaders/contours.wgsl?raw'
 import equalEarthWgsl from './shaders/equal-earth.wgsl?raw'
 import magmaWgsl from './shaders/magma.wgsl?raw'
+import quadWgsl from './shaders/quad.wgsl?raw'
 import scoreStyleWgsl from './shaders/score-style.wgsl?raw'
 import surfaceTerrainFallbackWgsl from './shaders/surface-terrain-fallback.wgsl?raw'
 import surfaceTerrainFilterableWgsl from './shaders/surface-terrain-filterable.wgsl?raw'
 import surfaceWgsl from './shaders/surface.wgsl?raw'
+import terrainCommonWgsl from './shaders/terrain-common.wgsl?raw'
 
 // Only the score bank texture bindings depend on the adapter's maxTextureArrayLayers limit;
 // all scalar constants (TILE_SIZE, BANK_SIZE, HIGHLIGHT_START, HIGHLIGHT_FULL) use WGSL overrides.
@@ -55,6 +57,8 @@ export function surfaceShader(banks: number, filterableTerrain: boolean) {
     scoreStyleWgsl,
     equalEarthWgsl,
     contoursWgsl,
+    quadWgsl,
+    terrainCommonWgsl,
     filterableTerrain ? surfaceTerrainFilterableWgsl : surfaceTerrainFallbackWgsl,
     scoreBankBindings(banks),
     surfaceWgsl,

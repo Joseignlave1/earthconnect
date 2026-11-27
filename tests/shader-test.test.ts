@@ -5,6 +5,7 @@ import {
   cameraBasis,
   cameraMatrix,
   createMesh,
+  dragGlobeRotation,
   EARTH_AXIS,
   EARTH_FLATTENING,
   EQUAL_EARTH_HALF_HEIGHT,
@@ -358,6 +359,29 @@ test('arcball keeps a grabbed terrain point attached and restores its starting o
         if (x === 0.2 && y === 0.1) view.rotation.forEach((value, i) => close(value, start.rotation[i], 1e-10))
       }
     }
+})
+
+test('production globe drag scales with altitude and restores orientation on return to grab point', () => {
+  const startRotation = orbitRotation(orbitRotation([0, 0, 0, 1], 0.4, 0), 0, 0.9)
+  const nearCam = { ...camera, distance: 1.2, rotation: startRotation }
+  const farCam = { ...camera, distance: 4.0, rotation: startRotation }
+  const returned = dragGlobeRotation(nearCam, startRotation, 0, 0, 800)
+  assert.deepEqual(returned, startRotation)
+  const nearDragged = dragGlobeRotation(nearCam, startRotation, 120, -60, 800)
+  const farDragged = dragGlobeRotation(farCam, startRotation, 120, -60, 800)
+  const nearDelta = Math.hypot(
+    nearDragged[0] - startRotation[0],
+    nearDragged[1] - startRotation[1],
+    nearDragged[2] - startRotation[2],
+    nearDragged[3] - startRotation[3],
+  )
+  const farDelta = Math.hypot(
+    farDragged[0] - startRotation[0],
+    farDragged[1] - startRotation[1],
+    farDragged[2] - startRotation[2],
+    farDragged[3] - startRotation[3],
+  )
+  assert.ok(nearDelta > 0.01 && farDelta > nearDelta * 3)
 })
 
 test('cached picking reuses surface geometry across camera moves and refreshes changed terrain settings', () => {

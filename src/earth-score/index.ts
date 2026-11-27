@@ -9,12 +9,13 @@ import { createLookup } from './scoring.ts'
 
 export {
   DEFAULT_SCORE_SHADER,
+  EARTH_CELL_FIELDS,
   SCORE_SHADER_EXAMPLES,
   SCORE_SHADER_FIELDS,
   SCORE_SHADER_PRELUDE,
   ScoreShaderError,
 } from './custom-shader.ts'
-export type { ScoreShaderDiagnostic } from './custom-shader.ts'
+export type { EarthCellFieldDescriptor, ScoreShaderDiagnostic, ScoreShaderFieldDescriptor } from './custom-shader.ts'
 export { freezePlanetaryShaderPoint } from './planetShaderSchema.ts'
 export type {
   PlanetaryShaderCall,

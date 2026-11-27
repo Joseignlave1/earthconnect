@@ -4,9 +4,12 @@
 
 struct CrewUniform {
   viewProj: mat4x4f,
-  params: vec4f,    // x: timeSeconds, y: pullStrength, z: hoverBoost, w: reducedMotion
-  pullDir: vec4f,   // xyz: unit vector toward black hole center (angled away into -Z), w: transitionAlpha (0..1)
-  lightDir: vec4f,  // xyz: key light direction, w: unused
+  pullDir: vec3f,
+  timeSeconds: f32,
+  lightDir: vec3f,
+  transitionAlpha: f32,
+  lightingEye: vec3f,
+  reducedMotion: f32,
 }
 
 @group(0) @binding(0) var<uniform> u: CrewUniform;
@@ -17,7 +20,8 @@ struct VertexIn {
   @location(0) pos: vec3f,
   @location(1) normal: vec3f,
   @location(2) uv: vec2f,
-  @location(3) mat: vec2f, // x: matId (0 suit, 1 metal, 2 pack, 3 visor, 4 stickyNote, 5 tape, 6 prop), y: tetherMask
+  @location(3) matId: u32, // 0 suit, 1 metal, 2 pack, 3 visor, 4 stickyNote, 5 tape, 6 prop
+  @location(4) tetherMask: f32,
 }
 
 struct VertexOut {
@@ -25,7 +29,14 @@ struct VertexOut {
   @location(0) worldPos: vec3f,
   @location(1) worldNormal: vec3f,
   @location(2) uv: vec2f,
-  @location(3) matAndDepth: vec4f, // x: matId, y: sWarped, z: stretchAmt, w: aux
+  @location(3) @interpolate(flat) matId: u32,
+  @location(4) sWarped: f32,
+  @location(5) stretchAmt: f32,
+}
+
+struct VortexWarp {
+  pos: vec3f,
+  stretch: f32,
 }
 
 // Orthonormal basis around the singularity pull axis:
@@ -41,11 +52,10 @@ fn pullBasis(pull: vec3f) -> mat3x3f {
 // Zero threshold / start line — head & visor sticky note stay intact & close to camera,
 // while torso, waist, and legs continuously taper, braid/twist in a vortex spiral,
 // and plunge away into -Z in a flowing cartoon noodle curve into the black hole throat.
-fn warpVortex(pIn: vec3f, tetherMask: f32) -> vec4f {
-  let time = u.params.x;
-  let reduced = u.params.w > .5;
-  let strength = u.params.y;
-  let pull = normalize(u.pullDir.xyz);
+fn warpVortex(pIn: vec3f, tetherMask: f32) -> VortexWarp {
+  let time = u.timeSeconds;
+  let reduced = u.reducedMotion > .5;
+  let pull = normalize(u.pullDir);
   let basis = pullBasis(pull);
   let axU = basis[0];
   let axV = basis[1];
@@ -67,7 +77,7 @@ fn warpVortex(pIn: vec3f, tetherMask: f32) -> vec4f {
 
   // Continuous exponential gravity-well intensity (C-infinity everywhere, no kink).
   let k = 1.32;
-  let a = .42 * strength;
+  let a = .42;
   let g = exp(k * clamp(s - .04, -2.5, 2.25));
   let sWarped = s + a * g;
 
@@ -77,7 +87,7 @@ fn warpVortex(pIn: vec3f, tetherMask: f32) -> vec4f {
 
   // Vortex spiral twist anchored at head depth (g ≈ 0.23) so the sticky-note face stays square to camera
   // while waist, hips, and legs progressively wring & braid around each other down the drain!
-  let twist = .78 * (g - .23) * strength;
+  let twist = .78 * (g - .23);
   let ct = cos(twist);
   let st = sin(twist);
   let uSpin = (uCoord * ct - vCoord * st) * pinch;
@@ -93,14 +103,14 @@ fn warpVortex(pIn: vec3f, tetherMask: f32) -> vec4f {
   let funnelCurve = axU * (.26 * a * g) - axV * (.44 * a * g);
 
   let warped = pull * sWarped + axU * uSpin + axV * vSpin + noodle + funnelCurve;
-  return vec4f(warped, lambda - 1.);
+  return VortexWarp(warped, lambda - 1.);
 }
 
 @vertex fn vsMain(input: VertexIn) -> VertexOut {
-  let pull = normalize(u.pullDir.xyz);
-  let w0 = warpVortex(input.pos, input.mat.y);
-  let p = w0.xyz;
-  let stretchAmt = w0.w;
+  let pull = normalize(u.pullDir);
+  let w0 = warpVortex(input.pos, input.tetherMask);
+  let p = w0.pos;
+  let stretchAmt = w0.stretch;
 
   // Finite-difference Jacobian to keep surface normals crisp under twisting + curved spaghettification.
   let nIn = normalize(input.normal);
@@ -108,8 +118,8 @@ fn warpVortex(pIn: vec3f, tetherMask: f32) -> vec4f {
   let t1 = normalize(cross(upHint, nIn));
   let t2 = cross(nIn, t1);
   let eps = .012;
-  let dp1 = warpVortex(input.pos + t1 * eps, input.mat.y).xyz - p;
-  let dp2 = warpVortex(input.pos + t2 * eps, input.mat.y).xyz - p;
+  let dp1 = warpVortex(input.pos + t1 * eps, input.tetherMask).pos - p;
+  let dp2 = warpVortex(input.pos + t2 * eps, input.tetherMask).pos - p;
   let nWarped = normalize(cross(dp1, dp2));
 
   let sWarped = dot(p, pull);
@@ -119,26 +129,24 @@ fn warpVortex(pIn: vec3f, tetherMask: f32) -> vec4f {
   out.worldPos = p;
   out.worldNormal = nWarped;
   out.uv = input.uv;
-  out.matAndDepth = vec4f(input.mat.x, sWarped, stretchAmt, 1.);
+  out.matId = input.matId;
+  out.sWarped = sWarped;
+  out.stretchAmt = stretchAmt;
   return out;
 }
 
 @fragment fn fsMain(input: VertexOut) -> @location(0) vec4f {
-  // Sample sticky-note texture unconditionally in uniform control flow (required by WGSL spec).
-  let noteSample = textureSample(noteTex, noteSampler, input.uv);
-
-  let matId = i32(round(input.matAndDepth.x));
+  let matId = input.matId;
   // Per-pixel smooth fade into pure #000000 abyss well before the canvas bottom edge.
-  let abyssFade = (1. - smoothstep(1.65, 3.25, input.matAndDepth.y)) * u.pullDir.w;
+  let abyssFade = (1. - smoothstep(1.65, 3.25, input.sWarped)) * u.transitionAlpha;
   if (abyssFade <= .002) {
     discard;
   }
 
   let n = normalize(input.worldNormal);
-  let camPos = vec3f(.14, -.14, 6.65);
-  let v = normalize(camPos - input.worldPos);
-  let keyL = normalize(u.lightDir.xyz);
-  let pullL = normalize(u.pullDir.xyz);
+  let v = normalize(u.lightingEye - input.worldPos);
+  let keyL = normalize(u.lightDir);
+  let pullL = normalize(u.pullDir);
 
   let ndlKey = max(0., dot(n, keyL));
   let ndlPull = max(0., dot(n, pullL));
@@ -151,35 +159,36 @@ fn warpVortex(pIn: vec3f, tetherMask: f32) -> vec4f {
   var emissive = vec3f(0.);
   var alpha = 1.;
 
-  if (matId == 0) {
+  if (matId == 0u) {
     // Smooth matte charcoal Content-Warning-style EVA suit
     albedo = vec3f(.20, .21, .24);
     specPower = 12.;
     specAmt = .10;
-  } else if (matId == 1) {
+  } else if (matId == 1u) {
     // Brushed warm-titanium helmet ring, cuffs, joints, tether
     albedo = vec3f(.52, .48, .42);
     specPower = 42.;
     specAmt = .38;
-  } else if (matId == 2) {
+  } else if (matId == 2u) {
     // Industrial backpack & chunky boot soles
     albedo = vec3f(.26, .27, .30);
     specPower = 16.;
     specAmt = .16;
-  } else if (matId == 3) {
+  } else if (matId == 3u) {
     // Deep reflective gold-tinted astronaut helmet visor
     albedo = vec3f(.07, .06, .04);
     specPower = 90.;
     specAmt = .85;
     emissive = vec3f(.24, .15, .05) * fresnel;
-  } else if (matId == 4) {
+  } else if (matId == 4u) {
     // Sticky note stuck directly onto the visor (photo or Content Warning panic doodle!)
+    let noteSample = textureSampleLevel(noteTex, noteSampler, input.uv, 0.);
     albedo = noteSample.rgb;
     specPower = 10.;
     specAmt = .05;
     // Crisp Post-it readability on pitch-black background while still taking subtle scene shading
     emissive = noteSample.rgb * .62;
-  } else if (matId == 5) {
+  } else if (matId == 5u) {
     // Translucent strip of matte Scotch tape holding the sticky note to the visor
     albedo = vec3f(.86, .84, .76);
     specPower = 24.;
@@ -196,7 +205,7 @@ fn warpVortex(pIn: vec3f, tetherMask: f32) -> vec4f {
 
   // Lighting: cool crisp moonlight key on upper body transitioning into intense warm Interstellar
   // amber photon-ring rim light + subtle gravitational redshift down the stretched lower legs!
-  let depthT = smoothstep(-.35, 2.35, input.matAndDepth.y);
+  let depthT = smoothstep(-.35, 2.35, input.sWarped);
   let halfKey = normalize(keyL + v);
   let specKey = pow(max(0., dot(n, halfKey)), specPower) * specAmt * mix(1., .42, depthT);
   let halfPull = normalize(pullL + v);
@@ -215,9 +224,9 @@ fn warpVortex(pIn: vec3f, tetherMask: f32) -> vec4f {
             + emissive;
 
   // Gravitational redshift bathing the deepest stretched legs in warm amber-crimson before vanishing into #000000.
-  if (matId != 4 && matId != 5) {
-    let redshift = smoothstep(.75, 2.45, input.matAndDepth.y);
-    let stretchRim = smoothstep(.55, 2.3, input.matAndDepth.z) * (.18 + rimCurve * .62);
+  if (matId != 4u && matId != 5u) {
+    let redshift = smoothstep(.75, 2.45, input.sWarped);
+    let stretchRim = smoothstep(.55, 2.3, input.stretchAmt) * (.18 + rimCurve * .62);
     color += vec3f(1.15, .52, .16) * stretchRim * .38;
     color = mix(color, color * vec3f(1.24, .64, .32), redshift * .55);
   }

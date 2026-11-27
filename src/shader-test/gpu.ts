@@ -1,3 +1,4 @@
+import { checkedGpu } from '../earth-score/gpu.ts'
 import fullscreenWgsl from './shaders/fullscreen.wgsl?raw'
 import mipBlitWgsl from './shaders/mip-blit.wgsl?raw'
 
@@ -192,4 +193,81 @@ export function generateMipmaps(
     }
   }
   if (ownEncoder) device.queue.submit([cmd.finish()])
+}
+
+export type SrgbTextureLoadOptions = {
+  label: string
+  mipLabel?: string
+  downloadErrorMessage?: string
+  maxWidth?: number
+  addressModeU?: GPUAddressMode
+  validateGpu?: boolean
+  createStepLabel?: string
+  uploadStepLabel?: string
+}
+
+/**
+ * Fetch an image, decode without color-space conversion, upload into a mipmapped
+ * `rgba8unorm-srgb` texture in bounded strips, and generate GPU mipmaps.
+ * Destroys the texture on any error or abort; callers own lifetime on success.
+ */
+export async function loadSrgbMipmappedTexture(
+  device: GPUDevice,
+  url: string,
+  signal: AbortSignal,
+  options: SrgbTextureLoadOptions,
+): Promise<GPUTexture> {
+  const response = await fetch(url, { signal })
+  if (!response.ok) {
+    throw new Error(options.downloadErrorMessage ?? `${options.label} download failed (${response.status}).`)
+  }
+  const blob = await response.blob()
+  const bitmap = await createImageBitmap(
+    blob,
+    options.maxWidth
+      ? {
+          colorSpaceConversion: 'none',
+          resizeWidth: options.maxWidth,
+          resizeHeight: options.maxWidth >> 1,
+          resizeQuality: 'high',
+        }
+      : { colorSpaceConversion: 'none' },
+  )
+  let texture: GPUTexture | undefined
+  try {
+    signal.throwIfAborted()
+    const createTexture = () => {
+      texture = device.createTexture({
+        label: options.label,
+        size: [bitmap.width, bitmap.height],
+        mipLevelCount: Math.floor(Math.log2(Math.max(bitmap.width, bitmap.height))) + 1,
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+      })
+      return texture
+    }
+    const created = options.validateGpu
+      ? await checkedGpu(device, createTexture, options.createStepLabel ?? `Creating ${options.label}`)
+      : createTexture()
+    signal.throwIfAborted()
+    await copyExternalImageChunked(device.queue, bitmap, created, signal)
+    signal.throwIfAborted()
+    const buildMips = () => {
+      generateMipmaps(device, created, {
+        label: options.mipLabel ?? `${options.label} mipmaps`,
+        addressModeU: options.addressModeU,
+      })
+      return created
+    }
+    const finished = options.validateGpu
+      ? await checkedGpu(device, buildMips, options.uploadStepLabel ?? `Uploading ${options.label}`)
+      : buildMips()
+    signal.throwIfAborted()
+    return finished
+  } catch (error) {
+    texture?.destroy()
+    throw error
+  } finally {
+    bitmap.close()
+  }
 }

@@ -9,6 +9,7 @@ import {
   paintTilePageTable,
   planetTileKey,
   readTileWebpBlob,
+  tileKey,
   toPackHandle,
   VIRTUAL_TILE_INNER,
   VIRTUAL_TILE_MIPS,
@@ -25,10 +26,10 @@ export type PlanetTileBody = 'moon' | 'mars'
 export const PLANET_TILE_PAIRS = 48
 
 const PLANET_TILE_PACKS = 4
-const PLANET_TILE_BASE_COLS = 24
-const PLANET_TILE_BASE_ROWS = 12
-const PLANET_TILE_PAGE_W = 48
-const PLANET_TILE_PAGE_H = 24
+export const PLANET_TILE_BASE_COLS = 24
+export const PLANET_TILE_BASE_ROWS = 12
+export const PLANET_TILE_PAGE_W = 48
+export const PLANET_TILE_PAGE_H = 24
 const LEVEL_COUNT = 2
 
 type PairSlot = {
@@ -50,10 +51,6 @@ export type PlanetTilePackLoader = (
 
 export function planetTilePath(body: PlanetTileBody, packId: number) {
   return `textures/${body}-tiles-${packId}.bin`
-}
-
-function pairKey(level: number, tx: number, ty: number) {
-  return (level << 16) | (ty << 8) | tx
 }
 
 function keyLevel(key: number) {
@@ -266,7 +263,10 @@ export class PlanetTileCache {
     const l1Threshold = l1TexelM * 1.55 // refine to L1 (~695m Moon, ~1,355m Mars)
 
     const loupeMpp = loupe ? physicalMetresPerPixel / Math.max(1, loupe.zoom) : Infinity
-    if (Math.min(physicalMetresPerPixel, loupeMpp) > entryThreshold) return
+    if (Math.min(physicalMetresPerPixel, loupeMpp) > entryThreshold) {
+      this.pendingQueue.length = 0
+      return
+    }
 
     // Lazily allocate the shared Moon/Mars pool on first actual zoom-in demand.
     this.ensureGpuPool()
@@ -291,7 +291,7 @@ export class PlanetTileCache {
           if (ty < 0 || ty >= rows) continue
           for (let dx = -radius; dx <= radius; dx++) {
             const tx = (cx + dx + cols) % cols
-            const pk = pairKey(level, tx, ty)
+            const pk = tileKey(level, tx, ty)
             if (!state.index.has(planetTileKey(0, level, tx, ty)) || !state.index.has(planetTileKey(1, level, tx, ty)))
               continue
             const slotIndex = state.resident.get(pk)
@@ -327,7 +327,10 @@ export class PlanetTileCache {
       requestPoint(loupe.lon, loupe.lat, loupeMpp, -2, 1)
     }
 
-    if (needed.size === 0) return
+    if (needed.size === 0) {
+      this.pendingQueue.length = 0
+      return
+    }
     const nextQueue: TileJob[] = []
     for (const [key, priority] of needed) {
       if (state.inFlight.has(key)) continue
@@ -383,41 +386,51 @@ export class PlanetTileCache {
         readTileWebpBlob(albedoHandle, albedoEntry.offset, albedoEntry.length, signal),
         readTileWebpBlob(normalHandle, normalEntry.offset, normalEntry.length, signal),
       ])
-      ;[albedoBitmap, normalBitmap] = await Promise.all([
+      const [albedoRes, normalRes] = await Promise.allSettled([
         createImageBitmap(albedoBlob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' }),
         createImageBitmap(normalBlob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' }),
       ])
+      if (albedoRes.status === 'fulfilled') albedoBitmap = albedoRes.value
+      if (normalRes.status === 'fulfilled') normalBitmap = normalRes.value
+      if (albedoRes.status === 'rejected') throw albedoRes.reason
+      if (normalRes.status === 'rejected') throw normalRes.reason
       if (signal.aborted || this.destroyed) return
       const slotIndex = this.allocateSlot()
-      const normalSlice = slotIndex + PLANET_TILE_PAIRS
-      const device = this.device
-      device.queue.copyExternalImageToTexture(
-        { source: albedoBitmap },
-        { texture: this.poolTexture, origin: [0, 0, slotIndex] },
-        [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE],
-      )
-      device.queue.copyExternalImageToTexture(
-        { source: normalBitmap },
-        { texture: this.poolTexture, origin: [0, 0, normalSlice] },
-        [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE],
-      )
-      generateMipmaps(device, this.poolTexture, {
-        layers: [slotIndex, normalSlice],
-        mipLevelCount: VIRTUAL_TILE_MIPS,
-        label: 'Planetary tile mipmaps',
-      })
-      this.slots[slotIndex] = {
-        body: job.body,
-        key: job.key,
-        level: job.level,
-        tx: job.tx,
-        ty: job.ty,
-        lastUsed: this.frameCounter,
+      try {
+        const normalSlice = slotIndex + PLANET_TILE_PAIRS
+        const device = this.device
+        device.queue.copyExternalImageToTexture(
+          { source: albedoBitmap! },
+          { texture: this.poolTexture, origin: [0, 0, slotIndex] },
+          [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE],
+        )
+        device.queue.copyExternalImageToTexture(
+          { source: normalBitmap! },
+          { texture: this.poolTexture, origin: [0, 0, normalSlice] },
+          [VIRTUAL_TILE_SIZE, VIRTUAL_TILE_SIZE],
+        )
+        generateMipmaps(device, this.poolTexture, {
+          layers: [slotIndex, normalSlice],
+          mipLevelCount: VIRTUAL_TILE_MIPS,
+          label: 'Planetary tile mipmaps',
+        })
+        this.slots[slotIndex] = {
+          body: job.body,
+          key: job.key,
+          level: job.level,
+          tx: job.tx,
+          ty: job.ty,
+          lastUsed: this.frameCounter,
+        }
+        state.resident.set(job.key, slotIndex)
+        state.pageDirty = true
+        this.flushPageTables()
+        this.notifyTileReady()
+      } catch (uploadError) {
+        // Ensure any page-table eviction triggered by allocateSlot() is still published.
+        this.flushPageTables()
+        throw uploadError
       }
-      state.resident.set(job.key, slotIndex)
-      state.pageDirty = true
-      this.flushPageTables()
-      this.notifyTileReady()
     } catch {
       // Transient aborts/decode errors degrade gracefully to 8K base textures.
     } finally {

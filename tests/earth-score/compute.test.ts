@@ -18,9 +18,8 @@ import {
 } from '../../src/earth-score/custom-shader.ts'
 import { createLayout, createScoreGeometry, GRID_WIDTH } from '../../src/earth-score/layout.ts'
 import { parseManifest } from '../../src/earth-score/manifest.ts'
-import { createQueryParameters, type EarthQueryCriterion } from '../../src/earth-score/query.ts'
+import { createQueryShaderSource, resolveEarthQuery, type EarthQueryCriterion } from '../../src/earth-score/query.ts'
 import { createLookup } from '../../src/earth-score/scoring.ts'
-import type { Criterion } from '../../src/explorerData.ts'
 
 const world = new URL('../../compute-data/world/', import.meta.url)
 const data = JSON.parse(await readFile(new URL('manifest.json', world), 'utf8'))
@@ -101,12 +100,26 @@ test('exact float lookup preserves valid physical zero and encodes missing separ
   assert.equal(floats[temperature + 65535], Math.fround((65535 - 7501) / 50))
 })
 
-function criterion(key: string, settings: Partial<EarthQueryCriterion> = {}): Criterion {
+function criterion(
+  key: string,
+  settings: Partial<EarthQueryCriterion> = {},
+): {
+  key: string
+  label: string
+  group: string
+  enabled: boolean
+  target: number | null
+  tolerance: number
+  weight: number
+  min: number | null
+  max: number | null
+  categorical?: boolean
+  qualityKey?: string | null
+} {
   return {
     key,
     label: key,
     group: key,
-    unit: 'test unit',
     enabled: true,
     target: 0,
     tolerance: 1,
@@ -119,8 +132,9 @@ function criterion(key: string, settings: Partial<EarthQueryCriterion> = {}): Cr
 
 test('criteria queries accept the full non-coverage field set and snapshot sampled subsets', () => {
   const scoreFields = manifest.columns.filter(key => !key.endsWith('_valid_fraction'))
-  const pack = (criteria: Criterion[]) => createQueryParameters(manifest, buildEarthQuery(criteria), Infinity)
-  assert.equal(pack(scoreFields.map(key => criterion(key)))[0], 19)
+  const resolve = (criteria: readonly EarthQueryCriterion[]) =>
+    resolveEarthQuery(manifest, buildEarthQuery(criteria), Infinity)
+  assert.equal(resolve(scoreFields.map(key => criterion(key))).terms.length, 19)
 
   const criteria = [
     criterion('surface_night_c', { target: -45, tolerance: 20 }),
@@ -128,14 +142,15 @@ test('criteria queries accept the full non-coverage field set and snapshot sampl
     criterion('unsupported_inactive_field', { enabled: false }),
   ]
   const query = buildEarthQuery(criteria)
-  const words = pack(criteria)
+  const resolved = resolve(criteria)
   criteria[0].target = 65
-  assert.deepEqual(createQueryParameters(manifest, query, Infinity), words)
-  assert.deepEqual(Array.from(words.slice(0, 2)), [1, 0])
-  assert.equal(words[words.length - 8], manifest.columns.indexOf('surface_night_c'))
-  assert.throws(() => createQueryParameters(manifest, query, 32), /device storage limit/)
+  assert.deepEqual(resolveEarthQuery(manifest, query, Infinity), resolved)
+  assert.equal(resolved.terms.length, 1)
+  assert.equal(resolved.coverage.length, 0)
+  assert.equal(resolved.terms[0].fieldIndex, manifest.columns.indexOf('surface_night_c'))
+  assert.throws(() => resolveEarthQuery(manifest, query, 32), /device storage limit/)
   const reduced = { ...manifest, columns: manifest.columns.filter(key => key !== 'surface_night_c') }
-  assert.throws(() => createQueryParameters(reduced, query, Infinity), /data does not contain surface_night_c/)
+  assert.throws(() => resolveEarthQuery(reduced, query, Infinity), /data does not contain surface_night_c/)
 })
 
 test('criteria queries validate active fields, coverage and numeric parameters', () => {
@@ -157,13 +172,18 @@ test('criteria queries validate active fields, coverage and numeric parameters',
 test('criteria query hard bounds distinguish a stored decimal from its neighbors', () => {
   const makeQuery = (min: number, max: number) =>
     buildEarthQuery([criterion('bare_fraction', { min, max, qualityKey: 'landcover_valid_fraction' })])
-  const inclusive = createQueryParameters(manifest, makeQuery(0.9, 0.9), Infinity)
-  const above = createQueryParameters(manifest, makeQuery(0.9000000000000001, 1), Infinity)
-  const below = createQueryParameters(manifest, makeQuery(0, 0.8999999999999999), Infinity)
-  assert.equal(inclusive[5], 901) // minimum coverage
-  assert.deepEqual(Array.from(inclusive.slice(-7, -5)), [901, 901])
-  assert.equal(above.at(-7), 902)
-  assert.equal(below.at(-6), 900)
+  const inclusiveQuery = makeQuery(0.9, 0.9)
+  const inclusive = resolveEarthQuery(manifest, inclusiveQuery, Infinity)
+  const above = resolveEarthQuery(manifest, makeQuery(0.9000000000000001, 1), Infinity)
+  const below = resolveEarthQuery(manifest, makeQuery(0, 0.8999999999999999), Infinity)
+  assert.equal(inclusive.coverage[0].minCode, 901) // minimum coverage
+  assert.equal(inclusive.terms[0].minCode, 901)
+  assert.equal(inclusive.terms[0].maxCode, 901)
+  assert.equal(above.terms[0].minCode, 902)
+  assert.equal(below.terms[0].maxCode, 900)
+  const wgsl = createQueryShaderSource(manifest, inclusiveQuery, Infinity)
+  assert.match(wgsl, /landcover_valid_fraction.*< 901u/)
+  assert.match(wgsl, /code_1 < 901u \|\| code_1 > 901u/)
 })
 
 test('the packaged world matches all 36 frozen Zstd frames and packed hashes', async () => {

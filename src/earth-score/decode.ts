@@ -35,30 +35,38 @@ async function loadDecoder(module?: WebAssembly.Module, signal?: AbortSignal) {
   return instance.exports as Decoder
 }
 
-type Scratch = {
-  inputPtr: number
-  inputCap: number
-  outputPtr: number
-  outputCap: number
+type ScratchBuffer = {
+  ptr: number
+  capacity: number
 }
 
-function reserve(zstd: Decoder, ptr: number, cap: number, needed: number): [number, number] {
-  if (needed <= cap && ptr) return [ptr, cap]
-  if (ptr) zstd.release(ptr, cap)
+type Scratch = {
+  input: ScratchBuffer
+  output: ScratchBuffer
+}
+
+function reserve(zstd: Decoder, slice: ScratchBuffer, needed: number) {
+  if (needed <= slice.capacity && slice.ptr) return
+  if (slice.ptr) {
+    zstd.release(slice.ptr, slice.capacity)
+    slice.ptr = 0
+    slice.capacity = 0
+  }
   const next = zstd.allocate(needed)
   if (!next) throw new Error('Unable to allocate Zstd decode buffers')
-  return [next, needed]
+  slice.ptr = next
+  slice.capacity = needed
 }
 
 function unpack(zstd: Decoder, scratch: Scratch, frame: ArrayBuffer, { packedBytes, rows, fields }: DecodeRequest) {
-  ;[scratch.inputPtr, scratch.inputCap] = reserve(zstd, scratch.inputPtr, scratch.inputCap, frame.byteLength)
-  ;[scratch.outputPtr, scratch.outputCap] = reserve(zstd, scratch.outputPtr, scratch.outputCap, packedBytes)
+  reserve(zstd, scratch.input, frame.byteLength)
+  reserve(zstd, scratch.output, packedBytes)
   // Allocations can grow WASM memory. Read its buffer only after both reservations.
-  new Uint8Array(zstd.memory.buffer, scratch.inputPtr, frame.byteLength).set(new Uint8Array(frame))
-  const status = zstd.decode(scratch.inputPtr, frame.byteLength, scratch.outputPtr, packedBytes)
+  new Uint8Array(zstd.memory.buffer, scratch.input.ptr, frame.byteLength).set(new Uint8Array(frame))
+  const status = zstd.decode(scratch.input.ptr, frame.byteLength, scratch.output.ptr, packedBytes)
   if (status === 1) throw new Error('Incorrect Zstd frame content size')
   if (status !== 0) throw new Error('Zstd decompression or checksum failed')
-  const header = new DataView(zstd.memory.buffer, scratch.outputPtr, 16)
+  const header = new DataView(zstd.memory.buffer, scratch.output.ptr, 16)
   if (
     header.getUint32(0, true) !== 0x31425045 ||
     header.getUint32(4, true) !== BLOCK_SIZE ||
@@ -69,7 +77,7 @@ function unpack(zstd: Decoder, scratch: Scratch, frame: ArrayBuffer, { packedByt
   }
   // WASM memory cannot be transferred. Copy the compact chunk once into a
   // transferable buffer so postMessage adds no further payload copy.
-  return new Uint8Array(zstd.memory.buffer, scratch.outputPtr, packedBytes).slice().buffer
+  return new Uint8Array(zstd.memory.buffer, scratch.output.ptr, packedBytes).slice().buffer
 }
 
 let sharedZstdModule: Promise<WebAssembly.Module> | undefined
@@ -106,7 +114,7 @@ export async function decompressZstd(
 
 export function createDecoder(signal?: AbortSignal) {
   let decoder: Promise<Decoder> | undefined
-  const scratch: Scratch = { inputPtr: 0, inputCap: 0, outputPtr: 0, outputCap: 0 }
+  const scratch: Scratch = { input: { ptr: 0, capacity: 0 }, output: { ptr: 0, capacity: 0 } }
   return async (request: DecodeRequest) => {
     decoder ??= loadDecoder(request.module, signal)
     const [zstd, frame] = await Promise.all([

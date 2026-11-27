@@ -1,5 +1,4 @@
-import { copyExternalImageChunked, generateMipmaps, raceAbort } from '../shader-test/gpu.ts'
-import { checkedGpu } from '../earth-score/gpu.ts'
+import { loadSrgbMipmappedTexture, raceAbort } from '../shader-test/gpu.ts'
 
 type DeviceSkyCache = {
   controller: AbortController
@@ -27,50 +26,16 @@ function getSkyCache(device: GPUDevice): DeviceSkyCache {
 }
 
 async function buildSkyMap(device: GPUDevice, cache: DeviceSkyCache, skyMapUrl: string): Promise<GPUTexture> {
-  const { signal } = cache.controller
-  const response = await fetch(skyMapUrl, { signal })
-  if (!response.ok) throw new Error(`Sky map download failed (${response.status}).`)
-  const bitmap = await createImageBitmap(await response.blob(), { colorSpaceConversion: 'none' })
-  let texture: GPUTexture | undefined
-  try {
-    signal.throwIfAborted()
-    const created = await checkedGpu(
-      device,
-      () => {
-        texture = device.createTexture({
-          label: 'NASA Deep Star Maps 2020',
-          size: [bitmap.width, bitmap.height],
-          mipLevelCount: Math.floor(Math.log2(Math.max(bitmap.width, bitmap.height))) + 1,
-          format: 'rgba8unorm-srgb',
-          usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
-        })
-        return texture
-      },
-      'Creating sky map',
-    )
-    signal.throwIfAborted()
-    await copyExternalImageChunked(device.queue, bitmap, created, signal)
-    signal.throwIfAborted()
-    const atlas = await checkedGpu(
-      device,
-      () => {
-        generateMipmaps(device, created, { label: 'Build sky map mipmaps' })
-        return created
-      },
-      'Uploading sky map',
-    )
-    if (signal.aborted) {
-      atlas.destroy()
-      signal.throwIfAborted()
-    }
-    cache.created.add(atlas)
-    return atlas
-  } catch (error) {
-    texture?.destroy()
-    throw error
-  } finally {
-    bitmap.close()
-  }
+  const atlas = await loadSrgbMipmappedTexture(device, skyMapUrl, cache.controller.signal, {
+    label: 'NASA Deep Star Maps 2020',
+    mipLabel: 'Build sky map mipmaps',
+    downloadErrorMessage: 'Sky map download failed.',
+    validateGpu: true,
+    createStepLabel: 'Creating sky map',
+    uploadStepLabel: 'Uploading sky map',
+  })
+  cache.created.add(atlas)
+  return atlas
 }
 
 /**

@@ -88,17 +88,28 @@ function expressionAfterEqual(node: Ast) {
 }
 
 function numericLiteral(text: string, floating: boolean): NumberValue {
+  if (floating && /^0x/i.test(text)) {
+    const [mantissa, rawExp] = text.slice(2).toLowerCase().split('p')
+    let type: NumberValue['type'] = 'abstract'
+    let exponentText = rawExp
+    if (exponentText !== undefined) {
+      const expSuffix = exponentText.at(-1)
+      if (expSuffix === 'f' || expSuffix === 'h') {
+        type = expSuffix === 'f' ? 'f32' : 'other'
+        exponentText = exponentText.slice(0, -1)
+      }
+    }
+    const [whole, fraction = ''] = mantissa.split('.')
+    const hexFraction = [...fraction].reduceRight((rest, digit) => (rest + parseInt(digit, 16)) / 16, 0)
+    const exponent = exponentText === undefined ? 0 : Number(exponentText)
+    const value = (Number.parseInt(whole || '0', 16) + hexFraction) * 2 ** exponent
+    return { type, value: type === 'f32' ? Math.fround(value) : value }
+  }
   const suffix = text.at(-1)?.toLowerCase()
   const explicit = floating ? suffix === 'f' || suffix === 'h' : suffix === 'i' || suffix === 'u'
   const type = !explicit ? 'abstract' : suffix === 'f' ? 'f32' : 'other'
   const digits = explicit ? text.slice(0, -1) : text
-  let value = Number(digits)
-  if (floating && digits.toLowerCase().startsWith('0x')) {
-    const [mantissa, exponent] = digits.slice(2).toLowerCase().split('p')
-    const [whole, fraction = ''] = mantissa.split('.')
-    const hexFraction = [...fraction].reduceRight((rest, digit) => (rest + parseInt(digit, 16)) / 16, 0)
-    value = (Number.parseInt(whole || '0', 16) + hexFraction) * 2 ** Number(exponent)
-  }
+  const value = Number(digits)
   return { type, value: type === 'f32' ? Math.fround(value) : value }
 }
 

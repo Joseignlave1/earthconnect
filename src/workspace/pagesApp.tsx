@@ -14,7 +14,13 @@ import type { loadWorkspaceRelease } from './workspaceRelease.ts'
 // or a hidden duplicate WebGPU SurfaceRenderer upfront.
 let workspaceModulePromise: Promise<typeof import('./SharedSkyWorkspace.tsx')> | null = null
 function loadWorkspaceModule() {
-  workspaceModulePromise ??= import('./SharedSkyWorkspace.tsx')
+  if (!workspaceModulePromise) {
+    const pending = import('./SharedSkyWorkspace.tsx').catch(error => {
+      if (workspaceModulePromise === pending) workspaceModulePromise = null
+      throw error
+    })
+    workspaceModulePromise = pending
+  }
   return workspaceModulePromise
 }
 
@@ -50,6 +56,8 @@ function EarthConnectShell({
   const [heroMounted, setHeroMounted] = useState(initialRoute === 'hero')
   const [heroLeaving, setHeroLeaving] = useState(false)
   const [workspaceReady, setWorkspaceReady] = useState(false)
+  const [workspaceLoadError, setWorkspaceLoadError] = useState<string | null>(null)
+  const [workspaceLoadAttempt, setWorkspaceLoadAttempt] = useState(0)
   const [heroReady, setHeroReady] = useState(false)
   const lastReportedReady = useRef<boolean | null>(null)
   const leaveTimer = useRef<number | undefined>(undefined)
@@ -81,15 +89,21 @@ function EarthConnectShell({
     void Promise.all([
       workspaceComponent ? Promise.resolve({ default: workspaceComponent }) : loadWorkspaceModule(),
       project ? Promise.resolve(project) : readShaderProject(),
-    ]).then(([mod, loadedProject]) => {
-      if (cancelled) return
-      setWorkspaceComponent(() => mod.default)
-      setProject(loadedProject)
-    })
+    ])
+      .then(([mod, loadedProject]) => {
+        if (cancelled) return
+        setWorkspaceLoadError(null)
+        setWorkspaceComponent(() => mod.default)
+        setProject(loadedProject)
+      })
+      .catch(error => {
+        if (cancelled) return
+        setWorkspaceLoadError(error instanceof Error ? error.message : 'Could not load the workspace.')
+      })
     return () => {
       cancelled = true
     }
-  }, [route, workspaceComponent, project])
+  }, [route, workspaceComponent, project, workspaceLoadAttempt])
 
   const leaveHero = useCallback(() => {
     window.clearTimeout(leaveTimer.current)
@@ -109,11 +123,13 @@ function EarthConnectShell({
   }, [])
 
   const openWorkspace = useCallback(() => {
-    if (route === 'workspace') return
+    if (route === 'workspace' && !workspaceLoadError) return
     if (routeFromLocation() !== 'workspace') window.history.pushState(null, '', '/find')
+    setWorkspaceLoadError(null)
     setWorkspaceReady(false)
     setRoute('workspace')
-  }, [route])
+    if (workspaceLoadError) setWorkspaceLoadAttempt(n => n + 1)
+  }, [route, workspaceLoadError])
 
   useEffect(() => {
     const onPopState = () => {
@@ -158,7 +174,54 @@ function EarthConnectShell({
     <>
       {route === 'workspace' && Workspace && project && (
         <div>
-          <Workspace assets={assets} resources={resources} initialProject={project} onReady={handleWorkspaceReady} />
+          <Workspace
+            assets={assets}
+            resources={resources}
+            initialProject={project}
+            onProjectChange={setProject}
+            onReady={handleWorkspaceReady}
+          />
+        </div>
+      )}
+      {route === 'workspace' && workspaceLoadError && (
+        <div
+          role="alert"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'grid',
+            placeItems: 'center',
+            background: '#05070c',
+            color: '#e6edf5',
+            padding: '24px',
+          }}
+        >
+          <div style={{ maxWidth: 420, textAlign: 'center', display: 'grid', gap: 12 }}>
+            <p style={{ margin: 0 }}>Could not open the workspace: {workspaceLoadError}</p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setWorkspaceLoadError(null)
+                  setWorkspaceLoadAttempt(n => n + 1)
+                }}
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setWorkspaceLoadError(null)
+                  window.history.pushState(null, '', '/')
+                  setRoute('hero')
+                  setHeroMounted(true)
+                }}
+              >
+                Back
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {heroMounted && (
@@ -229,7 +292,7 @@ export function mount(
   const open = createOpener(devicePool, releaseUnclaimedDevice, getPrewarm)
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <WorkspaceStartup open={open} loadInitialRelease={loadInitialRelease} devicePool={devicePool} />
+      <WorkspaceStartup open={open} loadInitialRelease={loadInitialRelease} />
     </StrictMode>,
   )
 }

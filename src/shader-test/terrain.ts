@@ -269,89 +269,167 @@ function smoothPolarLongitudes(data: Float32Array, width: number, height: number
   }
 }
 
-// Numeric averages, not averages of the packed PNG color channels. Uploading
-// these levels also avoids requiring float render-target extensions for mipmaps.
-export function elevationPyramid(terrain: Terrain, isotropicPoles = false) {
-  let width = terrain.width,
-    height = terrain.height
+function closePoles(data: Float32Array, columns: number, rows: number) {
+  if (!data.length) return
+  // Every longitude converges to one point. A longitude-dependent last row
+  // otherwise remains visible as radial wedges, even with correct coordinates.
+  for (const row of new Set([0, rows - 1])) {
+    let sum = 0
+    for (let x = 0; x < columns; x++) sum += data[row * columns + x]
+    data.fill(sum / columns, row * columns, (row + 1) * columns)
+  }
+}
+
+function downsampleTerrainLevel(
+  values: Float32Array,
+  coast: Float32Array,
+  width: number,
+  height: number,
+  hasCoast: boolean,
+) {
+  const w = Math.max(1, width >> 1)
+  const h = Math.max(1, height >> 1)
+  const next = new Float32Array(w * h)
+  const nextCoast = hasCoast ? new Float32Array(w * h) : new Float32Array(0)
+  if (width === w * 2 && height === h * 2) {
+    for (let y = 0; y < h; y++) {
+      const r0 = y * 2 * width
+      const r1 = r0 + width
+      const dstRow = y * w
+      if (hasCoast) {
+        for (let x = 0; x < w; x++) {
+          const x0 = x * 2
+          const i0 = r0 + x0,
+            i1 = r1 + x0
+          next[dstRow + x] = (values[i0] + values[i0 + 1] + values[i1] + values[i1 + 1]) * 0.25
+          nextCoast[dstRow + x] = (coast[i0] + coast[i0 + 1] + coast[i1] + coast[i1 + 1]) * 0.25
+        }
+      } else {
+        for (let x = 0; x < w; x++) {
+          const x0 = x * 2
+          const i0 = r0 + x0,
+            i1 = r1 + x0
+          next[dstRow + x] = (values[i0] + values[i0 + 1] + values[i1] + values[i1 + 1]) * 0.25
+        }
+      }
+    }
+  } else {
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        let sum = 0,
+          coastSum = 0,
+          count = 0
+        for (let sy = Math.floor((y * height) / h); sy < Math.floor(((y + 1) * height) / h); sy++) {
+          for (let sx = Math.floor((x * width) / w); sx < Math.floor(((x + 1) * width) / w); sx++) {
+            sum += values[sy * width + sx]
+            if (hasCoast) coastSum += coast[sy * width + sx]
+            count++
+          }
+        }
+        next[y * w + x] = sum / count
+        if (hasCoast) nextCoast[y * w + x] = coastSum / count
+      }
+  }
+  return { values: next, coast: nextCoast, width: w, height: h }
+}
+
+function packRg32FloatLevel(
+  values: Float32Array,
+  coast: Float32Array,
+  width: number,
+  height: number,
+): PackedTerrainLevel<Float32Array<ArrayBuffer>> {
+  const data = new Float32Array(values.length * 2)
+  for (let i = 0; i < values.length; i++) {
+    data[i * 2] = values[i]
+    data[i * 2 + 1] = coast[i] ?? 0
+  }
+  return { data, width, height }
+}
+
+function initTerrainBaseLevel(terrain: Terrain, isotropicPoles: boolean) {
+  const width = terrain.width
+  const height = terrain.height
   const stride = terrain.stride ?? 4
   const hasCoast = stride === 4
-  let values = new Float32Array(width * height)
-  let coast = hasCoast ? new Float32Array(width * height) : new Float32Array(0)
+  const values = new Float32Array(width * height)
+  const coast = hasCoast ? new Float32Array(width * height) : new Float32Array(0)
   for (let i = 0; i < values.length; i++) {
     const o = i * stride
     values[i] = terrain.pixels[o] * 256 + terrain.pixels[o + 1] - 32768
     if (hasCoast) coast[i] = (terrain.pixels[o + 2] - 128) / 4
   }
-  const closePoles = (data: Float32Array, columns: number, rows: number) => {
-    if (!data.length) return
-    // Every longitude converges to one point. A longitude-dependent last row
-    // otherwise remains visible as radial wedges, even with correct coordinates.
-    for (const row of new Set([0, rows - 1])) {
-      let sum = 0
-      for (let x = 0; x < columns; x++) sum += data[row * columns + x]
-      data.fill(sum / columns, row * columns, (row + 1) * columns)
-    }
-  }
   const smoothRuntime = isotropicPoles && !terrain.polarSmoothed
   if (smoothRuntime) smoothPolarLongitudes(values, width, height)
   closePoles(values, width, height)
   closePoles(coast, width, height)
+  return { values, coast, width, height, hasCoast, smoothRuntime }
+}
+
+// Numeric averages, not averages of the packed PNG color channels. Uploading
+// these levels also avoids requiring float render-target extensions for mipmaps.
+export function elevationPyramid(terrain: Terrain, isotropicPoles = false) {
+  const base = initTerrainBaseLevel(terrain, isotropicPoles)
+  const { hasCoast, smoothRuntime } = base
+  let { values, coast, width, height } = base
   const levels = [{ values, coast, width, height }]
   while (width > 1 || height > 1) {
-    const w = Math.max(1, width >> 1),
-      h = Math.max(1, height >> 1)
-    const next = new Float32Array(w * h)
-    const nextCoast = hasCoast ? new Float32Array(w * h) : new Float32Array(0)
-    if (width === w * 2 && height === h * 2) {
-      for (let y = 0; y < h; y++) {
-        const r0 = y * 2 * width
-        const r1 = r0 + width
-        const dstRow = y * w
-        if (hasCoast) {
-          for (let x = 0; x < w; x++) {
-            const x0 = x * 2
-            const i0 = r0 + x0,
-              i1 = r1 + x0
-            next[dstRow + x] = (values[i0] + values[i0 + 1] + values[i1] + values[i1 + 1]) * 0.25
-            nextCoast[dstRow + x] = (coast[i0] + coast[i0 + 1] + coast[i1] + coast[i1 + 1]) * 0.25
-          }
-        } else {
-          for (let x = 0; x < w; x++) {
-            const x0 = x * 2
-            const i0 = r0 + x0,
-              i1 = r1 + x0
-            next[dstRow + x] = (values[i0] + values[i0 + 1] + values[i1] + values[i1 + 1]) * 0.25
-          }
-        }
-      }
-    } else {
-      for (let y = 0; y < h; y++)
-        for (let x = 0; x < w; x++) {
-          let sum = 0,
-            coastSum = 0,
-            count = 0
-          for (let sy = Math.floor((y * height) / h); sy < Math.floor(((y + 1) * height) / h); sy++) {
-            for (let sx = Math.floor((x * width) / w); sx < Math.floor(((x + 1) * width) / w); sx++) {
-              sum += values[sy * width + sx]
-              if (hasCoast) coastSum += coast[sy * width + sx]
-              count++
-            }
-          }
-          next[y * w + x] = sum / count
-          if (hasCoast) nextCoast[y * w + x] = coastSum / count
-        }
-    }
-    if (smoothRuntime) smoothPolarLongitudes(next, w, h)
-    closePoles(next, w, h)
-    closePoles(nextCoast, w, h)
-    levels.push({ values: next, coast: nextCoast, width: w, height: h })
-    values = next
-    coast = nextCoast
-    width = w
-    height = h
+    const next = downsampleTerrainLevel(values, coast, width, height, hasCoast)
+    if (smoothRuntime) smoothPolarLongitudes(next.values, next.width, next.height)
+    closePoles(next.values, next.width, next.height)
+    closePoles(next.coast, next.width, next.height)
+    levels.push(next)
+    values = next.values
+    coast = next.coast
+    width = next.width
+    height = next.height
   }
   return levels
+}
+
+/**
+ * Incrementally build and interleave the RG32 float mip pyramid so only the
+ * current level's scratch arrays remain live while generating the next level.
+ */
+export function packRg32FloatPyramidDirect(
+  terrain: Terrain,
+  isotropicPoles = false,
+): PackedTerrainLevel<Float32Array<ArrayBuffer>>[] {
+  const base = initTerrainBaseLevel(terrain, isotropicPoles)
+  const { hasCoast, smoothRuntime } = base
+  let { values, coast, width, height } = base
+  const packed: PackedTerrainLevel<Float32Array<ArrayBuffer>>[] = [packRg32FloatLevel(values, coast, width, height)]
+  while (width > 1 || height > 1) {
+    const next = downsampleTerrainLevel(values, coast, width, height, hasCoast)
+    if (smoothRuntime) smoothPolarLongitudes(next.values, next.width, next.height)
+    closePoles(next.values, next.width, next.height)
+    closePoles(next.coast, next.width, next.height)
+    packed.push(packRg32FloatLevel(next.values, next.coast, next.width, next.height))
+    values = next.values
+    coast = next.coast
+    width = next.width
+    height = next.height
+  }
+  return packed
+}
+
+export async function prepareTerrainData<F extends TerrainPackFormat>(
+  url: string,
+  format: F,
+  signal: AbortSignal,
+  decompressZstd: TerrainZstdDecompressor,
+): Promise<{
+  terrain: Terrain
+  poles: [number, number]
+  levels: PackedTerrainLevel<F extends 'rg32float' ? Float32Array<ArrayBuffer> : Uint8Array<ArrayBuffer>>[]
+}> {
+  const terrain = await loadTerrain(url, signal, decompressZstd)
+  signal.throwIfAborted()
+  const poles = poleElevations(terrain)
+  const levels = (
+    format === 'rg8unorm' ? packRg8PyramidDirect(terrain) : packRg32FloatPyramidDirect(terrain, false)
+  ) as PackedTerrainLevel<F extends 'rg32float' ? Float32Array<ArrayBuffer> : Uint8Array<ArrayBuffer>>[]
+  return { terrain, poles, levels }
 }
 
 // Match normalized GPU linear sampling, including the dateline and pole clamps.

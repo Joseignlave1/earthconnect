@@ -1,3 +1,23 @@
+struct DecodedGeo {
+  valid: bool,
+  bodyId: i32,
+  uv: vec2f,
+}
+
+// Body IDs are packed in the integer part of x: Earth [0,1], Moon [2,3], Mars [4,5]; y == -1 marks space.
+fn decodeGeo(g: vec4f) -> DecodedGeo {
+  let coords = vec2f(g.x + g.y, g.z + g.w);
+  if (coords.y == -1.) { return DecodedGeo(false, -1, vec2f(0., -1.)); }
+  let bodyId = i32(floor(coords.x * .5));
+  return DecodedGeo(true, bodyId, vec2f(coords.x - f32(bodyId) * 2., coords.y));
+}
+
+fn markerForBody(bodyId: i32, selEarth: MarkerRecord, selMoon: MarkerRecord, selMars: MarkerRecord) -> MarkerRecord {
+  if (bodyId == 1) { return selMoon; }
+  if (bodyId == 2) { return selMars; }
+  return selEarth;
+}
+
 fn worldTangent(uv: vec2f, point: vec2f, bodyMorph: f32, unitPerPixel: f32) -> vec2f {
   let angles = (uv - .5) * vec2f(6.283185307, 3.141592654);
   let origin = (point - .5) * vec2f(6.283185307, 3.141592654);
@@ -39,21 +59,19 @@ fn applyPrecisionReticle(base: vec3f, bg: f32, t: vec2f, d: f32, aa: f32, opacit
 }
 
 fn evalWorldMarkerSample(
-  s: vec4f, coordinates: vec2f, selEarth: vec4f, selMoon: vec4f, selMars: vec4f,
+  s: vec4f, geo: DecodedGeo, selEarth: MarkerRecord, selMoon: MarkerRecord, selMars: MarkerRecord,
   earthMorph: f32, exposure: f32, ratio: f32, hdr: bool,
 ) -> vec4f {
-  if (coordinates.y == -1.) { return s; }
-  let bodyId = i32(floor(coordinates.x * .5));
-  let sel = select(select(selEarth, selMoon, bodyId == 1), selMars, bodyId == 2);
-  if (sel.z <= .005) { return s; }
-  let uv = vec2f(coordinates.x - f32(bodyId) * 2., coordinates.y);
-  let bodyMorph = select(1., earthMorph, bodyId == 0);
-  let t = worldTangent(uv, sel.xy, bodyMorph, sel.w);
+  if (!geo.valid) { return s; }
+  let sel = markerForBody(geo.bodyId, selEarth, selMoon, selMars);
+  if (sel.opacity <= .005) { return s; }
+  let bodyMorph = select(1., earthMorph, geo.bodyId == 0);
+  let t = worldTangent(geo.uv, sel.uv, bodyMorph, sel.unitsPerPixel);
   let d = length(t);
   if (d > 16.) { return s; }
   let aa = clamp(.65 / max(ratio, 1.), .15, .75);
   let base = s.rgb / max(s.a, .0001);
   let bg = dot(select(base, toDisplay(acesToneMap(base * exposure)), hdr), vec3f(.2126, .7152, .0722));
-  let col = applyPrecisionReticle(base, bg, t, d, aa, sel.z, hdr);
+  let col = applyPrecisionReticle(base, bg, t, d, aa, sel.opacity, hdr);
   return vec4f(col * s.a, s.a);
 }
