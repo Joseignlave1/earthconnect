@@ -8,6 +8,9 @@ import './WorkspaceStartup.css'
 
 const decimal = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const mb = (bytes: number) => decimal.format(bytes / 1_000_000)
+// Hold route-transition overlay long enough after the constellation logo finishes
+// fading in (~360ms) so fast transitions never flash and cut away abruptly.
+const MIN_TRANSITION_LOGO_HOLD_MS = 550
 
 export function WorkspaceStartup({
   open,
@@ -32,19 +35,62 @@ export function WorkspaceStartup({
   const [slow, setSlow] = useState(false)
   const nextView = useRef(0)
   const readyToken = useRef(0)
+  const isTransitioningRef = useRef(false)
+  const logoReadyAtRef = useRef(0)
+  const pendingTransitionRevealRef = useRef<(() => void) | null>(null)
+  const revealDelayTimerRef = useRef<number | undefined>(undefined)
+
+  const scheduleTransitionReveal = useCallback((run: () => void) => {
+    window.clearTimeout(revealDelayTimerRef.current)
+    revealDelayTimerRef.current = undefined
+    const shownAt = logoReadyAtRef.current
+    if (shownAt === 0) {
+      pendingTransitionRevealRef.current = run
+      return
+    }
+    const remaining = Math.max(0, MIN_TRANSITION_LOGO_HOLD_MS - (performance.now() - shownAt))
+    if (remaining > 0) {
+      revealDelayTimerRef.current = window.setTimeout(() => {
+        revealDelayTimerRef.current = undefined
+        run()
+      }, remaining)
+    } else {
+      run()
+    }
+  }, [])
+
   const openView = useCallback(
     async (assets: WorkspaceAssets, signal: AbortSignal) => {
       const id = ++nextView.current
       const isCurrent = () => id === nextView.current && !signal.aborted
+      isTransitioningRef.current = false
+      logoReadyAtRef.current = 0
+      pendingTransitionRevealRef.current = null
+      window.clearTimeout(revealDelayTimerRef.current)
+      revealDelayTimerRef.current = undefined
       setReady(false)
       setTransitioning(false)
       setWorkspace(undefined)
       setError('')
       let initialReported = false
+      signal.addEventListener(
+        'abort',
+        () => {
+          pendingTransitionRevealRef.current = null
+          window.clearTimeout(revealDelayTimerRef.current)
+          revealDelayTimerRef.current = undefined
+        },
+        { once: true },
+      )
       const onReady = (isReady = true) => {
         if (!isCurrent()) return
         const token = ++readyToken.current
+        pendingTransitionRevealRef.current = null
+        window.clearTimeout(revealDelayTimerRef.current)
+        revealDelayTimerRef.current = undefined
         if (!isReady) {
+          isTransitioningRef.current = true
+          logoReadyAtRef.current = 0
           setTransitioning(true)
           setReady(false)
           setLogoReady(false)
@@ -52,21 +98,31 @@ export function WorkspaceStartup({
           setLogoCycle(value => value + 1)
           return
         }
-        // Leave a full paint opportunity for Monaco, the preview controls and
-        // the already completed WebGPU canvas before removing the overlay.
-        if (!initialReported) startStartupSpan('reveal', 'settle')
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            if (!isCurrent() || token !== readyToken.current) return
-            if (!initialReported) {
-              initialReported = true
-              endStartupSpan('reveal')
-              reportStartupTiming()
-            }
-            setTransitioning(false)
-            setReady(true)
-          }),
-        )
+        const finishReveal = () => {
+          // Leave a full paint opportunity for Monaco, the preview controls and
+          // the already completed WebGPU canvas before removing the overlay.
+          if (!initialReported) startStartupSpan('reveal', 'settle')
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              if (!isCurrent() || token !== readyToken.current) return
+              if (!initialReported) {
+                initialReported = true
+                endStartupSpan('reveal')
+                reportStartupTiming()
+              }
+              isTransitioningRef.current = false
+              setTransitioning(false)
+              setReady(true)
+            }),
+          )
+        }
+        if (isTransitioningRef.current) {
+          scheduleTransitionReveal(() => {
+            if (isCurrent() && token === readyToken.current) finishReveal()
+          })
+        } else {
+          finishReveal()
+        }
       }
       try {
         const view = await open(assets, onReady, signal)
@@ -75,19 +131,27 @@ export function WorkspaceStartup({
         if (isCurrent()) setError(cause instanceof Error ? cause.message : String(cause))
       }
     },
-    [open],
+    [open, scheduleTransitionReveal],
   )
 
   const revealed = opening && ready && !error
   const finalizing = !!progress?.total && progress.downloaded === progress.total
   // Keep the WebGPU logo alive through the 220ms fade-out so it never snaps back to blank,
   // then tear down its GPU resources & stop rAF completely once hidden.
-  const handleLogoReady = useCallback(() => setLogoReady(true), [])
+  const handleLogoReady = useCallback(() => {
+    setLogoReady(true)
+    if (logoReadyAtRef.current === 0) logoReadyAtRef.current = performance.now()
+    const pending = pendingTransitionRevealRef.current
+    if (pending) {
+      pendingTransitionRevealRef.current = null
+      scheduleTransitionReveal(pending)
+    }
+  }, [scheduleTransitionReveal])
   useEffect(() => {
     if (logoReady || revealed || error) return
-    const safety = window.setTimeout(() => setLogoReady(true), 2000)
+    const safety = window.setTimeout(handleLogoReady, 2000)
     return () => window.clearTimeout(safety)
-  }, [logoReady, revealed, error])
+  }, [logoReady, revealed, error, handleLogoReady])
   useEffect(() => {
     if (!revealed) return
     const timer = window.setTimeout(() => setLogoDismissed(true), 280)
@@ -225,12 +289,13 @@ export function WorkspaceStartup({
         className="workspace-startup"
         aria-label="Earth Connect startup"
         inert={revealed}
+        data-transitioning={transitioning || undefined}
         data-revealed={revealed || undefined}
         data-offline={offline || undefined}
       >
         <div className="workspace-startup-content" data-ready={startupContentVisible || undefined}>
           {logoMounted && <ConstellationLogo key={logoCycle} onReady={handleLogoReady} />}
-          {!error && (!unsaved || opening) && (
+          {!error && !transitioning && (!unsaved || opening) && (
             <progress
               aria-label="Earth data download"
               max={progress?.total || 1}

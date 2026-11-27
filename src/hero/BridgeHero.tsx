@@ -23,17 +23,25 @@ import './style.css'
 type Coordinates = { latitude: number; longitude: number }
 
 const HERO_SCROLL_CUE_MS = 1950
+// Keep EarthScore compute buffers warm briefly after hero reveal so clicking
+// Explore reuses them immediately instead of re-decoding all 36 Zstd chunks,
+// while still reclaiming ~500 MB VRAM for visitors who stay on the landing page.
+const HERO_WORLD_WARM_TTL_MS = 45_000
 
 export function BridgeHero({
   assets,
   resources,
   leaving,
+  opening = false,
+  onPrefetchWorkspace,
   onOpenWorkspace,
   onReady,
 }: {
   assets: WorkspaceAssets
   resources: EarthWorkspaceResources
   leaving: boolean
+  opening?: boolean
+  onPrefetchWorkspace?: () => void
   onOpenWorkspace: () => void
   onReady: () => void
 }) {
@@ -51,13 +59,15 @@ export function BridgeHero({
   const scrollProgressRef = useRef(0)
   const scrollPausedRef = useRef(false)
   const leavingRef = useRef(leaving)
+  const openingRef = useRef(opening)
   const onReadyRef = useRef(onReady)
   const [error, setError] = useState('')
 
   useEffect(() => {
     leavingRef.current = leaving
-    rendererRef.current?.setPaused(leaving || scrollPausedRef.current)
-  }, [leaving])
+    openingRef.current = opening
+    rendererRef.current?.setPaused(leaving || opening || scrollPausedRef.current)
+  }, [leaving, opening])
 
   useEffect(() => {
     onReadyRef.current = onReady
@@ -135,11 +145,16 @@ export function BridgeHero({
       const pauseChanged = scrollPausedRef.current !== shouldPause
       if (pauseChanged) {
         scrollPausedRef.current = shouldPause
-        rendererRef.current?.setPaused(leavingRef.current || shouldPause)
+        rendererRef.current?.setPaused(leavingRef.current || openingRef.current || shouldPause)
       }
       // Under prefers-reduced-motion, the renderer stops scheduling animation frames once settled,
       // so explicitly request a frame whenever scroll progress moves (including the last visible frame).
-      if (Math.abs(progress - prevProgress) > 1e-4 && !leavingRef.current && (!shouldPause || pauseChanged)) {
+      if (
+        Math.abs(progress - prevProgress) > 1e-4 &&
+        !leavingRef.current &&
+        !openingRef.current &&
+        (!shouldPause || pauseChanged)
+      ) {
         rendererRef.current?.invalidateHeroFrame()
       }
     }
@@ -172,6 +187,7 @@ export function BridgeHero({
     let ctaOverlay: StardustCtaOverlay | undefined
     let blackHoleLens: BlackHoleLensPass | undefined
     let world: ReturnType<EarthWorkspaceResources['acquireWorld']> | undefined
+    let worldReleaseTimer: number | undefined
     let notifiedReady = false
     let scoreReady = false
     let deviceController: AbortController | null = null
@@ -228,6 +244,8 @@ export function BridgeHero({
     window.addEventListener('resize', syncRestLayout, { passive: true, signal })
 
     const releaseHeroDeviceResources = () => {
+      window.clearTimeout(worldReleaseTimer)
+      worldReleaseTimer = undefined
       deviceController?.abort()
       deviceController = null
       ctaOverlayRef.current = null
@@ -433,7 +451,7 @@ export function BridgeHero({
             }
             renderer = instance
             rendererRef.current = instance
-            instance.setPaused(leavingRef.current || scrollPausedRef.current)
+            instance.setPaused(leavingRef.current || openingRef.current || scrollPausedRef.current)
             return instance
           },
         })
@@ -526,7 +544,7 @@ export function BridgeHero({
         }
         scoreReady = true
 
-        // Render exactly one settled frame and wait for its GPU fence before releasing compute buffers and revealing.
+        // Render exactly one settled frame and wait for its GPU fence before revealing.
         await boot.task('hero-settle', {
           phase: 'settle',
           recordTiming: isInitial,
@@ -535,9 +553,16 @@ export function BridgeHero({
         devSignal.throwIfAborted()
 
         if (localWorld) {
-          localWorld.release()
-          if (world === localWorld) world = undefined
+          const retainedWorld = localWorld
           localWorld = undefined
+          window.clearTimeout(worldReleaseTimer)
+          worldReleaseTimer = window.setTimeout(() => {
+            worldReleaseTimer = undefined
+            if (world === retainedWorld) {
+              world = undefined
+              retainedWorld.release()
+            }
+          }, HERO_WORLD_WARM_TTL_MS)
         }
 
         instance.setPhase('live')
@@ -594,7 +619,7 @@ export function BridgeHero({
       className="bridge-hero"
       aria-label="Earth Connect overview"
       data-leaving={leaving ? '' : undefined}
-      inert={leaving}
+      inert={leaving || opening}
     >
       <div ref={trackRef} className="bridge-hero-scroll-track">
         <div ref={stickyRef} className="bridge-hero-sticky">
@@ -609,10 +634,12 @@ export function BridgeHero({
             boundsRef={canvasRef}
             ctaRef={ctaStageRef}
             onCtaHoverChange={hovered => {
+              if (hovered) onPrefetchWorkspace?.()
               ctaOverlayRef.current?.setHovered(hovered)
               rendererRef.current?.invalidateHeroFrame()
             }}
             onCtaFocusChange={focused => {
+              if (focused) onPrefetchWorkspace?.()
               ctaOverlayRef.current?.setFocused(focused)
               rendererRef.current?.invalidateHeroFrame()
             }}
@@ -620,7 +647,8 @@ export function BridgeHero({
               ctaOverlayRef.current?.setPressed(pressed)
               rendererRef.current?.invalidateHeroFrame()
             }}
-            canActivateCta={(x, y) => ctaOverlayRef.current?.hitTestClient(x, y) ?? true}
+            canActivateCta={(x, y) => !opening && (ctaOverlayRef.current?.hitTestClient(x, y) ?? true)}
+            ctaBusy={opening}
             onOpenWorkspace={onOpenWorkspace}
           />
           <button

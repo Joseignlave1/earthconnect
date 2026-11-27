@@ -1,5 +1,5 @@
 export const WEBGPU_UNAVAILABLE_MESSAGE =
-  'Earth Connect requires WebGPU. Open this page in Chrome, Edge, or Safari 26+, or enable dom.webgpu.enabled in Firefox (about:config).'
+  'Earth Connect requires WebGPU. Open this page in Chrome, Edge, or Safari 26+, or enable dom.webgpu.enabled in Firefox (about:config; Firefox WebGPU may experience performance issues).'
 
 type SurfaceDevice = { device: GPUDevice; adapter: GPUAdapter }
 type DeviceEntry = { ready: Promise<SurfaceDevice>; users: number; lost: Set<(info: GPUDeviceLostInfo) => void> }

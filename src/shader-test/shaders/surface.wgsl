@@ -491,6 +491,9 @@ fn oceanNoise3(p: vec3f) -> f32 {
   return mix(nxy.x, nxy.y, u.z);
 }
 
+// Precomputed mix(0.66, 1.52, smoothstep(0.24, 0.78, 0.5)) — Naga does not support smoothstep() in const expressions.
+const OCEAN_WIND_MEAN_ROUGHNESS: f32 = 1.06612203;
+
 // Seam-free 3D mesoscale ocean wind field (~150-1000 km fronts & calm slicks) modulating
 // Cox-Munk RMS wave slope, analytically band-limited using a proven Frobenius Jacobian bound
 // (||J_p||_2 <= 1 + 0.22 * 5.2 * sqrt(3) * 1.875 * wWarp ≈ 1 + 3.72 * wWarp) so all
@@ -501,13 +504,13 @@ fn oceanWindRoughness(n: vec3f, nDx: vec3f, nDy: vec3f) -> f32 {
   let flowDy = vec3f(nDy.x, nDy.y * 1.45, nDy.z);
   let flowStep = max(length(flowDx), length(flowDy));
   // Even without warp stretching, once the lowest octave (7.5) exceeds Nyquist all octaves are 0.5.
-  if (7.5 * flowStep >= .85) { return mix(.66, 1.52, smoothstep(.24, .78, .5)); }
+  if (7.5 * flowStep >= .85) { return OCEAN_WIND_MEAN_ROUGHNESS; }
   let wWarp = 1. - smoothstep(.30, .85, 5.2 * flowStep);
   let pStep = flowStep * (1. + 3.72 * wWarp);
   let w0 = 1. - smoothstep(.30, .85, 7.5 * pStep);
   let w1 = 1. - smoothstep(.30, .85, 17.5 * pStep);
   let w2 = 1. - smoothstep(.30, .85, 38. * pStep);
-  if (w0 <= .001 && w1 <= .001 && w2 <= .001) { return mix(.66, 1.52, smoothstep(.24, .78, .5)); }
+  if (w0 <= .001 && w1 <= .001 && w2 <= .001) { return OCEAN_WIND_MEAN_ROUGHNESS; }
   var warp = vec3f(0.);
   if (wWarp > .001) {
     warp = (vec3f(

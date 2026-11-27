@@ -13,6 +13,7 @@ import type { loadWorkspaceRelease } from './workspaceRelease.ts'
 // Lazily loaded when entering /find so the landing page (/) never pays for Monaco/WGSL analyzer
 // or a hidden duplicate WebGPU SurfaceRenderer upfront.
 let workspaceModulePromise: Promise<typeof import('./SharedSkyWorkspace.tsx')> | null = null
+let projectPromise: Promise<ShaderProject> | null = null
 function loadWorkspaceModule() {
   if (!workspaceModulePromise) {
     const pending = import('./SharedSkyWorkspace.tsx').catch(error => {
@@ -22,6 +23,20 @@ function loadWorkspaceModule() {
     workspaceModulePromise = pending
   }
   return workspaceModulePromise
+}
+function loadSavedProject() {
+  if (!projectPromise) {
+    const pending = readShaderProject().catch(error => {
+      if (projectPromise === pending) projectPromise = null
+      throw error
+    })
+    projectPromise = pending
+  }
+  return projectPromise
+}
+function prefetchWorkspaceAssets() {
+  void loadWorkspaceModule().catch(() => undefined)
+  void loadSavedProject().catch(() => undefined)
 }
 
 type AppRoute = 'hero' | 'workspace'
@@ -54,27 +69,20 @@ function EarthConnectShell({
   )
   const [project, setProject] = useState<ShaderProject | null>(() => initialProject)
   const [heroMounted, setHeroMounted] = useState(initialRoute === 'hero')
-  const [heroLeaving, setHeroLeaving] = useState(false)
   const [workspaceReady, setWorkspaceReady] = useState(false)
   const [workspaceLoadError, setWorkspaceLoadError] = useState<string | null>(null)
   const [workspaceLoadAttempt, setWorkspaceLoadAttempt] = useState(0)
   const [heroReady, setHeroReady] = useState(false)
   const lastReportedReady = useRef<boolean | null>(null)
-  const leaveTimer = useRef<number | undefined>(undefined)
   const routeRef = useRef(route)
   const heroMountedRef = useRef(heroMounted)
-  const workspaceReadyRef = useRef(workspaceReady)
   useEffect(() => {
     routeRef.current = route
     heroMountedRef.current = heroMounted
-    workspaceReadyRef.current = workspaceReady
-  }, [route, heroMounted, workspaceReady])
+  }, [route, heroMounted])
 
-  useEffect(() => () => window.clearTimeout(leaveTimer.current), [])
-
-  // Keep the loading screen up whenever the active view hasn't finished rendering its first complete frame
-  // (except when leaving the already-live hero into /find, where the hero itself stays on top until workspaceReady).
-  const activeRouteReady = route === 'hero' ? heroReady : workspaceReady || (heroMounted && heroReady)
+  // Keep the loading screen up whenever the active view hasn't finished rendering its first complete frame.
+  const activeRouteReady = route === 'hero' ? heroReady : workspaceReady || Boolean(workspaceLoadError)
   useEffect(() => {
     if (lastReportedReady.current === null && !activeRouteReady) return
     if (lastReportedReady.current === activeRouteReady) return
@@ -88,7 +96,7 @@ function EarthConnectShell({
     let cancelled = false
     void Promise.all([
       workspaceComponent ? Promise.resolve({ default: workspaceComponent }) : loadWorkspaceModule(),
-      project ? Promise.resolve(project) : readShaderProject(),
+      project ? Promise.resolve(project) : loadSavedProject(),
     ])
       .then(([mod, loadedProject]) => {
         if (cancelled) return
@@ -105,22 +113,27 @@ function EarthConnectShell({
     }
   }, [route, workspaceComponent, project, workspaceLoadAttempt])
 
-  const leaveHero = useCallback(() => {
-    window.clearTimeout(leaveTimer.current)
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduced) {
-      setHeroLeaving(false)
-      setHeroMounted(false)
-      setHeroReady(false)
-      return
+  // Silently warm the workspace bundle after the hero has revealed and settled,
+  // so clicking Explore doesn't wait to download & parse Monaco from scratch.
+  useEffect(() => {
+    if (!heroReady || route !== 'hero' || workspaceComponent) return
+    let idleId: number | undefined
+    const timer = window.setTimeout(() => {
+      const ric = (window as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number })
+        .requestIdleCallback
+      if (typeof ric === 'function') {
+        idleId = ric(() => prefetchWorkspaceAssets(), { timeout: 2000 })
+      } else {
+        prefetchWorkspaceAssets()
+      }
+    }, 1000)
+    return () => {
+      window.clearTimeout(timer)
+      if (idleId !== undefined) {
+        ;(window as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(idleId)
+      }
     }
-    setHeroLeaving(true)
-    leaveTimer.current = window.setTimeout(() => {
-      setHeroLeaving(false)
-      setHeroMounted(false)
-      setHeroReady(false)
-    }, 340)
-  }, [])
+  }, [heroReady, route, workspaceComponent])
 
   const openWorkspace = useCallback(() => {
     if (route === 'workspace' && !workspaceLoadError) return
@@ -134,11 +147,9 @@ function EarthConnectShell({
   useEffect(() => {
     const onPopState = () => {
       const next = routeFromLocation()
-      window.clearTimeout(leaveTimer.current)
       setRoute(next)
       if (next === 'hero') {
         setWorkspaceReady(false)
-        setHeroLeaving(false)
         if (!heroMountedRef.current) {
           // Cover synchronously in the same React render batch as remounting BridgeHero
           // so zero unloaded frames leak before effects run.
@@ -152,23 +163,23 @@ function EarthConnectShell({
         if (!heroMountedRef.current) {
           lastReportedReady.current = false
           onReadyChange(false)
-        } else if (workspaceReadyRef.current) {
-          leaveHero()
         }
       }
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [leaveHero, onReadyChange])
+  }, [onReadyChange])
 
   const handleWorkspaceReady = useCallback(() => {
     setWorkspaceReady(true)
     if (routeRef.current === 'workspace' && heroMountedRef.current) {
-      leaveHero()
+      setHeroMounted(false)
+      setHeroReady(false)
     }
-  }, [leaveHero])
+  }, [])
   const handleHeroReady = useCallback(() => setHeroReady(true), [])
 
+  const openingWorkspace = route === 'workspace' && !workspaceReady && !workspaceLoadError
   const Workspace = workspaceComponent
   return (
     <>
@@ -228,7 +239,9 @@ function EarthConnectShell({
         <BridgeHero
           assets={assets}
           resources={resources}
-          leaving={heroLeaving}
+          leaving={false}
+          opening={openingWorkspace}
+          onPrefetchWorkspace={prefetchWorkspaceAssets}
           onOpenWorkspace={openWorkspace}
           onReady={handleHeroReady}
         />

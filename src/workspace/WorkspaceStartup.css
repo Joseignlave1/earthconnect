@@ -95,6 +95,12 @@
   overflow: hidden;
 }
 
+.workspace-startup[data-transitioning] {
+  transition:
+    opacity 200ms ease-out,
+    visibility 0s 0s;
+}
+
 .workspace-startup[data-revealed] {
   opacity: 0;
   visibility: hidden;
@@ -108,14 +114,15 @@
   position: relative;
   width: min(100%, 440px);
   opacity: 0;
-  transition: opacity 360ms ease-out;
 }
 
 .workspace-startup-content[data-ready] {
   opacity: 1;
+  transition: opacity 360ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .workspace-startup[data-transitioning],
   .workspace-startup[data-revealed],
   .workspace-startup-content {
     transition: none;
@@ -152,6 +159,9 @@
   margin: 0;
   color: #bbb;
   font-variant-numeric: tabular-nums;
+}
+.workspace-startup[data-transitioning] p {
+  margin-top: 28px;
 }
 .workspace-startup p[role="alert"] {
   margin-top: 22px;

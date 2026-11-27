@@ -9,6 +9,7 @@ export function HeroTitle({
   onCtaFocusChange,
   onCtaPressChange,
   canActivateCta,
+  ctaBusy = false,
   onOpenWorkspace,
 }: {
   stageRef: RefObject<HTMLDivElement | null>
@@ -18,6 +19,7 @@ export function HeroTitle({
   onCtaFocusChange: (focused: boolean) => void
   onCtaPressChange: (pressed: boolean) => void
   canActivateCta?: (clientX: number, clientY: number) => boolean
+  ctaBusy?: boolean
   onOpenWorkspace: () => void
 }) {
   return (
@@ -44,12 +46,16 @@ export function HeroTitle({
         className="bridge-hero-cta"
         href="/find"
         aria-label="Explore workspace"
+        aria-busy={ctaBusy || undefined}
+        aria-disabled={ctaBusy || undefined}
         onPointerEnter={() => onCtaHoverChange(true)}
         onPointerLeave={() => {
           onCtaHoverChange(false)
           onCtaPressChange(false)
         }}
-        onPointerDown={() => onCtaPressChange(true)}
+        onPointerDown={() => {
+          if (!ctaBusy) onCtaPressChange(true)
+        }}
         onPointerUp={() => onCtaPressChange(false)}
         onFocus={() => onCtaFocusChange(true)}
         onBlur={() => {
@@ -59,9 +65,11 @@ export function HeroTitle({
         onClick={event => {
           if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
           event.preventDefault()
+          if (ctaBusy) return
           // For pointer clicks (detail > 0), honor the exact lensed GPU hit test so clicks
           // inside the swallowed black-hole void do not activate the hidden CTA behind it.
           if (event.detail > 0 && canActivateCta && !canActivateCta(event.clientX, event.clientY)) return
+          event.currentTarget.blur()
           onOpenWorkspace()
         }}
       >
