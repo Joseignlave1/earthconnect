@@ -18,6 +18,8 @@ function scoreBankBindings(banks: number) {
     `@group(0) @binding(${6 + banks}) var earthTilePage: texture_2d<u32>;`,
     `@group(0) @binding(${7 + banks}) var earthTilePool: texture_2d_array<f32>;`,
     `@group(0) @binding(${8 + banks}) var earthTileSampler: sampler;`,
+    `@group(0) @binding(${9 + banks}) var earthNormalPool: texture_2d_array<f32>;`,
+    `@group(0) @binding(${10 + banks}) var<uniform> earthTileFades: array<vec4f, 80>;`,
   ].join('\n')
 
   const singleBranches = Array.from(

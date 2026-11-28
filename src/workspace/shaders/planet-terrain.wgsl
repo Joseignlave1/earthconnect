@@ -41,6 +41,11 @@ struct View {
 @group(0) @binding(5) var tilePage: texture_2d<u32>;
 @group(0) @binding(6) var tilePool: texture_2d_array<f32>;
 @group(0) @binding(7) var tileSampler: sampler;
+@group(0) @binding(8) var<uniform> tileFades: array<vec4f, 48>;
+
+fn planetSlotFade(idx: u32) -> f32 {
+  return tileFades[idx >> 2u][idx & 3u];
+}
 
 struct Vertex {
   @builtin(position) position: vec4f,
@@ -154,6 +159,51 @@ struct PlanetShadeInput {
   hGrad: vec2f,
 }
 
+struct TileSelection {
+  valid: bool,
+  slot: u32,
+  tileUv: vec2f,
+  dx: vec2f,
+  dy: vec2f,
+  weight: f32,
+  usedFallback: bool,
+}
+
+fn evalPlanetTileSlot(slot: u32, level: u32, cell: vec2i, tileCoord: vec2f, uvDx: vec2f, uvDy: vec2f, usedFallback: bool) -> TileSelection {
+  let innerScale = VIRTUAL_TILE_INNER / VIRTUAL_TILE_SIZE;
+  let baseGrid = vec2f(PLANET_TILE_BASE_COLS, PLANET_TILE_BASE_ROWS);
+  let grid = baseGrid * exp2(f32(level));
+  let gradScale = grid * innerScale;
+  let dx = uvDx * gradScale;
+  let dy = uvDy * gradScale;
+  let tileMip = log2(max(1., max(length(dx), length(dy)) * VIRTUAL_TILE_SIZE));
+  let fadeStart = select(1.4, .55, level == 0u);
+  let fadeEnd = select(2.2, 1.15, level == 0u);
+  if (tileMip >= fadeEnd) {
+    return TileSelection(false, 0u, vec2f(0.), vec2f(0.), vec2f(0.), 0., usedFallback);
+  }
+  let spanShift = 4u - min(level, 4u);
+  let tileOrigin = vec2f(vec2u(cell) >> vec2u(spanShift));
+  let localUv = clamp(tileCoord * grid - tileOrigin, vec2f(0.), vec2f(1.));
+  let tileUv = localUv * innerScale + (VIRTUAL_TILE_GUTTER / VIRTUAL_TILE_SIZE);
+  let weight = 1. - smoothstep(fadeStart, fadeEnd, tileMip);
+  return TileSelection(true, slot, tileUv, dx, dy, weight, usedFallback);
+}
+
+fn selectPlanetTile(entry: vec4u, cell: vec2i, tileCoord: vec2f, uvDx: vec2f, uvDy: vec2f) -> TileSelection {
+  if (entry.r >= 255u) {
+    return TileSelection(false, 0u, vec2f(0.), vec2f(0.), vec2f(0.), 0., false);
+  }
+  let innerScale = VIRTUAL_TILE_INNER / VIRTUAL_TILE_SIZE;
+  let baseGrid = vec2f(PLANET_TILE_BASE_COLS, PLANET_TILE_BASE_ROWS);
+  let grad0 = baseGrid * exp2(f32(entry.g)) * innerScale;
+  let mip0 = log2(max(1., max(length(uvDx * grad0), length(uvDy * grad0)) * VIRTUAL_TILE_SIZE));
+  if (mip0 > 1.5 && entry.b < 255u) {
+    return evalPlanetTileSlot(entry.b, entry.a, cell, tileCoord, uvDx, uvDy, true);
+  }
+  return evalPlanetTileSlot(entry.r, entry.g, cell, tileCoord, uvDx, uvDy, false);
+}
+
 fn shadePlanet(s: PlanetShadeInput) -> vec3f {
   let p = s.p;
   let uv = s.uv;
@@ -165,45 +215,87 @@ fn shadePlanet(s: PlanetShadeInput) -> vec3f {
   let pMax = max(1e-12, .5 * (pxx + pyy + length(vec2f(pxx - pyy, 2. * pxy))));
   let minorAngle = max(sqrt(pDet / pMax), s.smallAngle);
   var tileAlbedo = vec3f(0.);
+  var tileCoarseLuma = 0.;
   var tileWeight = 0.;
   var tileNormal = p;
   var tileNormalWeight = 0.;
-  if (u.tilesReady > .5) {
+  if (u.tilesReady > .001) {
     let tileCoord = vec2f(fract(uv.x), clamp(uv.y, 0., .999999));
     let pageDims = vec2f(textureDimensions(tilePage));
-    let cell = vec2i(clamp(floor(tileCoord * pageDims), vec2f(0.), pageDims - 1.));
-    let entry = textureLoad(tilePage, cell, 0);
-    if (entry.r < 255u) {
-      let innerScale = VIRTUAL_TILE_INNER / VIRTUAL_TILE_SIZE;
-      let baseGrid = vec2f(PLANET_TILE_BASE_COLS, PLANET_TILE_BASE_ROWS);
-      var slot = entry.r;
-      var grid = baseGrid * exp2(f32(entry.g));
-      var gradScale = grid * innerScale;
-      var dx = s.uvDx * gradScale;
-      var dy = s.uvDy * gradScale;
-      var tileMip = log2(max(1., max(length(dx), length(dy)) * VIRTUAL_TILE_SIZE));
-      if (tileMip > 1.75 && entry.b < 255u) {
-        slot = entry.b;
-        grid = baseGrid * exp2(f32(entry.a));
-        gradScale = grid * innerScale;
-        dx = s.uvDx * gradScale;
-        dy = s.uvDy * gradScale;
-        tileMip = log2(max(1., max(length(dx), length(dy)) * VIRTUAL_TILE_SIZE));
-      }
-      if (tileMip < 2.8) {
-        let localUv = fract(tileCoord * grid);
-        let tileUv = localUv * innerScale + (VIRTUAL_TILE_GUTTER / VIRTUAL_TILE_SIZE);
-        tileWeight = 1. - smoothstep(2.0, 2.8, tileMip);
-        tileAlbedo = textureSampleGrad(tilePool, tileSampler, tileUv, i32(slot), dx, dy).rgb;
-        let polarSafe = smoothstep(.04, .14, length(p.xz));
-        if (polarSafe > .001) {
-          let nSample = textureSampleGrad(tilePool, tileSampler, tileUv, i32(slot + PLANET_TILE_PAIRS), dx, dy).rgb;
-          let tn = normalize(vec3f(nSample.x * 2. - 1., nSample.y * 2. - 1., max(.05, nSample.z)));
-          let east = normalize(vec3f(p.z, 0., -p.x));
-          let north = cross(p, east);
-          tileNormal = normalize(east * tn.x + north * tn.y + p * tn.z);
-          tileNormalWeight = tileWeight * polarSafe;
+    let halfH = pageDims.y * .5;
+    let albCell = vec2i(clamp(floor(tileCoord * vec2f(pageDims.x, halfH)), vec2f(0.), vec2f(pageDims.x - 1., halfH - 1.)));
+    let albEntry = textureLoad(tilePage, albCell, 0);
+    let albSel = selectPlanetTile(albEntry, albCell, tileCoord, s.uvDx, s.uvDy);
+    if (albSel.valid) {
+      let fade = planetSlotFade(albSel.slot);
+      let childAlb = textureSampleGrad(tilePool, tileSampler, albSel.tileUv, i32(albSel.slot), albSel.dx, albSel.dy).rgb;
+      let childCoarse = textureSampleLevel(tilePool, tileSampler, albSel.tileUv, i32(albSel.slot), 2.).r;
+      if (fade >= .999) {
+        tileWeight = albSel.weight * u.tilesReady;
+        tileAlbedo = childAlb;
+        tileCoarseLuma = childCoarse;
+      } else if (!albSel.usedFallback && albEntry.b < 255u) {
+        let pSel = evalPlanetTileSlot(albEntry.b, albEntry.a, albCell, tileCoord, s.uvDx, s.uvDy, true);
+        if (pSel.valid) {
+          let pFade = planetSlotFade(albEntry.b);
+          let parentAlb = textureSampleGrad(tilePool, tileSampler, pSel.tileUv, i32(pSel.slot), pSel.dx, pSel.dy).rgb;
+          let parentCoarse = textureSampleLevel(tilePool, tileSampler, pSel.tileUv, i32(pSel.slot), 2.).r;
+          let pw = pSel.weight * pFade;
+          let cw = albSel.weight;
+          let outW = mix(pw, cw, fade);
+          let wSum = pw * (1. - fade) + cw * fade;
+          let mixT = select(1., (cw * fade) / max(1e-5, wSum), wSum > 1e-4);
+          tileAlbedo = mix(parentAlb, childAlb, mixT);
+          tileCoarseLuma = mix(parentCoarse, childCoarse, mixT);
+          tileWeight = outW * u.tilesReady;
+        } else {
+          tileAlbedo = childAlb;
+          tileCoarseLuma = childCoarse;
+          tileWeight = albSel.weight * fade * u.tilesReady;
         }
+      } else {
+        tileAlbedo = childAlb;
+        tileCoarseLuma = childCoarse;
+        tileWeight = albSel.weight * fade * u.tilesReady;
+      }
+    }
+    let normEntry = textureLoad(tilePage, albCell + vec2i(0, i32(halfH)), 0);
+    let normSel = selectPlanetTile(normEntry, albCell, tileCoord, s.uvDx, s.uvDy);
+    if (normSel.valid) {
+      let polarSafe = smoothstep(.04, .14, length(p.xz));
+      if (polarSafe > .001) {
+        let nFade = planetSlotFade(96u + normSel.slot);
+        let nSample = textureSampleGrad(
+          tilePool, tileSampler, normSel.tileUv, i32(normSel.slot + PLANET_TILE_PAIRS), normSel.dx, normSel.dy
+        ).rgb;
+        var tn = normalize(vec3f(nSample.x * 2. - 1., nSample.y * 2. - 1., max(.05, nSample.z)));
+        var nw = normSel.weight;
+        if (nFade < .999) {
+          if (!normSel.usedFallback && normEntry.b < 255u) {
+            let pnSel = evalPlanetTileSlot(normEntry.b, normEntry.a, albCell, tileCoord, s.uvDx, s.uvDy, true);
+            if (pnSel.valid) {
+              let pnFade = planetSlotFade(96u + normEntry.b);
+              let pnSample = textureSampleGrad(
+                tilePool, tileSampler, pnSel.tileUv, i32(pnSel.slot + PLANET_TILE_PAIRS), pnSel.dx, pnSel.dy
+              ).rgb;
+              let ptn = normalize(vec3f(pnSample.x * 2. - 1., pnSample.y * 2. - 1., max(.05, pnSample.z)));
+              let pnw = pnSel.weight * pnFade;
+              let cnw = normSel.weight;
+              let nwSum = pnw * (1. - nFade) + cnw * nFade;
+              let nMixT = select(1., (cnw * nFade) / max(1e-5, nwSum), nwSum > 1e-4);
+              tn = normalize(mix(ptn, tn, nMixT));
+              nw = mix(pnw, cnw, nFade);
+            } else {
+              nw *= nFade;
+            }
+          } else {
+            nw *= nFade;
+          }
+        }
+        let east = normalize(vec3f(p.z, 0., -p.x));
+        let north = cross(p, east);
+        tileNormal = normalize(east * tn.x + north * tn.y + p * tn.z);
+        tileNormalWeight = nw * polarSafe * u.tilesReady;
       }
     }
   }
@@ -304,8 +396,22 @@ fn shadePlanet(s: PlanetShadeInput) -> vec3f {
     surfaceLinear = albedoSample.rgb;
   }
   if (tileWeight > .001) {
-    // 24K tilePool stores sRGB albedo alongside linear normal layers, so linearize albedo to match 8K sRGB hardware decode.
-    surfaceLinear = mix(surfaceLinear, toLinear(tileAlbedo), tileWeight);
+    // Fuse high-frequency 100m ECV3 detail into the photometrically equalized 8K base albedo via a
+    // mip-2 local-mean ratio (4px window fits inside the 2px tile gutter -> zero tile-boundary seams
+    // AND cancels orbital pushframe swath brightness steps in LRO WAC / THEMIS mosaics).
+    let tileCoarse = tileCoarseLuma;
+    if (isMars) {
+      let latDeg = abs(.5 - uv.y) * 180.;
+      let marsBandFade = 1. - smoothstep(61., 64.5, latDeg);
+      let wMars = tileWeight * marsBandFade;
+      let detailRatio = clamp((tileAlbedo.r + .06) / (tileCoarse + .06), .45, 1.90);
+      let marsDetailed = surfaceLinear * pow(detailRatio, 1.35);
+      surfaceLinear = mix(surfaceLinear, marsDetailed, wMars);
+    } else {
+      let detailRatio = clamp((tileAlbedo.r + .08) / (tileCoarse + .08), .45, 1.95);
+      let moonDetailed = surfaceLinear * pow(detailRatio, 1.45);
+      surfaceLinear = mix(surfaceLinear, moonDetailed, tileWeight);
+    }
   }
   let lineColor = mix(surfaceLinear * .38, surfaceLinear + vec3f(.055, .058, .062), .60);
   surfaceLinear = mix(surfaceLinear, lineColor, select(.45, .32, hasAlbedo) * contours);

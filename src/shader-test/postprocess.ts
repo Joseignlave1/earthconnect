@@ -1,4 +1,5 @@
 import { joinWgsl, shaderModule } from './gpu.ts'
+import { getPipelineCompileQueue } from './pipeline-queue.ts'
 import { motionBlurShader, type MotionBlurUniforms } from './motion-blur.ts'
 import bloomWgsl from './shaders/bloom.wgsl?raw'
 import colorWgsl from './shaders/color.wgsl?raw'
@@ -104,67 +105,60 @@ function getPostPipelines(device: GPUDevice, format: GPUTextureFormat, reverseDe
             })
           : undefined,
       ])
-      let cursorPipe: GPURenderPipeline | undefined
-      let loupePipe: GPURenderPipeline | undefined
       let motionModule: GPUShaderModule | undefined
-      let motionPipe: GPURenderPipeline | undefined
-      let staticResolvePipe: GPURenderPipeline | undefined
       const getMotionModule = () =>
         (motionModule ??= device.createShaderModule({ label: 'Camera motion blur WGSL', code: motionBlurShader }))
+      const compileQueue = getPipelineCompileQueue(device)
+      const cursorDeferred = compileQueue.register(10, () => {
+        const mod = device.createShaderModule({ label: 'Cursor WGSL', code: cursorShader })
+        return {
+          label: 'Space cursor',
+          layout: 'auto',
+          vertex: vertex(mod, 'cursorVertex'),
+          fragment: { module: mod, entryPoint: 'cursorFragment', targets: [{ format, blend: alphaBlend }] },
+        }
+      })
+      const motionDeferred = reverseDepth
+        ? compileQueue.register(30, () => ({
+            label: 'Depth-aware camera motion blur',
+            layout: 'auto',
+            vertex: vertex(getMotionModule()),
+            fragment: {
+              module: getMotionModule(),
+              entryPoint: 'blurFragment',
+              targets: [{ format: 'rgba16float' }],
+            },
+          }))
+        : undefined
+      const staticResolveDeferred = reverseDepth
+        ? compileQueue.register(50, () => ({
+            label: 'Per-sample static marker and orbit resolve',
+            layout: 'auto',
+            vertex: vertex(getMotionModule()),
+            fragment: {
+              module: getMotionModule(),
+              entryPoint: 'staticResolveFragment',
+              targets: [{ format: 'rgba16float' }],
+            },
+          }))
+        : undefined
+      const loupeDeferred = compileQueue.register(55, () => {
+        const mod = device.createShaderModule({ label: 'Optical loupe WGSL', code: loupeShader })
+        return {
+          label: 'Optical loupe',
+          layout: 'auto',
+          vertex: vertex(mod, 'loupeVertex'),
+          fragment: { module: mod, entryPoint: 'loupeFragment', targets: [{ format, blend: alphaBlend }] },
+        }
+      })
       return {
         bloom: bp,
         composition: cp,
         presentation: pp,
-        getCursor: () => {
-          if (!cursorPipe) {
-            const mod = device.createShaderModule({ label: 'Cursor WGSL', code: cursorShader })
-            cursorPipe = device.createRenderPipeline({
-              label: 'Space cursor',
-              layout: 'auto',
-              vertex: vertex(mod, 'cursorVertex'),
-              fragment: { module: mod, entryPoint: 'cursorFragment', targets: [{ format, blend: alphaBlend }] },
-            })
-          }
-          return cursorPipe
-        },
-        getLoupe: () => {
-          if (!loupePipe) {
-            const mod = device.createShaderModule({ label: 'Optical loupe WGSL', code: loupeShader })
-            loupePipe = device.createRenderPipeline({
-              label: 'Optical loupe',
-              layout: 'auto',
-              vertex: vertex(mod, 'loupeVertex'),
-              fragment: { module: mod, entryPoint: 'loupeFragment', targets: [{ format, blend: alphaBlend }] },
-            })
-          }
-          return loupePipe
-        },
-        getMotion: reverseDepth
-          ? () =>
-              (motionPipe ??= device.createRenderPipeline({
-                label: 'Depth-aware camera motion blur',
-                layout: 'auto',
-                vertex: vertex(getMotionModule()),
-                fragment: {
-                  module: getMotionModule(),
-                  entryPoint: 'blurFragment',
-                  targets: [{ format: 'rgba16float' }],
-                },
-              }))
-          : undefined,
-        getStaticResolve: reverseDepth
-          ? () =>
-              (staticResolvePipe ??= device.createRenderPipeline({
-                label: 'Per-sample static marker and orbit resolve',
-                layout: 'auto',
-                vertex: vertex(getMotionModule()),
-                fragment: {
-                  module: getMotionModule(),
-                  entryPoint: 'staticResolveFragment',
-                  targets: [{ format: 'rgba16float' }],
-                },
-              }))
-          : undefined,
+        getCursor: () => cursorDeferred.get(),
+        getLoupe: () => loupeDeferred.get(),
+        getMotion: motionDeferred ? () => motionDeferred.get() : undefined,
+        getStaticResolve: staticResolveDeferred ? () => staticResolveDeferred.get() : undefined,
         backdropBlit: bbp,
       }
     })()

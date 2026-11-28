@@ -5,8 +5,8 @@ override HIGHLIGHT_FULL: f32 = 0.32;
 override VIRTUAL_TILE_SIZE: f32 = 512.0;
 override VIRTUAL_TILE_INNER: f32 = 508.0;
 override VIRTUAL_TILE_GUTTER: f32 = 2.0;
-override EARTH_TILE_BASE_COLS: f32 = 40.0;
-override EARTH_TILE_BASE_ROWS: f32 = 20.0;
+override EARTH_TILE_BASE_COLS: f32 = 32.0;
+override EARTH_TILE_BASE_ROWS: f32 = 16.0;
 
 // Explicit 16-byte-aligned uniform layout shared with the CPU writer.
 struct SurfaceUniforms {
@@ -422,6 +422,105 @@ struct EarthImagery {
   color: vec3f,
   tileWeight: f32,
   landMask: f32,
+  normalLocal: vec3f,
+  normalWeight: f32,
+}
+
+fn calibrateS2(rawRgb: vec3f) -> vec3f {
+  // Calibrate Sentinel-2 L3 BOA reflectance (baseline-lifted & brighter) onto Blue Marble's
+  // linear exposure, black point, and white balance.
+  return clamp(
+    vec3f(.593, .507, .516) * pow(max(rawRgb - vec3f(.030, .030, .040), vec3f(0.)), vec3f(1.50, 1.45, 1.55)),
+    vec3f(0.),
+    vec3f(1.),
+  );
+}
+
+fn earthSlotFade(idx: u32) -> f32 {
+  return earthTileFades[idx >> 2u][idx & 3u];
+}
+
+struct EarthAlbedoSample {
+  rgb: vec3f,
+  land: f32,
+  w: f32,
+}
+
+fn sampleEarthAlbedoSlot(
+  slot: u32,
+  level: u32,
+  cell: vec2i,
+  tileCoord: vec2f,
+  imgUv: vec2f,
+  imgDx: vec2f,
+  imgDy: vec2f,
+  coast: f32,
+) -> EarthAlbedoSample {
+  let innerScale = VIRTUAL_TILE_INNER / VIRTUAL_TILE_SIZE;
+  let baseGrid = vec2f(EARTH_TILE_BASE_COLS, EARTH_TILE_BASE_ROWS);
+  let maxShift = 5u;
+  let grid = baseGrid * exp2(f32(level));
+  let gradScale = grid * innerScale;
+  let dx = imgDx * gradScale;
+  let dy = imgDy * gradScale;
+  let tileMip = log2(max(1., max(length(dx), length(dy)) * VIRTUAL_TILE_SIZE));
+  if (level == 0u && tileMip >= 1.5) {
+    return EarthAlbedoSample(vec3f(0.), 0., 0.);
+  }
+  // Integer-cell tile origin eliminates 1 px wrap hairlines at tile edges.
+  let tileOrigin = vec2f(vec2u(cell) >> vec2u(maxShift - min(level, maxShift)));
+  let localUv = clamp(tileCoord * grid - tileOrigin, vec2f(0.), vec2f(1.));
+  let tileUv = localUv * innerScale + (VIRTUAL_TILE_GUTTER / VIRTUAL_TILE_SIZE);
+  let high = textureSampleGrad(earthTilePool, earthTileSampler, tileUv, i32(slot), dx, dy);
+  // Alpha encodes exact 30 m Copernicus land fraction in [0.5 .. 1.0] (128=water, 255=land).
+  let highLand = clamp((high.a - .5) * 2., 0., 1.);
+  var s2Cal = calibrateS2(high.rgb);
+  // Low-frequency Blue Marble radiometric harmonization removes Sentinel-2 MGRS
+  // tile-to-tile seasonal exposure steps across regional views while keeping 61 m detail crisp.
+  let s2Mip = select(4., 3., level <= 2u);
+  let bmLod = max(0., select(3., 2., level <= 2u) - f32(level));
+  let s2LowSample = textureSampleLevel(earthTilePool, earthTileSampler, tileUv, i32(slot), s2Mip);
+  let inlandSafe = smoothstep(.5, 2.2, coast) * smoothstep(.93, .995, s2LowSample.a);
+  let harmonizeW = mix(.88, .20, smoothstep(1.5, 4.5, f32(level))) * inlandSafe;
+  if (u.earthReady > .5 && harmonizeW > .001) {
+    let s2LowCal = calibrateS2(s2LowSample.rgb);
+    let bmLow = textureSampleLevel(earth, geographicSampler, imgUv, bmLod).rgb;
+    let ratio = clamp(bmLow / max(s2LowCal, vec3f(.015)), vec3f(.50), vec3f(2.0));
+    s2Cal = clamp(s2Cal * mix(vec3f(1.), ratio, harmonizeW), vec3f(0.), vec3f(1.));
+  }
+  let highRgb = mix(high.rgb, s2Cal, highLand);
+  // L0 fades smoothly into 8K Blue Marble at orbital altitude; L1..L5 also fade gracefully if
+  // their 5-mip chain runs out on rapid zoom-out or grazing views without an active ancestor.
+  let w = select(1. - smoothstep(3.5, 4.5, tileMip), 1. - smoothstep(.75, 1.45, tileMip), level == 0u);
+  return EarthAlbedoSample(highRgb, highLand, w);
+}
+
+fn sampleEarthNormalSlot(
+  slot: u32,
+  level: u32,
+  cell: vec2i,
+  tileCoord: vec2f,
+  imgDx: vec2f,
+  imgDy: vec2f,
+) -> vec4f {
+  let innerScale = VIRTUAL_TILE_INNER / VIRTUAL_TILE_SIZE;
+  let baseGrid = vec2f(EARTH_TILE_BASE_COLS, EARTH_TILE_BASE_ROWS);
+  let maxShift = 5u;
+  let grid = baseGrid * exp2(f32(level));
+  let gradScale = grid * innerScale;
+  let dx = imgDx * gradScale;
+  let dy = imgDy * gradScale;
+  let tileMip = log2(max(1., max(length(dx), length(dy)) * VIRTUAL_TILE_SIZE));
+  if (level == 0u && tileMip >= 1.5) {
+    return vec4f(0., 0., 1., 0.);
+  }
+  let origin = vec2f(vec2u(cell) >> vec2u(maxShift - min(level, maxShift)));
+  let localUv = clamp(tileCoord * grid - origin, vec2f(0.), vec2f(1.));
+  let tileUv = localUv * innerScale + (VIRTUAL_TILE_GUTTER / VIRTUAL_TILE_SIZE);
+  let ns = textureSampleGrad(earthNormalPool, earthTileSampler, tileUv, i32(slot), dx, dy);
+  let n = normalize(vec3f(ns.xy * 2. - 1., max(.05, ns.z)));
+  let w = select(1. - smoothstep(3.5, 4.5, tileMip), 1. - smoothstep(.75, 1.45, tileMip), level == 0u);
+  return vec4f(n, w);
 }
 
 fn sampleEarthImagery(uv: vec2f, uvDx: vec2f, uvDy: vec2f, coast: f32) -> EarthImagery {
@@ -429,42 +528,97 @@ fn sampleEarthImagery(uv: vec2f, uvDx: vec2f, uvDy: vec2f, coast: f32) -> EarthI
   let imgDx = vec2f(uvDx.x, -uvDx.y);
   let imgDy = vec2f(uvDy.x, -uvDy.y);
   let coarseLand = smoothstep(-.25, .25, coast);
-  if (u.earthTilesReady > .5) {
+  var outColor = textureSampleGrad(earth, geographicSampler, imgUv, imgDx, imgDy).rgb;
+  var outTileW = 0.;
+  var outLand = coarseLand;
+  var outNormal = vec3f(0., 0., 1.);
+  var outNormalW = 0.;
+
+  if (u.earthTilesReady > .001) {
     let tileCoord = vec2f(fract(imgUv.x), clamp(imgUv.y, 0., .999999));
-    let pageDims = vec2f(textureDimensions(earthTilePage));
+    let fullDims = vec2i(textureDimensions(earthTilePage));
+    let halfH = fullDims.y >> 1;
+    let pageDims = vec2f(f32(fullDims.x), f32(halfH));
     let cell = vec2i(clamp(floor(tileCoord * pageDims), vec2f(0.), pageDims - 1.));
+    let innerScale = VIRTUAL_TILE_INNER / VIRTUAL_TILE_SIZE;
+    let baseGrid = vec2f(EARTH_TILE_BASE_COLS, EARTH_TILE_BASE_ROWS);
+
+    // Top half of earthTilePage: Sentinel-2 RGB + 30 m Copernicus land/water alpha
     let entry = textureLoad(earthTilePage, cell, 0);
     if (entry.r < 255u) {
-      let innerScale = VIRTUAL_TILE_INNER / VIRTUAL_TILE_SIZE;
-      let baseGrid = vec2f(EARTH_TILE_BASE_COLS, EARTH_TILE_BASE_ROWS);
       var slot = entry.r;
-      var grid = baseGrid * exp2(f32(entry.g));
-      var gradScale = grid * innerScale;
-      var dx = imgDx * gradScale;
-      var dy = imgDy * gradScale;
-      var tileMip = log2(max(1., max(length(dx), length(dy)) * VIRTUAL_TILE_SIZE));
-      if (tileMip > 1.75 && entry.b < 255u) {
+      var level = entry.g;
+      let grad0 = baseGrid * exp2(f32(level)) * innerScale;
+      let mip0 = log2(max(1., max(length(imgDx * grad0), length(imgDy * grad0)) * VIRTUAL_TILE_SIZE));
+      var usedFallback = false;
+      if (mip0 > 1.75 && entry.b < 255u) {
         slot = entry.b;
-        grid = baseGrid * exp2(f32(entry.a));
-        gradScale = grid * innerScale;
-        dx = imgDx * gradScale;
-        dy = imgDy * gradScale;
-        tileMip = log2(max(1., max(length(dx), length(dy)) * VIRTUAL_TILE_SIZE));
+        level = entry.a;
+        usedFallback = true;
       }
-      if (tileMip < 2.8) {
-        let localUv = fract(tileCoord * grid);
-        let tileUv = localUv * innerScale + (VIRTUAL_TILE_GUTTER / VIRTUAL_TILE_SIZE);
-        let high = textureSampleGrad(earthTilePool, earthTileSampler, tileUv, i32(slot), dx, dy);
-        // Alpha encodes exact ~463m GEBCO + lake land fraction in [0.5 .. 1.0] (128=water, 255=land).
-        let highLand = clamp((high.a - .5) * 2., 0., 1.);
-        if (tileMip <= 2.0) { return EarthImagery(high.rgb, 1., highLand); }
-        let base = textureSampleGrad(earth, geographicSampler, imgUv, imgDx, imgDy).rgb;
-        let w = 1. - smoothstep(2.0, 2.8, tileMip);
-        return EarthImagery(mix(base, high.rgb, w), w, mix(coarseLand, highLand, w));
+      let fade = earthSlotFade(slot);
+      let primary = sampleEarthAlbedoSlot(slot, level, cell, tileCoord, imgUv, imgDx, imgDy, coast);
+      if (fade >= .999) {
+        if (primary.w > .001) {
+          let w = primary.w * u.earthTilesReady;
+          outColor = mix(outColor, primary.rgb, w);
+          outTileW = w;
+          outLand = mix(coarseLand, primary.land, w);
+        }
+      } else if (!usedFallback && entry.b < 255u) {
+        let parentFade = earthSlotFade(entry.b);
+        let parent = sampleEarthAlbedoSlot(entry.b, entry.a, cell, tileCoord, imgUv, imgDx, imgDy, coast);
+        let pW = parent.w * parentFade * u.earthTilesReady;
+        let cW = primary.w * u.earthTilesReady;
+        let parentColor = mix(outColor, parent.rgb, pW);
+        let childColor = mix(outColor, primary.rgb, cW);
+        let parentLand = mix(coarseLand, parent.land, pW);
+        let childLand = mix(coarseLand, primary.land, cW);
+        outColor = mix(parentColor, childColor, fade);
+        outTileW = mix(pW, cW, fade);
+        outLand = mix(parentLand, childLand, fade);
+      } else if (primary.w * fade > .001) {
+        let w = primary.w * fade * u.earthTilesReady;
+        outColor = mix(outColor, primary.rgb, w);
+        outTileW = w;
+        outLand = mix(coarseLand, primary.land, w);
+      }
+    }
+
+    // Bottom half of earthTilePage: 60 m Copernicus 10-bit DEM tangent-space normals
+    let nEntry = textureLoad(earthTilePage, cell + vec2i(0, halfH), 0);
+    if (nEntry.r < 255u) {
+      var nSlot = nEntry.r;
+      var nLevel = nEntry.g;
+      let nGrad0 = baseGrid * exp2(f32(nLevel)) * innerScale;
+      let nMip0 = log2(max(1., max(length(imgDx * nGrad0), length(imgDy * nGrad0)) * VIRTUAL_TILE_SIZE));
+      var usedNFallback = false;
+      if (nMip0 > 1.75 && nEntry.b < 255u) {
+        nSlot = nEntry.b;
+        nLevel = nEntry.a;
+        usedNFallback = true;
+      }
+      let nFade = earthSlotFade(160u + nSlot);
+      let primaryN = sampleEarthNormalSlot(nSlot, nLevel, cell, tileCoord, imgDx, imgDy);
+      if (nFade >= .999) {
+        outNormal = primaryN.xyz;
+        outNormalW = primaryN.w * u.earthTilesReady;
+      } else if (!usedNFallback && nEntry.b < 255u) {
+        let parentNFade = earthSlotFade(160u + nEntry.b);
+        let parentN = sampleEarthNormalSlot(nEntry.b, nEntry.a, cell, tileCoord, imgDx, imgDy);
+        let pNW = parentN.w * parentNFade;
+        let cNW = primaryN.w;
+        let nwSum = pNW * (1. - nFade) + cNW * nFade;
+        let nMixT = select(1., (cNW * nFade) / max(1e-5, nwSum), nwSum > 1e-4);
+        outNormal = normalize(mix(parentN.xyz, primaryN.xyz, nMixT));
+        outNormalW = mix(pNW, cNW, nFade) * u.earthTilesReady;
+      } else {
+        outNormal = primaryN.xyz;
+        outNormalW = primaryN.w * nFade * u.earthTilesReady;
       }
     }
   }
-  return EarthImagery(textureSampleGrad(earth, geographicSampler, imgUv, imgDx, imgDy).rgb, 0., coarseLand);
+  return EarthImagery(outColor, outTileW, outLand, outNormal, outNormalW);
 }
 
 fn oceanHash3(p: vec3f) -> f32 {
@@ -637,23 +791,38 @@ fn shadeEarth(
   if (u.terrainReady > .5) {
     let normalSample = textureSampleGrad(terrainNormals, geographicSampler, sampleUv, imgDx, imgDy);
     let reliefScale = u.relief / 20.;
-    let localN = normalize(vec3f((normalSample.xy * 2. - 1.) * reliefScale, max(.02, normalSample.z)));
+    var localN = normalize(vec3f((normalSample.xy * 2. - 1.) * reliefScale, max(.02, normalSample.z)));
+    if (satSample.normalWeight > .001 && exactLandMask > .01) {
+      let hiScale = clamp(reliefScale, 0., 1.5);
+      let hiLocalN = normalize(vec3f(satSample.normalLocal.xy * hiScale, max(.05, satSample.normalLocal.z)));
+      localN = normalize(mix(localN, hiLocalN, satSample.normalWeight * exactLandMask));
+    }
     hillNormal = normalize(geoEast * localN.x + geoNorth * localN.y + geoDir * localN.z);
     let ridge = normalSample.a * 2. - 1.;
     valleyAo = 1. + ridge * .13 * exactLandMask * clamp(reliefScale, 0., 1.25);
+  } else if (satSample.normalWeight > .001 && exactLandMask > .01) {
+    let hiScale = clamp(u.relief / 20., 0., 1.5);
+    let hiLocalN = normalize(vec3f(satSample.normalLocal.xy * hiScale, max(.05, satSample.normalLocal.z)));
+    let localN = normalize(mix(vec3f(0., 0., 1.), hiLocalN, satSample.normalWeight * exactLandMask));
+    hillNormal = normalize(geoEast * localN.x + geoNorth * localN.y + geoDir * localN.z);
   }
   let oneMinusV = clamp(1. - dot(N, V), 1.e-4, 1.);
   let ndotl = dot(N, L);
   let daylight = smoothstep(-.035, .045, ndotl);
   let sunDay = smoothstep(-.10, .22, ndotl);
-  // Single unified linear-space lighting pass for both hemispheres: camera-aligned oblique fill
-  // keeps night relief and sunlit shadows legible while warm direct sun sculpts the day side.
+  // Distance-aware unified linear-space lighting pass for both hemispheres: keep the dramatic
+  // midnight-blue night side from space/Hero while smoothly lifting night-side ambient when
+  // zoomed in so dark-cartographic forests, rivers, and 60 m DEM relief stay legible past ACES's
+  // dark toe while preserving a smooth day/night terminator.
+  let zoomInspect = 1. - smoothstep(.0006, .0045, minorAngle * u.pixelRatio);
   let fillSide = normalize(cross(V, vec3f(0., 1., 0.)) + vec3f(1e-4, 0., 0.));
   let fillDir = normalize(geoDir + .42 * V + .26 * fillSide + .22 * vec3f(0., 1., 0.));
   let fill = max(0., dot(hillNormal, fillDir));
   let ambientRelief = (.56 + .48 * fill) * valleyAo;
   let sunDiffuse = max(0., dot(hillNormal, L)) * daylight;
-  let globeLightLinear = vec3f(.24, .28, .36) * ambientRelief + vec3f(.82, .80, .75) * sunDiffuse;
+  let nightAmbient = mix(vec3f(.24, .28, .36), vec3f(.58, .62, .70), zoomInspect);
+  let sunLight = mix(vec3f(.82, .80, .75), vec3f(.50, .48, .44), zoomInspect);
+  let globeLightLinear = nightAmbient * ambientRelief + sunLight * sunDiffuse;
   // Utilitarian flat map uses classic NW cartographic hillshade across all longitudes.
   let flatSun = normalize(geoDir * .70710678 - geoEast * .5 + geoNorth * .5);
   let flatDiffuse = max(0., dot(hillNormal, flatSun));

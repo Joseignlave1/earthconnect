@@ -2,6 +2,7 @@ import type { WorkspaceAssets } from './workspaceAssets.ts'
 import type { TerrainLoader } from './earthWorkspaceResources.ts'
 import { EARTH_AXIS, FOV, intersectsAabb } from '../shader-test/geometry.ts'
 import { joinWgsl, raceAbort, shaderModule } from '../shader-test/gpu.ts'
+import { getPipelineCompileQueue } from '../shader-test/pipeline-queue.ts'
 import { LOUPE_TEXTURE_SIZE } from '../shader-test/postprocess.ts'
 import fullscreenWgsl from '../shader-test/shaders/fullscreen.wgsl?raw'
 import { PlanetTerrainRenderer, type PlanetPickingMesh } from './planetTerrain.ts'
@@ -174,143 +175,141 @@ function getSolarPipelines(device: GPUDevice): Promise<SolarPipelines> {
           depthStencil: { ...depth, depthWriteEnabled: false },
         }),
       ])
-      let bodyAnnotationPipeline: GPURenderPipeline | undefined
-      let bodyAnnotationCoveragePipeline: GPURenderPipeline | undefined
-      let orbitCoveragePipelines: GPURenderPipeline[] | undefined
-      let orbitAccumPipeline: GPURenderPipeline | undefined
-      let earthAtmoMotionPipeline: GPURenderPipeline | undefined
+      const compileQueue = getPipelineCompileQueue(device)
+      const earthAtmoMotionDeferred = compileQueue.register(32, () => {
+        const earthAtmoMotion = device.createShaderModule({
+          label: 'Earth Rayleigh atmosphere post-motion',
+          code: earthAtmoMotionShader,
+        })
+        return {
+          layout: 'auto',
+          multisample: { count: 1 },
+          label: 'Earth Rayleigh atmosphere post-motion',
+          vertex: { module: earthAtmoMotion, entryPoint: 'screenVertex' },
+          fragment: {
+            module: earthAtmoMotion,
+            entryPoint: 'earthAtmoMotionFragment',
+            targets: [{ ...color, blend: additive }],
+          },
+        }
+      })
+      const bodyAnnotationDeferred = compileQueue.register(66, () => ({
+        layout: bodyAnnotationPipelineLayout,
+        multisample: { count: 4 },
+        label: 'Billboard body annotation occluders',
+        vertex: { module: body, entryPoint: 'bodyVertex' },
+        fragment: { module: body, entryPoint: 'bodyAnnotationFragment', targets: [color] },
+        depthStencil: depth,
+      }))
+      const bodyAnnotationCoverageDeferred = compileQueue.register(86, () => ({
+        layout: bodyAnnotationPipelineLayout,
+        multisample: { count: 4 },
+        label: 'Billboard body annotation coverage occluders',
+        vertex: { module: body, entryPoint: 'bodyVertex' },
+        fragment: {
+          module: body,
+          entryPoint: 'bodyAnnotationCoverageFragment',
+          targets: [color, { format: 'rg8unorm' }],
+        },
+        depthStencil: depth,
+      }))
+      let orbitMod: GPUShaderModule | undefined
+      let orbitCoverageLayout: GPUPipelineLayout | undefined
+      const getOrbitCoverageShared = () => {
+        if (!orbitMod) orbitMod = device.createShaderModule({ label: 'Planetary paths', code: orbitShader })
+        if (!orbitCoverageLayout) {
+          const orbitCoverageBindGroupLayout = device.createBindGroupLayout({
+            label: 'Orbit coverage depth bind group layout',
+            entries: [
+              {
+                binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: { sampleType: 'depth', multisampled: true },
+              },
+            ],
+          })
+          orbitCoverageLayout = device.createPipelineLayout({
+            label: 'Orbit coverage pipeline layout',
+            bindGroupLayouts: [orbitCoverageBindGroupLayout],
+          })
+        }
+        return { orbit: orbitMod, layout: orbitCoverageLayout }
+      }
+      const channelMasks = [GPUColorWrite.RED, GPUColorWrite.GREEN, GPUColorWrite.BLUE, GPUColorWrite.ALPHA]
+      const orbitCoverageDeferred = channelMasks.map((writeMask, i) =>
+        compileQueue.register(90 + i, () => {
+          const { orbit, layout } = getOrbitCoverageShared()
+          return {
+            layout,
+            multisample: { count: 4 },
+            label: `Ephemeris orbit coverage ${i}`,
+            vertex: {
+              module: orbit,
+              entryPoint: 'orbitVertex',
+              buffers: [
+                {
+                  arrayStride: 48,
+                  attributes: [
+                    { shaderLocation: 0, offset: 0, format: 'float32x4' },
+                    { shaderLocation: 1, offset: 16, format: 'float32x4' },
+                    { shaderLocation: 2, offset: 32, format: 'float32x4' },
+                  ],
+                },
+              ],
+            },
+            fragment: {
+              module: orbit,
+              entryPoint: 'orbitCoverageFragment',
+              targets: [{ format: 'rgba8unorm', blend: maxBlend, writeMask }],
+            },
+            primitive: { topology: 'triangle-list', cullMode: 'none' },
+          }
+        }),
+      )
+      const orbitAccumDeferred = compileQueue.register(94, () => {
+        const orbitComposite = device.createShaderModule({
+          label: 'Planetary path accumulate',
+          code: orbitCompositeShader,
+        })
+        const orbitAccumBindGroupLayout = device.createBindGroupLayout({
+          label: 'Orbit accumulate bind group layout',
+          entries: [
+            { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+            {
+              binding: 1,
+              visibility: GPUShaderStage.FRAGMENT,
+              texture: { sampleType: 'unfilterable-float', multisampled: true },
+            },
+          ],
+        })
+        const orbitAccumLayout = device.createPipelineLayout({
+          label: 'Orbit accumulate pipeline layout',
+          bindGroupLayouts: [orbitAccumBindGroupLayout],
+        })
+        return {
+          layout: orbitAccumLayout,
+          multisample: { count: 4 },
+          label: 'Ephemeris orbit accumulate',
+          vertex: { module: orbitComposite, entryPoint: 'screenVertex' },
+          fragment: {
+            module: orbitComposite,
+            entryPoint: 'orbitAccumFragment',
+            targets: [{ ...color, blend: premulOver }],
+          },
+        }
+      })
       return {
         skyPipeline,
         bodyPipeline,
         bodyAnnotationLayout,
         getBodyAnnotationPipeline: (includeCoverage: boolean) =>
-          includeCoverage
-            ? (bodyAnnotationCoveragePipeline ??= device.createRenderPipeline({
-                layout: bodyAnnotationPipelineLayout,
-                multisample: { count: 4 },
-                label: 'Billboard body annotation coverage occluders',
-                vertex: { module: body, entryPoint: 'bodyVertex' },
-                fragment: {
-                  module: body,
-                  entryPoint: 'bodyAnnotationCoverageFragment',
-                  targets: [color, { format: 'rg8unorm' }],
-                },
-                depthStencil: depth,
-              }))
-            : (bodyAnnotationPipeline ??= device.createRenderPipeline({
-                layout: bodyAnnotationPipelineLayout,
-                multisample: { count: 4 },
-                label: 'Billboard body annotation occluders',
-                vertex: { module: body, entryPoint: 'bodyVertex' },
-                fragment: { module: body, entryPoint: 'bodyAnnotationFragment', targets: [color] },
-                depthStencil: depth,
-              })),
-        getOrbitCoveragePipelines: () => {
-          if (!orbitCoveragePipelines) {
-            const orbit = device.createShaderModule({ label: 'Planetary paths', code: orbitShader })
-            const orbitCoverageBindGroupLayout = device.createBindGroupLayout({
-              label: 'Orbit coverage depth bind group layout',
-              entries: [
-                {
-                  binding: 0,
-                  visibility: GPUShaderStage.FRAGMENT,
-                  texture: { sampleType: 'depth', multisampled: true },
-                },
-              ],
-            })
-            const orbitCoverageLayout = device.createPipelineLayout({
-              label: 'Orbit coverage pipeline layout',
-              bindGroupLayouts: [orbitCoverageBindGroupLayout],
-            })
-            const channelMasks = [GPUColorWrite.RED, GPUColorWrite.GREEN, GPUColorWrite.BLUE, GPUColorWrite.ALPHA]
-            orbitCoveragePipelines = channelMasks.map((writeMask, i) =>
-              device.createRenderPipeline({
-                layout: orbitCoverageLayout,
-                multisample: { count: 4 },
-                label: `Ephemeris orbit coverage ${i}`,
-                vertex: {
-                  module: orbit,
-                  entryPoint: 'orbitVertex',
-                  buffers: [
-                    {
-                      arrayStride: 48,
-                      attributes: [
-                        { shaderLocation: 0, offset: 0, format: 'float32x4' },
-                        { shaderLocation: 1, offset: 16, format: 'float32x4' },
-                        { shaderLocation: 2, offset: 32, format: 'float32x4' },
-                      ],
-                    },
-                  ],
-                },
-                fragment: {
-                  module: orbit,
-                  entryPoint: 'orbitCoverageFragment',
-                  targets: [{ format: 'rgba8unorm', blend: maxBlend, writeMask }],
-                },
-                primitive: { topology: 'triangle-list', cullMode: 'none' },
-              }),
-            )
-          }
-          return orbitCoveragePipelines
-        },
-        getOrbitAccumPipeline: () => {
-          if (!orbitAccumPipeline) {
-            const orbitComposite = device.createShaderModule({
-              label: 'Planetary path accumulate',
-              code: orbitCompositeShader,
-            })
-            const orbitAccumBindGroupLayout = device.createBindGroupLayout({
-              label: 'Orbit accumulate bind group layout',
-              entries: [
-                { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
-                {
-                  binding: 1,
-                  visibility: GPUShaderStage.FRAGMENT,
-                  texture: { sampleType: 'unfilterable-float', multisampled: true },
-                },
-              ],
-            })
-            const orbitAccumLayout = device.createPipelineLayout({
-              label: 'Orbit accumulate pipeline layout',
-              bindGroupLayouts: [orbitAccumBindGroupLayout],
-            })
-            orbitAccumPipeline = device.createRenderPipeline({
-              layout: orbitAccumLayout,
-              multisample: { count: 4 },
-              label: 'Ephemeris orbit accumulate',
-              vertex: { module: orbitComposite, entryPoint: 'screenVertex' },
-              fragment: {
-                module: orbitComposite,
-                entryPoint: 'orbitAccumFragment',
-                targets: [{ ...color, blend: premulOver }],
-              },
-            })
-          }
-          return orbitAccumPipeline
-        },
+          includeCoverage ? bodyAnnotationCoverageDeferred.get() : bodyAnnotationDeferred.get(),
+        getOrbitCoveragePipelines: () => orbitCoverageDeferred.map(d => d.get()),
+        getOrbitAccumPipeline: () => orbitAccumDeferred.get(),
         haloPipeline,
         lensFlarePipeline,
         earthAtmoPipeline,
-        getEarthAtmoMotionPipeline: () => {
-          if (!earthAtmoMotionPipeline) {
-            const earthAtmoMotion = device.createShaderModule({
-              label: 'Earth Rayleigh atmosphere post-motion',
-              code: earthAtmoMotionShader,
-            })
-            earthAtmoMotionPipeline = device.createRenderPipeline({
-              layout: 'auto',
-              multisample: { count: 1 },
-              label: 'Earth Rayleigh atmosphere post-motion',
-              vertex: { module: earthAtmoMotion, entryPoint: 'screenVertex' },
-              fragment: {
-                module: earthAtmoMotion,
-                entryPoint: 'earthAtmoMotionFragment',
-                targets: [{ ...color, blend: additive }],
-              },
-            })
-          }
-          return earthAtmoMotionPipeline
-        },
+        getEarthAtmoMotionPipeline: () => earthAtmoMotionDeferred.get(),
       }
     })()
     solarPipelines.set(device, pending)
@@ -601,7 +600,15 @@ export class SolarScene {
   }
 
   get terrainReady() {
-    return Boolean(this.terrain)
+    return Boolean(this.terrain && this.terrain.readyBodyCount >= 2)
+  }
+
+  get terrainReadyCount() {
+    return this.terrain?.readyBodyCount ?? 0
+  }
+
+  get tileRevision() {
+    return this.terrain?.tileRevision ?? 0
   }
 
   whenSkySettled(signal?: AbortSignal): Promise<void> {
@@ -615,7 +622,7 @@ export class SolarScene {
     return this.terrainPromise ? raceAbort(this.terrainPromise, signal) : Promise.resolve()
   }
 
-  loadTerrain() {
+  loadTerrain(priorityBody?: SourceBody) {
     if (this.loadingTerrain || this.terrain || this.controller.signal.aborted) return
     this.loadingTerrain = true
     const { signal } = this.controller
@@ -627,6 +634,10 @@ export class SolarScene {
       this.invalidate,
       this.loadPlanetTilePack,
       this.sceneOptions?.albedoMaxWidths,
+      priorityBody,
+      renderer => {
+        if (!signal.aborted) this.terrain = renderer
+      },
     )
       .then(
         terrain => {
@@ -638,6 +649,9 @@ export class SolarScene {
           this.invalidate()
         },
         error => {
+          if (this.terrain) {
+            this.terrain = undefined
+          }
           if (!signal.aborted) this.onError(error instanceof Error ? error : new Error(String(error)))
         },
       )
@@ -648,6 +662,14 @@ export class SolarScene {
           this.invalidate()
         }
       })
+  }
+
+  pauseTilesForFlight() {
+    this.terrain?.pauseTilesForFlight()
+  }
+
+  updatePlanetTileFades(now: number): boolean {
+    return this.terrain?.updateTileFades(now) ?? false
   }
 
   updatePlanetTiles(
@@ -889,6 +911,7 @@ export class SolarScene {
     overview: boolean,
     flightTarget?: SourceBody | 'earth',
     drawEarth?: () => void,
+    tileFade = 1,
   ) {
     this.writeView(frame, width, height)
     const { ordered, meshFlags } = this.writeBodies(
@@ -926,6 +949,7 @@ export class SolarScene {
           isSmall,
           reliefFade,
           isSmall ? this.bodySmallView(frame, id, width, height) : undefined,
+          tileFade,
         )
       }
     }

@@ -4,6 +4,7 @@ import { HIGHLIGHT_FULL, HIGHLIGHT_START, resolveScoreStyle, ScoreDistribution, 
 import { LOUPE_TEXTURE_SIZE, PostProcess, type LoupeOverlay, type PostMarkers, type TileRect } from './postprocess.ts'
 import { cameraChanged, motionBlurUniforms } from './motion-blur.ts'
 import { loadSrgbMipmappedTexture, raceAbort, shaderModule, uploadBuffer, writeTextureChunkedAsync } from './gpu.ts'
+import { getPipelineCompileQueue, type DeferredPipeline } from './pipeline-queue.ts'
 import { surfaceShader } from './surface-shader.ts'
 import { getSharedTerrainNormals } from './terrain-normals.ts'
 import {
@@ -159,7 +160,7 @@ type SurfaceUniformParams = {
   terrainReady: boolean
   nativeDepth: boolean
   earthReady: boolean
-  earthTilesReady: boolean
+  earthTilesReady: number
   poleHeights: readonly [number, number]
   meshRelief: number
   sunDirection: readonly [number, number, number]
@@ -219,16 +220,11 @@ type OrbitView = { rotation: Rotation; zoom: number; center: Vec3 }
 type SurfacePipelines = {
   layout: GPUBindGroupLayout
   surface: GPURenderPipeline
-  surfaceSmall: GPURenderPipeline | null
-  surfaceSmallDescriptor: GPURenderPipelineDescriptor
-  annotation: GPURenderPipeline | null
-  annotationDescriptor: GPURenderPipelineDescriptor
-  annotationSmall: GPURenderPipeline | null
-  annotationSmallDescriptor: GPURenderPipelineDescriptor
-  coverage: GPURenderPipeline | null
-  coverageDescriptor: GPURenderPipelineDescriptor
-  coverageSmall: GPURenderPipeline | null
-  coverageSmallDescriptor: GPURenderPipelineDescriptor
+  surfaceSmall: DeferredPipeline
+  annotation: DeferredPipeline
+  annotationSmall: DeferredPipeline
+  coverage: DeferredPipeline
+  coverageSmall: DeferredPipeline
 }
 type SharedMeshGpu = {
   vertexBuffer: GPUBuffer
@@ -423,6 +419,12 @@ function getSurfacePipelines(
             texture: { sampleType: 'float', viewDimension: '2d-array' },
           },
           { binding: 8 + banks, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+          {
+            binding: 9 + banks,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: { sampleType: 'float', viewDimension: '2d-array' },
+          },
+          { binding: 10 + banks, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
         ],
       })
       const module = await shaderModule(device, 'Earth surface WGSL', surfaceShader(banks, filterable))
@@ -509,46 +511,44 @@ function getSurfacePipelines(
           surfaceConstants,
         ),
       )
+      const compileQueue = getPipelineCompileQueue(device)
       return {
         layout: bindLayout,
         surface,
-        surfaceSmall: null,
-        surfaceSmallDescriptor: smallPipeline(
-          '4x MSAA Earth small per-sample ellipsoid',
-          'smallSurfaceFragment',
-          [{ format: 'rgba16float' }],
-          surfaceConstants,
+        annotation: compileQueue.register(20, () =>
+          pipeline('Geographic annotations', 'annotationFragment', [{ format: 'rgba16float' }], 4, 'annotationVertex'),
         ),
-        annotation: null,
-        annotationDescriptor: pipeline(
-          'Geographic annotations',
-          'annotationFragment',
-          [{ format: 'rgba16float' }],
-          4,
-          'annotationVertex',
+        surfaceSmall: compileQueue.register(40, () =>
+          smallPipeline(
+            '4x MSAA Earth small per-sample ellipsoid',
+            'smallSurfaceFragment',
+            [{ format: 'rgba16float' }],
+            surfaceConstants,
+          ),
         ),
-        annotationSmall: null,
-        annotationSmallDescriptor: smallPipeline(
-          '4x MSAA Earth small per-sample annotations',
-          'smallAnnotationFragment',
-          [{ format: 'rgba16float' }],
+        annotationSmall: compileQueue.register(60, () =>
+          smallPipeline('4x MSAA Earth small per-sample annotations', 'smallAnnotationFragment', [
+            { format: 'rgba16float' },
+          ]),
         ),
-        coverage: null,
-        coverageDescriptor: pipeline(
-          'Geographic annotations with coverage',
-          'coverageAnnotationFragment',
-          [{ format: 'rgba16float' }, { format: 'rg8unorm' }],
-          4,
-          'annotationVertex',
-          true,
-          coverageConstants,
+        coverage: compileQueue.register(80, () =>
+          pipeline(
+            'Geographic annotations with coverage',
+            'coverageAnnotationFragment',
+            [{ format: 'rgba16float' }, { format: 'rg8unorm' }],
+            4,
+            'annotationVertex',
+            true,
+            coverageConstants,
+          ),
         ),
-        coverageSmall: null,
-        coverageSmallDescriptor: smallPipeline(
-          '4x MSAA Earth small per-sample annotations with coverage',
-          'smallCoverageAnnotationFragment',
-          [{ format: 'rgba16float' }, { format: 'rg8unorm' }],
-          coverageConstants,
+        coverageSmall: compileQueue.register(81, () =>
+          smallPipeline(
+            '4x MSAA Earth small per-sample annotations with coverage',
+            'smallCoverageAnnotationFragment',
+            [{ format: 'rgba16float' }, { format: 'rg8unorm' }],
+            coverageConstants,
+          ),
         ),
       }
     })()
@@ -643,6 +643,7 @@ export class SurfaceRenderer {
   private earthQuadtree = EarthQuadtree.createFlat()
   private earthPatchCount = 0
   private scoreRevision = 0
+  private tilesFading = false
   private heroBackdrop: {
     frame: SolarFrame
     width: number
@@ -651,7 +652,8 @@ export class SurfaceRenderer {
     bodies: SolarBodies
     earthReady: boolean
     terrainReady: boolean
-    solarTerrain: boolean
+    solarTerrainCount: number
+    tileRevision: number
     scoreRevision: number
   } | null = null
   private geographicSampler!: GPUSampler
@@ -751,6 +753,7 @@ export class SurfaceRenderer {
   setPhase(phase: RenderPhase) {
     if (this.phase === phase) return
     this.phase = phase
+    if (phase === 'prepare') this.tilesFading = false
     if (phase !== 'prepare' && !this.destroyed && !this.lost) this.invalidate(false)
   }
   waitForTerrainReady(signal?: AbortSignal): Promise<void> {
@@ -794,7 +797,6 @@ export class SurfaceRenderer {
     assets?: SurfaceAssets,
     private onDevice?: RendererSettings['onDevice'],
     loadTerrain?: TerrainLoader,
-    private loadEarthTilePack?: EarthTilePackLoader,
     private heroStage?: HeroStage,
     private loupeOnly = false,
     initialProjection?: 'globe' | 'plane',
@@ -913,7 +915,6 @@ export class SurfaceRenderer {
       acquireDevice,
       assets,
       loadTerrain,
-      loadEarthTilePack,
       onDevice,
       hero,
       loupeOnly,
@@ -934,7 +935,6 @@ export class SurfaceRenderer {
       assets,
       onDevice,
       loadTerrain,
-      loadEarthTilePack,
       hero,
       loupeOnly,
       initialProjection,
@@ -1086,7 +1086,7 @@ export class SurfaceRenderer {
         }
       },
     )
-    if (this.loadEarthTilePack) earthTiles.attachPacks(this.loadEarthTilePack)
+    earthTiles.attachPacks()
     this.terrainTexture = device.createTexture({
       label: 'Terrain placeholder',
       size: [1, 1],
@@ -1144,6 +1144,8 @@ export class SurfaceRenderer {
       { binding: 6 + banks, resource: tiles.pageTexture.createView() },
       { binding: 7 + banks, resource: tiles.poolTexture.createView({ dimension: '2d-array' }) },
       { binding: 8 + banks, resource: tiles.sampler },
+      { binding: 9 + banks, resource: tiles.normalPoolTexture.createView({ dimension: '2d-array' }) },
+      { binding: 10 + banks, resource: { buffer: tiles.slotFadeBuffer } },
     ]
     const bind = (buffer: GPUBuffer) =>
       this.device.createBindGroup({
@@ -1379,8 +1381,12 @@ export class SurfaceRenderer {
     this.rotation = previous?.rotation ?? initial
     this.zoom = previous?.zoom ?? 1
     this.center = previous?.center ?? [0, 0, 0]
+    this.earthTiles?.pauseForFlight()
+    this.solar?.pauseTilesForFlight()
+    this.pipelines?.surfaceSmall.promote()
+    this.pipelines?.annotationSmall.promote()
     this.solarCamera?.startFlight(this.reducedMotion.matches)
-    if (focus === 'moon' || focus === 'mars') this.solar?.loadTerrain()
+    if (focus === 'moon' || focus === 'mars') this.solar?.loadTerrain(focus)
     this.invalidate()
   }
 
@@ -1514,12 +1520,23 @@ export class SurfaceRenderer {
         this.render(redraw, annotations, display)
       }
     } catch (error) {
+      this.tilesFading = false
       if (!this.destroyed && !this.lost) this.onError(error instanceof Error ? error : new Error(String(error)))
     } finally {
       this.rendering = false
-      // Input events schedule work. A stationary pointer or idle view does not
-      // need a polling loop, history convergence or additional GPU submissions.
-      if (this.dirty || this.annotationsDirty || this.displayDirty || this.overlayDirty) this.schedule()
+      const keepFading = this.tilesFading && this.phase !== 'prepare'
+      // Input events schedule work. Keep flights ticking even if a frame was skipped or errored.
+      if (
+        this.dirty ||
+        this.annotationsDirty ||
+        this.displayDirty ||
+        this.overlayDirty ||
+        this.solar?.camera.flying ||
+        keepFading
+      ) {
+        if (this.solar?.camera.flying || keepFading) this.dirty = true
+        this.schedule()
+      }
     }
   }
 
@@ -1569,6 +1586,10 @@ export class SurfaceRenderer {
       ? hero.frame(camera.aspect, heroTimeSeconds)
       : solar?.camera.update(solar.bodies, this.solarFocus, camera, frameTime)
     const flying = hero ? false : (solar?.camera.flying ?? false)
+    const earthFading =
+      !flying && this.solarFocus === 'earth' && this.earthTiles ? this.earthTiles.updateFades(frameTime) : false
+    const planetFading = !flying && solar ? solar.updatePlanetTileFades(frameTime) : false
+    this.tilesFading = earthFading || planetFading
     const stableCamera = sceneFrame
     const prior = this.cameraHistory
     const cameraMoved =
@@ -1604,7 +1625,7 @@ export class SurfaceRenderer {
     if (o.dataBoundary && this.solarFocus === 'earth' && !this.post.hasCurrentCoverage) annotations = true
     const dragging = this.pointers.size > 0 && Boolean(this.gesture?.moved)
     const needsPreview = progressive && redraw && !this.post.hasValidDisplay
-    const inMotion = Boolean(motion) || cameraMoved || dragging || flying
+    const inMotion = Boolean(motion) || cameraMoved || dragging || flying || this.tilesFading
     const activeSettlePass = progressive && redraw && !inMotion && !needsPreview ? Math.max(0, this.settlePass) : -1
     const useLowRes = redraw ? progressive && (inMotion || needsPreview) : this.post.isLowResActive
     const tile = activeSettlePass >= 0 ? settleTile(width, height, activeSettlePass) : undefined
@@ -1639,6 +1660,7 @@ export class SurfaceRenderer {
     if (this.annotationsStale && !skipAnnotations && (hasSelectedMarker || hover || earthBoundary)) annotations = true
     const metresPerPixel = (2 * Math.tan(FOV / 2) * (camera.distance - earthMorph) * EARTH_AXIS) / clientHeight
     const detail = contourDetail(metresPerPixel)
+    const tileRevision = (this.earthTiles?.revision ?? 0) + (solar?.tileRevision ?? 0)
     const canUseHeroBackdrop = Boolean(
       hero &&
         sceneFrame &&
@@ -1646,6 +1668,7 @@ export class SurfaceRenderer {
         !motion &&
         !tile &&
         !useLowRes &&
+        !this.tilesFading &&
         this.post.hasValidHeroBackdrop &&
         this.heroBackdrop &&
         this.heroBackdrop.width === renderWidth &&
@@ -1654,7 +1677,8 @@ export class SurfaceRenderer {
         this.heroBackdrop.bodies === hero.bodies &&
         this.heroBackdrop.earthReady === this.earthReady &&
         this.heroBackdrop.terrainReady === this.terrainGpuReady &&
-        this.heroBackdrop.solarTerrain === Boolean(solar?.terrainReady) &&
+        this.heroBackdrop.solarTerrainCount === (solar?.terrainReadyCount ?? 0) &&
+        this.heroBackdrop.tileRevision === tileRevision &&
         this.heroBackdrop.scoreRevision === this.scoreRevision &&
         Math.abs(this.heroBackdrop.frame.aspect - sceneFrame.aspect) < 1e-4 &&
         Math.hypot(
@@ -1671,6 +1695,7 @@ export class SurfaceRenderer {
           Math.abs(this.heroBackdrop.frame.right[2] - sceneFrame.right[2]),
         ) < 0.00022,
     )
+    const tileFade = flying && solar ? solar.camera.flightTileFade(frameTime) : 1
     const earthSun = sceneFrame ? solar!.sunlight('earth') : this.sun.direction
     const earthEye = sceneFrame ? solar!.earthEye(sceneFrame) : cameraBasis(camera).eye
     const surfaceUniformBase = {
@@ -1698,7 +1723,7 @@ export class SurfaceRenderer {
       terrainReady: this.terrainGpuReady,
       nativeDepth: Boolean(sceneFrame),
       earthReady: this.earthReady,
-      earthTilesReady: Boolean(this.earthTiles?.ready),
+      earthTilesReady: this.earthTiles?.ready ? tileFade : 0,
       poleHeights: this.poleHeights,
       meshRelief: activeMeshRelief,
       sunDirection: earthSun,
@@ -1774,10 +1799,7 @@ export class SurfaceRenderer {
             renderEarth
               ? () => {
                   if (earthSmall) {
-                    const smallPipe = (pipelines.surfaceSmall ??= device.createRenderPipeline(
-                      pipelines.surfaceSmallDescriptor,
-                    ))
-                    backdropPass.setPipeline(smallPipe)
+                    backdropPass.setPipeline(pipelines.surfaceSmall.get())
                     backdropPass.setBindGroup(0, this.bindings)
                     backdropPass.draw(6)
                   } else {
@@ -1799,7 +1821,8 @@ export class SurfaceRenderer {
             bodies: hero.bodies,
             earthReady: this.earthReady,
             terrainReady: this.terrainGpuReady,
-            solarTerrain: Boolean(solar?.terrainReady),
+            solarTerrainCount: solar?.terrainReadyCount ?? 0,
+            tileRevision,
             scoreRevision: this.scoreRevision,
           }
         }
@@ -1827,10 +1850,7 @@ export class SurfaceRenderer {
             renderEarth
               ? () => {
                   if (earthSmall) {
-                    const smallPipe = (pipelines.surfaceSmall ??= device.createRenderPipeline(
-                      pipelines.surfaceSmallDescriptor,
-                    ))
-                    pass.setPipeline(smallPipe)
+                    pass.setPipeline(pipelines.surfaceSmall.get())
                     pass.setBindGroup(0, this.bindings)
                     pass.draw(6)
                   } else {
@@ -1838,6 +1858,7 @@ export class SurfaceRenderer {
                   }
                 }
               : undefined,
+            tileFade,
           )
         } else if (renderEarth) {
           drawMesh(pass, pipelines.surface, this.bindings)
@@ -1855,16 +1876,12 @@ export class SurfaceRenderer {
       const pass = this.post.beginAnnotations(encoder, earthBoundary, useLowRes)
       if (renderEarth) {
         if (earthSmall) {
-          const smallPipe = earthBoundary
-            ? (pipelines.coverageSmall ??= device.createRenderPipeline(pipelines.coverageSmallDescriptor))
-            : (pipelines.annotationSmall ??= device.createRenderPipeline(pipelines.annotationSmallDescriptor))
+          const smallPipe = earthBoundary ? pipelines.coverageSmall.get() : pipelines.annotationSmall.get()
           pass.setPipeline(smallPipe)
           pass.setBindGroup(0, this.bindings)
           pass.draw(6)
         } else {
-          const pipeline = earthBoundary
-            ? (pipelines.coverage ??= device.createRenderPipeline(pipelines.coverageDescriptor))
-            : (pipelines.annotation ??= device.createRenderPipeline(pipelines.annotationDescriptor))
+          const pipeline = earthBoundary ? pipelines.coverage.get() : pipelines.annotation.get()
           drawMesh(pass, pipeline, this.bindings)
         }
       }
@@ -2686,6 +2703,7 @@ export class SurfaceRenderer {
     this.patchInstanceBuffer?.destroy()
     this.loupePatchInstanceBuffer?.destroy()
     this.heroBackdrop = null
+    this.tilesFading = false
     this.post?.destroy()
     this.pipelines = null
   }

@@ -1,6 +1,5 @@
 import { checkedGpu } from '../earth-score/gpu.ts'
-import { getAssetCacheKey } from '../workspace/workspaceAssets.ts'
-import { readCachedBc7, transcodeSrgbTextureToBc7Gpu, uploadRawBc7Texture } from './bc7-gpu.ts'
+import { purgeLegacyGpuCacheOnce, transcodeSrgbTextureToBc7Gpu } from './bc7-gpu.ts'
 import fullscreenWgsl from './shaders/fullscreen.wgsl?raw'
 import mipBlitWgsl from './shaders/mip-blit.wgsl?raw'
 
@@ -206,16 +205,14 @@ export type SrgbTextureLoadOptions = {
   validateGpu?: boolean
   createStepLabel?: string
   uploadStepLabel?: string
-  cacheKey?: string
   bc7?: boolean
 }
 
 /**
  * Fetch an image, decode without color-space conversion, upload into a mipmapped
  * texture in bounded strips, and generate GPU mipmaps. When the device supports
- * `texture-compression-bc`, transcodes once on the GPU into `bc7-rgba-unorm-srgb`
- * (~7–56 ms, 4× less VRAM) and caches raw mipmapped BC7 in IndexedDB so warm
- * reloads skip image decoding and mip generation completely.
+ * `texture-compression-bc`, transcodes on the GPU into `bc7-rgba-unorm-srgb`
+ * (~7–56 ms, 4× less VRAM, zero CPU readback or disk bloat).
  * Destroys the texture on any error or abort; callers own lifetime on success.
  */
 export async function loadSrgbMipmappedTexture(
@@ -224,17 +221,8 @@ export async function loadSrgbMipmappedTexture(
   signal: AbortSignal,
   options: SrgbTextureLoadOptions,
 ): Promise<GPUTexture> {
+  purgeLegacyGpuCacheOnce()
   const useBc7 = options.bc7 !== false && device.features.has('texture-compression-bc')
-  const baseKey = options.cacheKey ?? getAssetCacheKey(url)
-  const bc7CacheKey = useBc7 && baseKey ? `${baseKey}@${options.maxWidth ?? 'full'}` : undefined
-
-  if (bc7CacheKey) {
-    const cached = await readCachedBc7(bc7CacheKey)
-    signal.throwIfAborted()
-    if (cached) {
-      return uploadRawBc7Texture(device, cached, `${options.label} (BC7)`, signal)
-    }
-  }
 
   const response = await fetch(url, { signal })
   if (!response.ok) {
@@ -284,7 +272,7 @@ export async function loadSrgbMipmappedTexture(
       : buildMips()
     signal.throwIfAborted()
     if (useBc7) {
-      const bc7Texture = transcodeSrgbTextureToBc7Gpu(device, finished, options.label, bc7CacheKey)
+      const bc7Texture = transcodeSrgbTextureToBc7Gpu(device, finished, options.label)
       // Release the temporary RGBA texture as soon as the GPU finishes reading it for BC7 encode.
       void device.queue
         .onSubmittedWorkDone()

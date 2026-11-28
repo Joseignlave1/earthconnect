@@ -459,6 +459,14 @@ export class SolarCamera {
   get transitioning() {
     return Boolean(this.flight)
   }
+  /** Smoothly fades high-res virtual tiles 1 -> 0 over the first 220 ms of a camera flight
+   * so grazing departures blend cleanly into uniform global 8K textures without unrendered edges. */
+  flightTileFade(now: number): number {
+    if (!this.flight || this.flight.instant) return 1
+    const t = Math.max(0, Math.min(1, (now - this.flight.start) / 220))
+    const smooth = t * t * (3 - 2 * t)
+    return 1 - smooth
+  }
 
   takeArrival() {
     const arrival = this.arrival
