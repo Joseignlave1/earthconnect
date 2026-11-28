@@ -5,7 +5,6 @@ const manifestUrl = 'https://earth-connect-assets.pages.dev/manifest.json'
 const scorePath = 'compute-data/world/manifest.json'
 const world = 'compute-data/world/'
 const renderPaths = [
-  'textures/earth-blue-marble.jpg',
   'textures/earth-terrain.bin',
   'textures/moon-terrain.bin',
   'textures/mars-terrain.bin',
@@ -17,11 +16,12 @@ const legacyTilePaths = [
   ...Array.from({ length: 4 }, (_, index) => `textures/mars-tiles-${index}.bin`),
 ]
 const optionalRenderPaths = new Set(['textures/moon-albedo.webp', 'textures/mars-albedo.webp'])
-// Legacy CDN releases still list removed basins, pre-baked BC7 textures, and superseded ECVT1
-// zoom tile packs (replaced by HTTP-streamed ECV3 packs on R2). Ignoring them lets pruneCache()
-// reclaim up to ~175 MB of dead tile blobs from existing IndexedDB caches.
+// Legacy CDN releases still list removed basins, pre-baked BC7 textures, superseded August Blue
+// Marble (replaced by the unified Sentinel-2 8K orbital texture), and ECVT1 zoom tile packs
+// (replaced by HTTP-streamed ECV3 packs on R2). Ignoring them lets pruneCache() reclaim dead blobs.
 const ignoredPaths = new Set([
   'data/surface-basins.bin',
+  'textures/earth-blue-marble.jpg',
   'textures/nasa-deep-star-map.bc7',
   'textures/mars-albedo-4096.bc7',
   'textures/moon-albedo-512.bc7',
@@ -334,7 +334,6 @@ function orderedPaths(files: Record<string, Asset>) {
   // per octant/quadrant on demand when the user zooms in, saving ~175 MB upfront.
   const priority = [
     scorePath,
-    'textures/earth-blue-marble.jpg',
     'textures/nasa-deep-star-map.webp',
     'textures/earth-terrain.bin',
     'textures/moon-albedo.webp',

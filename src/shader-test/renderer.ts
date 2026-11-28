@@ -294,6 +294,11 @@ function getSurfaceCache(device: GPUDevice): DeviceSurfaceCache {
   return entry
 }
 
+// Unified 8192x4096 Sentinel-2 L0 + Blue Marble ocean orbital Earth texture baked to match
+// surface.wgsl's calibrateS2() curve so orbit -> 61 m uses a single dataset, season, and palette.
+const EARTH_SENTINEL2_ORBITAL_URL =
+  'https://earth-connect-assets.pages.dev/assets/textures/earth-sentinel2-3c9c39f42ba523d3f8fd26240ca9b629fc0e4508737012c0e611fe1917c90c54.webp'
+
 async function buildEarthTexture(
   device: GPUDevice,
   cache: DeviceSurfaceCache,
@@ -301,7 +306,7 @@ async function buildEarthTexture(
   maxWidth?: number,
 ): Promise<GPUTexture> {
   const texture = await loadSrgbMipmappedTexture(device, url, cache.controller.signal, {
-    label: 'NASA Earth imagery',
+    label: 'Earth Sentinel-2 orbital imagery',
     mipLabel: 'Earth imagery mipmaps',
     downloadErrorMessage: 'Could not load the Earth background. Reload to retry.',
     maxWidth,
@@ -874,19 +879,8 @@ export class SurfaceRenderer {
   private requestEarthImage() {
     if (this.earthImageRequested) return
     this.earthImageRequested = true
-    const { signal } = this.terrainRequest
-    const imageUrlPromise = this.assets
-      ? this.assets('textures/earth-blue-marble.jpg', signal)
-      : Promise.resolve(`${import.meta.env.BASE_URL}textures/earth-blue-marble.jpg`)
-    void imageUrlPromise
-      .then(url => {
-        if (this.destroyed || signal.aborted) return
-        this.earthImageUrl = url
-        if (!this.lost) this.startEarthUpload(url)
-      })
-      .catch(error => {
-        if (!signal.aborted) this.onError(error instanceof Error ? error : new Error(String(error)))
-      })
+    this.earthImageUrl = EARTH_SENTINEL2_ORBITAL_URL
+    if (!this.destroyed && !this.lost) this.startEarthUpload(EARTH_SENTINEL2_ORBITAL_URL)
   }
 
   private onVisibilityChange = () => {
@@ -1209,14 +1203,32 @@ export class SurfaceRenderer {
       })
       .catch(error => {
         if (
-          !this.destroyed &&
-          !this.lost &&
-          !signal.aborted &&
-          this.device === device &&
-          !getSurfaceCache(device).controller.signal.aborted
+          this.destroyed ||
+          this.lost ||
+          signal.aborted ||
+          this.device !== device ||
+          getSurfaceCache(device).controller.signal.aborted
         ) {
-          this.onError(error instanceof Error ? error : new Error(String(error)))
+          return
         }
+        if (url === EARTH_SENTINEL2_ORBITAL_URL) {
+          const fallbackPromise = this.assets
+            ? this.assets('textures/earth-blue-marble.jpg', signal)
+            : Promise.resolve(`${import.meta.env.BASE_URL}textures/earth-blue-marble.jpg`)
+          void fallbackPromise
+            .then(fallbackUrl => {
+              if (this.destroyed || this.lost || signal.aborted || this.device !== device) return
+              this.earthImageUrl = fallbackUrl
+              this.startEarthUpload(fallbackUrl)
+            })
+            .catch(() => {
+              if (!this.destroyed && !this.lost && !signal.aborted) {
+                this.onError(error instanceof Error ? error : new Error(String(error)))
+              }
+            })
+          return
+        }
+        this.onError(error instanceof Error ? error : new Error(String(error)))
       })
   }
 

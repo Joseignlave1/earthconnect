@@ -427,10 +427,13 @@ struct EarthImagery {
 }
 
 fn calibrateS2(rawRgb: vec3f) -> vec3f {
-  // Calibrate Sentinel-2 L3 BOA reflectance (baseline-lifted & brighter) onto Blue Marble's
-  // linear exposure, black point, and white balance.
+  // Calibrate Sentinel-2 L3 BOA reflectance (baseline-lifted & brighter) to natural linear
+  // exposure and white balance while keeping bright snow/ice crisp neutral white.
+  // Matches scripts/ecv3/bake_earth_orbital_8k.py so orbital 8K -> L0..L5 tiles are seamless.
+  let snow = smoothstep(.45, .80, min(rawRgb.r, min(rawRgb.g, rawRgb.b)));
+  let scale = mix(vec3f(.593, .507, .516), vec3f(.57, .57, .59), snow);
   return clamp(
-    vec3f(.593, .507, .516) * pow(max(rawRgb - vec3f(.030, .030, .040), vec3f(0.)), vec3f(1.50, 1.45, 1.55)),
+    scale * pow(max(rawRgb - vec3f(.030, .030, .040), vec3f(0.)), vec3f(1.50, 1.45, 1.55)),
     vec3f(0.),
     vec3f(1.),
   );
@@ -451,10 +454,8 @@ fn sampleEarthAlbedoSlot(
   level: u32,
   cell: vec2i,
   tileCoord: vec2f,
-  imgUv: vec2f,
   imgDx: vec2f,
   imgDy: vec2f,
-  coast: f32,
 ) -> EarthAlbedoSample {
   let innerScale = VIRTUAL_TILE_INNER / VIRTUAL_TILE_SIZE;
   let baseGrid = vec2f(EARTH_TILE_BASE_COLS, EARTH_TILE_BASE_ROWS);
@@ -474,23 +475,10 @@ fn sampleEarthAlbedoSlot(
   let high = textureSampleGrad(earthTilePool, earthTileSampler, tileUv, i32(slot), dx, dy);
   // Alpha encodes exact 30 m Copernicus land fraction in [0.5 .. 1.0] (128=water, 255=land).
   let highLand = clamp((high.a - .5) * 2., 0., 1.);
-  var s2Cal = calibrateS2(high.rgb);
-  // Low-frequency Blue Marble radiometric harmonization removes Sentinel-2 MGRS
-  // tile-to-tile seasonal exposure steps across regional views while keeping 61 m detail crisp.
-  let s2Mip = select(4., 3., level <= 2u);
-  let bmLod = max(0., select(3., 2., level <= 2u) - f32(level));
-  let s2LowSample = textureSampleLevel(earthTilePool, earthTileSampler, tileUv, i32(slot), s2Mip);
-  let inlandSafe = smoothstep(.5, 2.2, coast) * smoothstep(.93, .995, s2LowSample.a);
-  let harmonizeW = mix(.88, .20, smoothstep(1.5, 4.5, f32(level))) * inlandSafe;
-  if (u.earthReady > .5 && harmonizeW > .001) {
-    let s2LowCal = calibrateS2(s2LowSample.rgb);
-    let bmLow = textureSampleLevel(earth, geographicSampler, imgUv, bmLod).rgb;
-    let ratio = clamp(bmLow / max(s2LowCal, vec3f(.015)), vec3f(.50), vec3f(2.0));
-    s2Cal = clamp(s2Cal * mix(vec3f(1.), ratio, harmonizeW), vec3f(0.), vec3f(1.));
-  }
+  let s2Cal = calibrateS2(high.rgb);
   let highRgb = mix(high.rgb, s2Cal, highLand);
-  // L0 fades smoothly into 8K Blue Marble at orbital altitude; L1..L5 also fade gracefully if
-  // their 5-mip chain runs out on rapid zoom-out or grazing views without an active ancestor.
+  // L0 fades smoothly into the unified 8K Sentinel-2 orbital texture; L1..L5 also fade
+  // gracefully if their 5-mip chain runs out on rapid zoom-out or grazing views.
   let w = select(1. - smoothstep(3.5, 4.5, tileMip), 1. - smoothstep(.75, 1.45, tileMip), level == 0u);
   return EarthAlbedoSample(highRgb, highLand, w);
 }
@@ -557,7 +545,7 @@ fn sampleEarthImagery(uv: vec2f, uvDx: vec2f, uvDy: vec2f, coast: f32) -> EarthI
         usedFallback = true;
       }
       let fade = earthSlotFade(slot);
-      let primary = sampleEarthAlbedoSlot(slot, level, cell, tileCoord, imgUv, imgDx, imgDy, coast);
+      let primary = sampleEarthAlbedoSlot(slot, level, cell, tileCoord, imgDx, imgDy);
       if (fade >= .999) {
         if (primary.w > .001) {
           let w = primary.w * u.earthTilesReady;
@@ -567,7 +555,7 @@ fn sampleEarthImagery(uv: vec2f, uvDx: vec2f, uvDy: vec2f, coast: f32) -> EarthI
         }
       } else if (!usedFallback && entry.b < 255u) {
         let parentFade = earthSlotFade(entry.b);
-        let parent = sampleEarthAlbedoSlot(entry.b, entry.a, cell, tileCoord, imgUv, imgDx, imgDy, coast);
+        let parent = sampleEarthAlbedoSlot(entry.b, entry.a, cell, tileCoord, imgDx, imgDy);
         let pW = parent.w * parentFade * u.earthTilesReady;
         let cW = primary.w * u.earthTilesReady;
         let parentColor = mix(outColor, parent.rgb, pW);
