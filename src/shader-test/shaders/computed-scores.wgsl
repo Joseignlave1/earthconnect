@@ -5,11 +5,18 @@ override GROUP_WIDTH: u32 = 16u;
 override GROUP_HEIGHT: u32 = 8u;
 override HISTOGRAM_SHARDS: u32 = 16u;
 
+struct BatchParams {
+  firstSite: u32,
+  firstChunkTile: u32,
+  packLayerOffset: u32,
+  _pad: u32,
+}
+
 @group(0) @binding(0) var<storage, read> scores: array<u32>;
 @group(0) @binding(1) var<storage, read_write> packed: array<u32>;
 @group(0) @binding(2) var<storage, read_write> histogram: array<atomic<u32>>;
 @group(0) @binding(3) var<storage, read_write> peaks: array<atomic<u32>>;
-@group(0) @binding(4) var<uniform> batch: vec4u; // first manifest site, first chunk tile, pack layer offset
+@group(0) @binding(4) var<uniform> batch: BatchParams;
 @group(0) @binding(5) var previous: texture_2d_array<u32>;
 @group(0) @binding(6) var<storage, read_write> summary: array<u32>;
 
@@ -37,16 +44,16 @@ fn base(
   @builtin(local_invocation_index) local: u32,
 ) {
   let x = id.x * 2u;
-  let site = batch.x + id.z;
+  let site = batch.firstSite + id.z;
   let shard = (group.x + group.y * 7u + site * 11u) % HISTOGRAM_SHARDS;
   let inBounds = x < SIZE && id.y < SIZE;
   var lo = MISSING;
   var hi = MISSING;
   if (inBounds) {
-    let row = (batch.y + id.z) * TILE_CELLS + id.y * SIZE + x;
+    let row = (batch.firstChunkTile + id.z) * TILE_CELLS + id.y * SIZE + x;
     lo = min(MISSING, scores[row]);
     hi = min(MISSING, scores[row + 1u]);
-    storePair(id, batch.z, vec2u(SIZE), lo, hi);
+    storePair(id, batch.packLayerOffset, vec2u(SIZE), lo, hi);
   }
   if (local == 0u) {
     hotCode = select(0u, lo, lo > 0u && lo < MISSING);

@@ -9,3 +9,12 @@ fn toDisplay(c: vec3f) -> vec3f {
 fn acesToneMap(c: vec3f) -> vec3f {
   return clamp((c * (2.51 * c + .03)) / (c * (2.43 * c + .59) + .14), vec3f(0.), vec3f(1.));
 }
+
+fn finishSceneColor(scene: vec4f, bloomRgb: vec3f, bloomGlow: f32, exposure: f32, hdr: bool) -> vec3f {
+  var c = scene.rgb / max(scene.a, .0001);
+  if (hdr) {
+    c = (c + bloomRgb * bloomGlow) * exposure;
+    c = toDisplay(acesToneMap(c));
+  }
+  return c;
+}

@@ -5,6 +5,7 @@ import {
   cameraBasis,
   cameraMatrix,
   createMesh,
+  dragGlobeRotation,
   EARTH_AXIS,
   EARTH_FLATTENING,
   EQUAL_EARTH_HALF_HEIGHT,
@@ -31,6 +32,23 @@ import {
   poleElevations,
 } from '../src/shader-test/terrain.ts'
 import { solarPosition } from '../src/shader-test/sun.ts'
+import {
+  Av1Height10Decoder,
+  decodeEcv3Key,
+  decodeFloat16,
+  ECV3_CHUNK_BYTES,
+  ECV3_MAGIC,
+  ECV3_TPL_HEIGHT10,
+  ECV3_VERSION,
+  Ecv3ChunkCache,
+  ecv3ChunkRangeUrl,
+  ecv3TileKey,
+  loadEcv3PackIndex,
+  reassembleEcv3AvifBlob,
+  unpackEcv3HeightBounds,
+} from '../src/shader-test/ecv3.ts'
+import { toPackHandle } from '../src/shader-test/virtual-tiles.ts'
+import { PipelineCompileQueue } from '../src/shader-test/pipeline-queue.ts'
 import { contourDetail } from '../src/shader-test/contours.ts'
 import { CELL, MISSING, RADIUS, SIZE, cellAddress, tileRow, tileX, worldTiles } from '../src/shader-test/world-grid.ts'
 import {
@@ -358,6 +376,29 @@ test('arcball keeps a grabbed terrain point attached and restores its starting o
         if (x === 0.2 && y === 0.1) view.rotation.forEach((value, i) => close(value, start.rotation[i], 1e-10))
       }
     }
+})
+
+test('production globe drag scales with altitude and restores orientation on return to grab point', () => {
+  const startRotation = orbitRotation(orbitRotation([0, 0, 0, 1], 0.4, 0), 0, 0.9)
+  const nearCam = { ...camera, distance: 1.2, rotation: startRotation }
+  const farCam = { ...camera, distance: 4.0, rotation: startRotation }
+  const returned = dragGlobeRotation(nearCam, startRotation, 0, 0, 800)
+  assert.deepEqual(returned, startRotation)
+  const nearDragged = dragGlobeRotation(nearCam, startRotation, 120, -60, 800)
+  const farDragged = dragGlobeRotation(farCam, startRotation, 120, -60, 800)
+  const nearDelta = Math.hypot(
+    nearDragged[0] - startRotation[0],
+    nearDragged[1] - startRotation[1],
+    nearDragged[2] - startRotation[2],
+    nearDragged[3] - startRotation[3],
+  )
+  const farDelta = Math.hypot(
+    farDragged[0] - startRotation[0],
+    farDragged[1] - startRotation[1],
+    farDragged[2] - startRotation[2],
+    farDragged[3] - startRotation[3],
+  )
+  assert.ok(nearDelta > 0.01 && farDelta > nearDelta * 3)
 })
 
 test('cached picking reuses surface geometry across camera moves and refreshes changed terrain settings', () => {
@@ -758,4 +799,557 @@ test('ECVT1 virtual tile pack headers and indices parse cleanly and reject inval
   view.setUint32(0, 0xdeadbeef, true)
   assert.equal(parseTilePackHeader(buf.slice(0, 16)), null)
   assert.equal(parseTilePackHeader(new ArrayBuffer(8)), null)
+})
+
+test('ECV3 pack headers, shared AVIF templates, height bounds, and OBU reassembly round-trip cleanly', async () => {
+  // Build a minimal valid ECV3 binary pack in memory with 1 template (18 bytes -> padded to 20) and 1 height10 tile.
+  const tplBytes = new Uint8Array(18)
+  tplBytes.set([0x66, 0x74, 0x79, 0x70], 0) // 'ftyp'
+  tplBytes.set([0x6d, 0x64, 0x61, 0x74], 14) // 'mdat'
+  const ilocOff = 6
+  const mdatOff = 10
+  const obu = new Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a])
+
+  const tplSectionLen = 8 + tplBytes.length + 2 // 4-byte aligned
+  const dataOff = 32 + tplSectionLen + 20
+  const packBuf = new ArrayBuffer(dataOff + obu.length)
+  const view = new DataView(packBuf)
+  const bytes = new Uint8Array(packBuf)
+
+  view.setUint32(0, ECV3_MAGIC, true)
+  view.setUint32(4, ECV3_VERSION, true)
+  view.setUint16(8, 1, true) // moon
+  view.setUint16(10, 24, true) // packId
+  view.setUint16(12, 512, true)
+  view.setUint16(14, 2, true)
+  view.setUint16(16, 24, true)
+  view.setUint16(18, 12, true)
+  view.setUint16(20, 5, true)
+  view.setUint16(22, 1, true) // tplCount
+  view.setUint32(24, 1, true) // tileCount
+
+  view.setUint16(32, ECV3_TPL_HEIGHT10, true)
+  view.setUint16(34, tplBytes.length, true)
+  view.setUint16(36, ilocOff, true)
+  view.setUint16(38, mdatOff, true)
+  bytes.set(tplBytes, 40)
+
+  const key = ecv3TileKey(1, 4, 317, 102)
+  assert.deepEqual(decodeEcv3Key(key), { kind: 1, level: 4, tx: 317, ty: 102 })
+  const meta = ((ECV3_TPL_HEIGHT10 << 24) | (35 << 16) | (74 << 8) | 0) >>> 0
+  // float16(-1024) = 0xe400, float16(2048) = 0x6800
+  const aux = ((0x6800 << 16) | 0xe400) >>> 0
+  const recOff = 32 + tplSectionLen
+  view.setUint32(recOff, key, true)
+  view.setUint32(recOff + 4, dataOff, true)
+  view.setUint32(recOff + 8, obu.length, true)
+  view.setUint32(recOff + 12, meta, true)
+  view.setUint32(recOff + 16, aux, true)
+  bytes.set(obu, dataOff)
+
+  const loaded = await loadEcv3PackIndex(toPackHandle(new Blob([packBuf])), 24, new AbortController().signal)
+  assert.ok(loaded)
+  assert.equal(loaded.pack.levelCount, 5)
+  const entry = loaded.entries.get(key)
+  assert.ok(entry)
+  assert.equal(entry.offset, dataOff)
+  assert.equal(entry.length, obu.length)
+  assert.equal(entry.quality, 74)
+  assert.equal(entry.grainAmp, 3.5)
+  assert.equal(decodeFloat16(0xe400), -1024)
+  assert.deepEqual(unpackEcv3HeightBounds(entry.aux), { loM: -1024, spanM: 2048 })
+
+  const tpl = loaded.pack.templates.get(ECV3_TPL_HEIGHT10)!
+  const rebuilt = new Uint8Array(await reassembleEcv3AvifBlob(tpl, obu).arrayBuffer())
+  const rv = new DataView(rebuilt.buffer)
+  assert.equal(rebuilt.length, tplBytes.length + obu.length)
+  assert.equal(rv.getUint32(ilocOff, false), obu.length)
+  assert.equal(rv.getUint32(mdatOff, false), obu.length + 8)
+  assert.deepEqual([...rebuilt.slice(tplBytes.length)], [...obu])
+
+  // Empty template (e.g. Earth self-contained RGBA AVIF) returns verbatim payload without patching.
+  const rawVerbatim = new Uint8Array([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70])
+  const emptyTpl = { id: 2, bytes: new Uint8Array(0), ilocOff: 0, mdatOff: 0 }
+  const verbatimRebuilt = new Uint8Array(await reassembleEcv3AvifBlob(emptyTpl, rawVerbatim).arrayBuffer())
+  assert.deepEqual([...verbatimRebuilt], [...rawVerbatim])
+})
+
+test('PipelineCompileQueue compiles eagerly by default order, drains promoted FIFO ahead of normal, and deduplicates sync fallback', async () => {
+  const started: string[] = []
+  const syncCompiled: string[] = []
+  const resolvers = new Map<string, (p: GPURenderPipeline) => void>()
+  const turns: (() => void)[] = []
+
+  const device = {
+    createRenderPipeline(desc: GPURenderPipelineDescriptor) {
+      const label = desc.label ?? ''
+      syncCompiled.push(label)
+      return { label } as unknown as GPURenderPipeline
+    },
+    createRenderPipelineAsync(desc: GPURenderPipelineDescriptor) {
+      const label = desc.label ?? ''
+      started.push(label)
+      return new Promise<GPURenderPipeline>(resolve => {
+        resolvers.set(label, resolve)
+      })
+    },
+    createComputePipeline(desc: GPUComputePipelineDescriptor) {
+      const label = desc.label ?? ''
+      syncCompiled.push(label)
+      return { label } as unknown as GPUComputePipeline
+    },
+    createComputePipelineAsync(desc: GPUComputePipelineDescriptor) {
+      const label = desc.label ?? ''
+      started.push(label)
+      return new Promise<GPUComputePipeline>(resolve => {
+        resolvers.set(label, resolve as unknown as (p: GPURenderPipeline) => void)
+      })
+    },
+  } as unknown as GPUDevice
+
+  const queue = new PipelineCompileQueue(device, {
+    maxConcurrent: 1,
+    yieldTurn: fn => {
+      turns.push(fn)
+    },
+  })
+  const flushTurns = async () => {
+    for (let i = 0; i < 4; i++) await Promise.resolve()
+    while (turns.length) {
+      turns.shift()!()
+      for (let i = 0; i < 4; i++) await Promise.resolve()
+    }
+  }
+
+  const desc = (label: string) => ({ label }) as GPURenderPipelineDescriptor
+  const pLate = queue.register(90, () => desc('late'))
+  const pMid = queue.register(50, () => desc('mid'))
+  const pEarlyA = queue.register(10, () => desc('early-a'))
+  const pEarlyB = queue.register(10, () => desc('early-b'))
+  const pUrgent = queue.register(80, () => desc('urgent'))
+  const pSync = queue.register(70, () => desc('sync-now'))
+  const pCompute = queue.registerCompute(55, () => ({ label: 'compute-bc7' }) as GPUComputePipelineDescriptor)
+
+  // Start first compilation: lowest order (10), tie-broken by registration sequence (early-a).
+  await flushTurns()
+  assert.deepEqual(started, ['early-a'])
+  assert.equal(pEarlyA.ready, false)
+
+  // Promote late first, then peek urgent (moves to back of priority queue without blocking).
+  pLate.promote()
+  assert.equal(pUrgent.peek(), undefined)
+
+  // Calling get() on a still-queued shader compiles synchronously once and removes it from the queue.
+  const syncPipe = pSync.get() as unknown as { label: string }
+  assert.equal(syncPipe.label, 'sync-now')
+  assert.equal(pSync.ready, true)
+  assert.deepEqual(syncCompiled, ['sync-now'])
+
+  // Finish early-a -> priorityQueue FIFO ('late', then 'urgent') must drain before normalQueue ('early-b', 'mid').
+  resolvers.get('early-a')!({ label: 'early-a' } as unknown as GPURenderPipeline)
+  await Promise.resolve()
+  await flushTurns()
+  assert.equal(pEarlyA.ready, true)
+  assert.deepEqual(started, ['early-a', 'late'])
+
+  resolvers.get('late')!({ label: 'late' } as unknown as GPURenderPipeline)
+  await Promise.resolve()
+  await flushTurns()
+  assert.deepEqual(started, ['early-a', 'late', 'urgent'])
+
+  resolvers.get('urgent')!({ label: 'urgent' } as unknown as GPURenderPipeline)
+  await Promise.resolve()
+  await flushTurns()
+  assert.deepEqual(started, ['early-a', 'late', 'urgent', 'early-b'])
+
+  resolvers.get('early-b')!({ label: 'early-b' } as unknown as GPURenderPipeline)
+  await Promise.resolve()
+  await flushTurns()
+  assert.deepEqual(started, ['early-a', 'late', 'urgent', 'early-b', 'mid'])
+
+  resolvers.get('mid')!({ label: 'mid' } as unknown as GPURenderPipeline)
+  await Promise.resolve()
+  await flushTurns()
+  assert.deepEqual(started, ['early-a', 'late', 'urgent', 'early-b', 'mid', 'compute-bc7'])
+
+  resolvers.get('compute-bc7')!({ label: 'compute-bc7' } as unknown as GPURenderPipeline)
+  await Promise.resolve()
+  await flushTurns()
+
+  // Every shader is ready, sync-now was never double-compiled asynchronously, and get() hits cache with no extra sync compiles.
+  assert.equal(pLate.ready, true)
+  assert.equal(pUrgent.ready, true)
+  assert.equal(pEarlyB.ready, true)
+  assert.equal(pMid.ready, true)
+  assert.equal(pCompute.ready, true)
+  assert.equal((pLate.get() as unknown as { label: string }).label, 'late')
+  assert.equal((pCompute.get() as unknown as { label: string }).label, 'compute-bc7')
+  assert.deepEqual(started, ['early-a', 'late', 'urgent', 'early-b', 'mid', 'compute-bc7'])
+  assert.deepEqual(syncCompiled, ['sync-now'])
+
+  // dispose() prevents any newly queued background work from compiling and guards late access/completion.
+  const pFail = queue.register(95, () => desc('will-fail'))
+  await flushTurns()
+  resolvers.get('will-fail') // registered; force a failure on a fresh queue below
+  queue.register(100, () => desc('after-dispose'))
+  queue.dispose()
+  await flushTurns()
+  assert.deepEqual(started, ['early-a', 'late', 'urgent', 'early-b', 'mid', 'compute-bc7', 'will-fail'])
+  assert.equal(pFail.ready, false)
+  assert.throws(() => pFail.get())
+  const postDispose = queue.register(1, () => desc('post-dispose'))
+  assert.equal(postDispose.failed, true)
+  assert.throws(() => postDispose.get())
+
+  // Async rejection marks entry failed and preserves the error reason.
+  const failErr = new Error('shader compile failed')
+  const failDevice = {
+    createRenderPipelineAsync: () => Promise.reject(failErr),
+    createRenderPipeline: () => ({ label: 'sync-fallback' }) as unknown as GPURenderPipeline,
+  } as unknown as GPUDevice
+  const failTurns: (() => void)[] = []
+  const failQueue = new PipelineCompileQueue(failDevice, {
+    maxConcurrent: 1,
+    yieldTurn: fn => failTurns.push(fn),
+  })
+  const failedHandle = failQueue.register(1, () => desc('bad'))
+  while (failTurns.length) failTurns.shift()!()
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.equal(failedHandle.failed, true)
+  assert.equal(failedHandle.error, failErr)
+  assert.equal(failedHandle.peek(), undefined)
+})
+
+test('Ecv3ChunkCache uses 64 KiB chunks, seeds chunk 0, enforces priority fetch concurrency, and drops cancelled queued fetches', async () => {
+  assert.equal(ECV3_CHUNK_BYTES, 65536)
+  assert.equal(
+    ecv3ChunkRangeUrl('https://earth-connect-assets.pages.dev/ecv3/earth/earth-ecv3-p134.ecv3?v=e1', 65536, 65536),
+    'https://earth-connect-assets.pages.dev/ecv3/earth/earth-ecv3-p134.ecv3?v=e1&r=65536-65536',
+  )
+  const fetched: { start: number; length: number }[] = []
+  const pending = new Map<number, (buf: ArrayBuffer) => void>()
+
+  const cache = new Ecv3ChunkCache({
+    maxConcurrentFetches: 1,
+    readRange: (_handle, start, length) => {
+      fetched.push({ start, length })
+      return new Promise<ArrayBuffer>(resolve => {
+        pending.set(start, resolve)
+      })
+    },
+  })
+
+  const makeChunk = (fill: number) => {
+    const out = new Uint8Array(ECV3_CHUNK_BYTES)
+    out.fill(fill)
+    return out
+  }
+
+  // Seed chunk 0 (like loadEcv3PackIndex does) -> zero network fetches and immediate hasSlice hit.
+  cache.seedChunk('moon:14', 0, makeChunk(42))
+  assert.equal(cache.hasSlice('moon:14', 100, 128), true)
+  assert.equal(cache.hasSlice('moon:14', ECV3_CHUNK_BYTES, 128), false)
+
+  const handle = toPackHandle('https://example.invalid/moon-ecv3-p14.ecv3?v=q92')
+  const ac = new AbortController()
+  const s0 = await cache.readSlice(handle, 'moon:14', 100, 4, ac.signal, 10)
+  assert.deepEqual([...s0], [42, 42, 42, 42])
+  assert.equal(fetched.length, 0)
+
+  // Start chunk 1 (occupies the single fetch slot), then queue chunks 2 (low prio), 3 (will be aborted), and 4 (high prio).
+  const p1 = cache.readSlice(handle, 'moon:14', ECV3_CHUNK_BYTES * 1 + 10, 4, ac.signal, 5)
+  const p2 = cache.readSlice(handle, 'moon:14', ECV3_CHUNK_BYTES * 2 + 10, 4, ac.signal, 50)
+  const abortMe = new AbortController()
+  const p3 = cache.readSlice(handle, 'moon:14', ECV3_CHUNK_BYTES * 3 + 10, 4, abortMe.signal, 20)
+  const p4 = cache.readSlice(handle, 'moon:14', ECV3_CHUNK_BYTES * 4 + 10, 4, ac.signal, 1)
+
+  // Upgrade chunk 2's priority to 2 (ahead of chunk 3, behind chunk 4).
+  const p2Upgraded = cache.readSlice(handle, 'moon:14', ECV3_CHUNK_BYTES * 2 + 20, 4, ac.signal, 2)
+
+  // Abort chunk 3 before it ever hits the wire -> must be dropped without fetching.
+  abortMe.abort(new Error('zoomed past'))
+  await assert.rejects(p3)
+
+  assert.deepEqual(fetched, [{ start: ECV3_CHUNK_BYTES * 1, length: ECV3_CHUNK_BYTES }])
+
+  // Finish chunk 1 -> chunk 4 (priority 1) must dispatch next, NOT chunk 2 or aborted chunk 3.
+  pending.get(ECV3_CHUNK_BYTES * 1)!(makeChunk(11).buffer)
+  assert.deepEqual([...(await p1)], [11, 11, 11, 11])
+  await Promise.resolve()
+  assert.deepEqual(
+    fetched.map(f => f.start / ECV3_CHUNK_BYTES),
+    [1, 4],
+  )
+
+  // Finish chunk 4 -> chunk 2 (upgraded priority 2) dispatches next and resolves both waiters.
+  pending.get(ECV3_CHUNK_BYTES * 4)!(makeChunk(44).buffer)
+  assert.deepEqual([...(await p4)], [44, 44, 44, 44])
+  await Promise.resolve()
+  assert.deepEqual(
+    fetched.map(f => f.start / ECV3_CHUNK_BYTES),
+    [1, 4, 2],
+  )
+
+  // Queue chunk 5 while chunk 2 is in flight, then cancelQueued() -> chunk 5 rejected without fetching, chunk 2 still completes.
+  const p5 = cache.readSlice(handle, 'moon:14', ECV3_CHUNK_BYTES * 5 + 10, 4, ac.signal, 0)
+  cache.cancelQueued()
+  await assert.rejects(p5)
+
+  pending.get(ECV3_CHUNK_BYTES * 2)!(makeChunk(22).buffer)
+  assert.deepEqual([...(await p2)], [22, 22, 22, 22])
+  assert.deepEqual([...(await p2Upgraded)], [22, 22, 22, 22])
+  await Promise.resolve()
+  assert.deepEqual(
+    fetched.map(f => f.start / ECV3_CHUNK_BYTES),
+    [1, 4, 2],
+  )
+
+  // Background prefetchSlice warms RAM chunks at low priority without blocking foreground slots,
+  // and cancelLowPriority drops unstarted prefetches when the camera moves.
+  const pfCache = new Ecv3ChunkCache({
+    maxConcurrentFetches: 2,
+    maxConcurrentPrefetches: 1,
+    readRange: (_handle, start) => {
+      fetched.push({ start, length: ECV3_CHUNK_BYTES })
+      return new Promise<ArrayBuffer>(resolve => {
+        pending.set(start, resolve)
+      })
+    },
+  })
+  fetched.length = 0
+  pending.clear()
+  pfCache.prefetchSlice(handle, 'moon:14', ECV3_CHUNK_BYTES * 10, 100, 210)
+  pfCache.prefetchSlice(handle, 'moon:14', ECV3_CHUNK_BYTES * 11, 100, 220)
+  // Only 1 prefetch runs concurrently (leaving the 2nd fetch slot free for foreground reads).
+  assert.deepEqual(
+    fetched.map(f => f.start / ECV3_CHUNK_BYTES),
+    [10],
+  )
+  // Foreground read immediately takes the reserved 2nd slot while prefetch 10 is still in flight.
+  const fg = pfCache.readSlice(handle, 'moon:14', ECV3_CHUNK_BYTES * 12, 4, ac.signal, 0)
+  assert.deepEqual(
+    fetched.map(f => f.start / ECV3_CHUNK_BYTES),
+    [10, 12],
+  )
+  // Camera moves -> cancelLowPriority drops queued prefetch 11 without aborting in-flight 10 or 12.
+  pfCache.cancelLowPriority(200)
+  pending.get(ECV3_CHUNK_BYTES * 10)!(makeChunk(10).buffer)
+  pending.get(ECV3_CHUNK_BYTES * 12)!(makeChunk(12).buffer)
+  assert.deepEqual([...(await fg)], [12, 12, 12, 12])
+  await Promise.resolve()
+  assert.equal(pfCache.hasSlice('moon:14', ECV3_CHUNK_BYTES * 10, 100), true)
+  assert.equal(pfCache.hasSlice('moon:14', ECV3_CHUNK_BYTES * 11, 100), false)
+  assert.deepEqual(
+    fetched.map(f => f.start / ECV3_CHUNK_BYTES),
+    [10, 12],
+  )
+})
+
+test('Ecv3ChunkCache handles >2 GiB offsets, rejects truncated slices, and guards clear() races', async () => {
+  const handle = toPackHandle('https://example.invalid/earth-ecv3-p000.ecv3?v=e1h')
+  const ac = new AbortController()
+
+  // Offsets >= 2 GiB must not overflow signed 32-bit shifts.
+  const largeCache = new Ecv3ChunkCache({
+    readRange: async () => new ArrayBuffer(0),
+  })
+  const chunkAt2GiB = Math.floor(2 ** 31 / ECV3_CHUNK_BYTES)
+  const chunkBytes = new Uint8Array(ECV3_CHUNK_BYTES)
+  chunkBytes[3] = 0xab
+  chunkBytes[4] = 0xcd
+  largeCache.seedChunk('earth:0', chunkAt2GiB, chunkBytes)
+  assert.equal(largeCache.hasSlice('earth:0', 2 ** 31 + 3, 2), true)
+  const hiSlice = await largeCache.readSlice(handle, 'earth:0', 2 ** 31 + 3, 2, ac.signal, 0)
+  assert.deepEqual([...hiSlice], [0xab, 0xcd])
+
+  // Truncated responses must reject instead of returning short or zero-padded slices.
+  const shortCache = new Ecv3ChunkCache({
+    readRange: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+  })
+  await assert.rejects(shortCache.readSlice(handle, 'earth:1', 0, 16, ac.signal, 0))
+
+  // Stale rejection from a pre-clear generation must not delete the new generation's inflight entry.
+  const calls: { reject: (e: unknown) => void; resolve: (b: ArrayBuffer) => void }[] = []
+  const raceCache = new Ecv3ChunkCache({
+    maxConcurrentFetches: 4,
+    readRange: () =>
+      new Promise<ArrayBuffer>((resolve, reject) => {
+        calls.push({ resolve, reject })
+      }),
+  })
+  const oldRead = raceCache.readSlice(handle, 'earth:2', 0, 4, ac.signal, 0)
+  raceCache.clear()
+  const newRead1 = raceCache.readSlice(handle, 'earth:2', 0, 4, ac.signal, 0)
+  calls[0].reject(new Error('old generation aborted'))
+  await assert.rejects(oldRead)
+  // A second caller for the same key must attach to newRead1 rather than starting a 3rd network fetch.
+  const newRead2 = raceCache.readSlice(handle, 'earth:2', 0, 4, ac.signal, 0)
+  assert.equal(calls.length, 2)
+  const goodChunk = new Uint8Array(ECV3_CHUNK_BYTES)
+  goodChunk.set([9, 8, 7, 6])
+  calls[1].resolve(goodChunk.buffer)
+  assert.deepEqual([...(await newRead1)], [9, 8, 7, 6])
+  assert.deepEqual([...(await newRead2)], [9, 8, 7, 6])
+})
+
+test('Av1Height10Decoder settles zero-output flush and closes frames when flush rejects', async () => {
+  const g = globalThis as unknown as {
+    VideoDecoder?: unknown
+    EncodedVideoChunk?: unknown
+  }
+  const origVD = g.VideoDecoder
+  const origEVC = g.EncodedVideoChunk
+  let mode: 'zero-output' | 'output-then-reject' = 'zero-output'
+  let closedFrames = 0
+
+  class FakeEncodedVideoChunk {
+    init: { type: string; timestamp: number; data: Uint8Array }
+    constructor(init: { type: string; timestamp: number; data: Uint8Array }) {
+      this.init = init
+    }
+  }
+  class FakeVideoDecoder {
+    state = 'configured'
+    private onOutput: (f: { format: string; close: () => void }) => void
+    constructor(init: { output: (f: { format: string; close: () => void }) => void }) {
+      this.onOutput = init.output
+    }
+    configure() {}
+    decode() {
+      if (mode === 'output-then-reject') {
+        this.onOutput({
+          format: 'I420P10',
+          close: () => {
+            closedFrames++
+          },
+        })
+      }
+    }
+    async flush() {
+      if (mode === 'output-then-reject') throw new Error('flush failed after output')
+    }
+    close() {
+      this.state = 'closed'
+    }
+  }
+
+  g.VideoDecoder = FakeVideoDecoder
+  g.EncodedVideoChunk = FakeEncodedVideoChunk
+  try {
+    const decoder = new Av1Height10Decoder(512, 1)
+    const ac = new AbortController()
+    // Zero-output flush must resolve cleanly to null rather than hanging the worker chain.
+    mode = 'zero-output'
+    assert.equal(await decoder.decode(new Uint8Array([1, 2, 3]), ac.signal), null)
+    // Output delivered before flush() rejects must still be closed in finally.
+    mode = 'output-then-reject'
+    assert.equal(await decoder.decode(new Uint8Array([4, 5, 6]), ac.signal), null)
+    assert.equal(closedFrames, 1)
+    decoder.destroy()
+  } finally {
+    g.VideoDecoder = origVD
+    g.EncodedVideoChunk = origEVC
+  }
+})
+
+test('CDN worker handles HEAD chunk lengths, R2 InvalidRange 416 with CORS, and bounded chunk caching', async () => {
+  const workerMod = (await import('../cdn/public/_worker.js')) as {
+    default: {
+      fetch: (
+        req: Request,
+        env: { EARTH_ASSETS: unknown },
+        ctx: { waitUntil: (p: Promise<unknown>) => void },
+      ) => Promise<Response>
+    }
+  }
+  const worker = workerMod.default
+  const cacheStore = new Map<string, Response>()
+  const g = globalThis as unknown as { caches?: unknown }
+  const origCaches = g.caches
+  g.caches = {
+    default: {
+      match: async (req: Request) => cacheStore.get(req.url)?.clone(),
+      put: async (req: Request, res: Response) => {
+        cacheStore.set(req.url, res)
+      },
+    },
+  }
+
+  const fileBytes = new Uint8Array(200_000)
+  for (let i = 0; i < fileBytes.length; i++) fileBytes[i] = i & 255
+  const bucket = {
+    head: async (key: string) =>
+      key === 'ecv3/moon/moon-ecv3-p00.ecv3' ? { size: fileBytes.length, httpEtag: '"etag-1"' } : null,
+    get: async (key: string, opts?: { range?: { offset: number; length?: number } }) => {
+      if (key !== 'ecv3/moon/moon-ecv3-p00.ecv3') return null
+      const off = opts?.range?.offset ?? 0
+      if (off >= fileBytes.length) throw new Error('The requested range is not satisfiable (InvalidRange)')
+      const len =
+        opts?.range?.length !== undefined ? Math.min(opts.range.length, fileBytes.length - off) : fileBytes.length - off
+      const slice = fileBytes.subarray(off, off + len)
+      return {
+        size: fileBytes.length,
+        httpEtag: '"etag-1"',
+        range: { offset: off, length: len },
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(slice)
+            controller.close()
+          },
+        }),
+      }
+    },
+  }
+  const pending: Promise<unknown>[] = []
+  const ctx = { waitUntil: (p: Promise<unknown>) => pending.push(p) }
+
+  try {
+    // HEAD on ?r= returns chunk length, not full pack size.
+    const headChunk = await worker.fetch(
+      new Request('https://earth-connect-assets.pages.dev/ecv3/moon/moon-ecv3-p00.ecv3?v=q92h&r=0-65536', {
+        method: 'HEAD',
+      }),
+      { EARTH_ASSETS: bucket },
+      ctx,
+    )
+    assert.equal(headChunk.status, 200)
+    assert.equal(headChunk.headers.get('Content-Length'), '65536')
+
+    // R2 InvalidRange past EOF returns 416 with CORS and Content-Range instead of 500.
+    const oob = await worker.fetch(
+      new Request('https://earth-connect-assets.pages.dev/ecv3/moon/moon-ecv3-p00.ecv3?v=q92h&r=999999-65536'),
+      { EARTH_ASSETS: bucket },
+      ctx,
+    )
+    assert.equal(oob.status, 416)
+    assert.equal(oob.headers.get('Access-Control-Allow-Origin'), '*')
+    assert.equal(oob.headers.get('Content-Range'), `bytes */${fileBytes.length}`)
+
+    // Open-ended Range streams as 206 without inserting into the bounded chunk cache.
+    const openRange = await worker.fetch(
+      new Request('https://earth-connect-assets.pages.dev/ecv3/moon/moon-ecv3-p00.ecv3?v=q92h', {
+        headers: { Range: 'bytes=1000-' },
+      }),
+      { EARTH_ASSETS: bucket },
+      ctx,
+    )
+    assert.equal(openRange.status, 206)
+    await openRange.arrayBuffer()
+    await Promise.all(pending)
+    assert.equal(cacheStore.size, 0)
+
+    // Bounded canonical chunk caches cleanly and returns 200 immutable.
+    const goodChunk = await worker.fetch(
+      new Request('https://earth-connect-assets.pages.dev/ecv3/moon/moon-ecv3-p00.ecv3?v=q92h&r=65536-65536'),
+      { EARTH_ASSETS: bucket },
+      ctx,
+    )
+    assert.equal(goodChunk.status, 200)
+    assert.equal((await goodChunk.arrayBuffer()).byteLength, 65536)
+    await Promise.all(pending)
+    assert.equal(cacheStore.size, 1)
+  } finally {
+    g.caches = origCaches
+  }
 })

@@ -1,26 +1,32 @@
 import { raceAbort } from '../shader-test/gpu.ts'
 import { workspaceAssets, type WorkspaceAssets } from './workspaceAssets.ts'
-import { endStartupSpan, startStartupSpan } from './startupTiming.ts'
 
 const manifestUrl = 'https://earth-connect-assets.pages.dev/manifest.json'
 const scorePath = 'compute-data/world/manifest.json'
 const world = 'compute-data/world/'
 const renderPaths = [
-  'textures/earth-blue-marble.jpg',
   'textures/earth-terrain.bin',
   'textures/moon-terrain.bin',
   'textures/mars-terrain.bin',
   'textures/nasa-deep-star-map.webp',
 ]
-const earthTilePaths = Array.from({ length: 8 }, (_, index) => `textures/earth-tiles-${index}.bin`)
-const planetTilePaths = [
+const legacyTilePaths = [
+  ...Array.from({ length: 8 }, (_, index) => `textures/earth-tiles-${index}.bin`),
   ...Array.from({ length: 4 }, (_, index) => `textures/moon-tiles-${index}.bin`),
   ...Array.from({ length: 4 }, (_, index) => `textures/mars-tiles-${index}.bin`),
 ]
-const allTilePaths = [...earthTilePaths, ...planetTilePaths]
-const optionalRenderPaths = new Set(['textures/moon-albedo.webp', 'textures/mars-albedo.webp', ...allTilePaths])
-// Legacy CDN releases still list the removed basins snapshot in their manifest totals.
-const ignoredPaths = new Set(['data/surface-basins.bin'])
+const optionalRenderPaths = new Set(['textures/moon-albedo.webp', 'textures/mars-albedo.webp'])
+// Legacy CDN releases still list removed basins, pre-baked BC7 textures, superseded August Blue
+// Marble (replaced by the unified Sentinel-2 8K orbital texture), and ECVT1 zoom tile packs
+// (replaced by HTTP-streamed ECV3 packs on R2). Ignoring them lets pruneCache() reclaim dead blobs.
+const ignoredPaths = new Set([
+  'data/surface-basins.bin',
+  'textures/earth-blue-marble.jpg',
+  'textures/nasa-deep-star-map.bc7',
+  'textures/mars-albedo-4096.bc7',
+  'textures/moon-albedo-512.bc7',
+  ...legacyTilePaths,
+])
 const hashPattern = /^[a-f0-9]{64}$/
 type Asset = { key: string; bytes: number; sha256: string; contentType: string }
 type Release = { etag: string | null; files: Record<string, Asset>; bytes: number }
@@ -219,6 +225,7 @@ function releaseSource(release: Release, lifetime: AbortSignal) {
   const slots = new Map<string, { blob?: Blob; pending?: Promise<Blob>; resolve?: (blob: Blob) => void }>()
   const worldFiles = new Map<string, Asset>()
   for (const [path, asset] of Object.entries(release.files)) {
+    if (ignoredPaths.has(path)) continue
     let resolve!: (blob: Blob) => void
     const pending = new Promise<Blob>(ready => {
       resolve = ready
@@ -256,11 +263,13 @@ function releaseSource(release: Release, lifetime: AbortSignal) {
       }
       const slot = slots.get(path)
       if (!slot) throw new Error(`Workspace data is missing ${path}.`)
-      return slot.blob ?? raceAbort(slot.pending!, combined)
+      if (slot.blob) return slot.blob
+      return raceAbort(slot.pending!, combined)
     },
     localDevUrlCache
       ? (path, signal) => resolveLocalDevTextureUrl(path, AbortSignal.any([signal, lifetime]))
       : undefined,
+    path => release.files[path]?.sha256,
   )
   lifetime.addEventListener(
     'abort',
@@ -321,9 +330,10 @@ const writeBacklog = 8
 
 function orderedPaths(files: Record<string, Asset>) {
   // Prioritize the score manifest and terrain/imagery needed immediately.
+  // High-resolution zoom tile packs (earth/moon/mars-tiles-*.bin) are fetched lazily
+  // per octant/quadrant on demand when the user zooms in, saving ~175 MB upfront.
   const priority = [
     scorePath,
-    'textures/earth-blue-marble.jpg',
     'textures/nasa-deep-star-map.webp',
     'textures/earth-terrain.bin',
     'textures/moon-albedo.webp',
@@ -331,11 +341,36 @@ function orderedPaths(files: Record<string, Asset>) {
     'textures/moon-terrain.bin',
     'textures/mars-terrain.bin',
   ].filter(path => Object.hasOwn(files, path))
-  const tiles = allTilePaths.filter(path => Object.hasOwn(files, path))
-  const chunks = Object.keys(files).filter(
-    path => !priority.includes(path) && !tiles.includes(path) && !ignoredPaths.has(path),
-  )
-  return [...priority, ...chunks, ...tiles]
+  const chunks = Object.keys(files).filter(path => !priority.includes(path) && !ignoredPaths.has(path))
+  return [...priority, ...chunks]
+}
+
+function stripIgnoredFiles(release: Release): { release: Release; changed: boolean } {
+  let changed = false
+  const files: Record<string, Asset> = Object.create(null)
+  let bytes = 0
+  for (const [path, asset] of Object.entries(release.files)) {
+    if (ignoredPaths.has(path)) {
+      changed = true
+      continue
+    }
+    files[path] = asset
+    bytes += asset.bytes
+  }
+  return changed ? { release: { etag: release.etag, files, bytes }, changed: true } : { release, changed: false }
+}
+
+function sameRelease(a: Release | undefined, b: Release | undefined): boolean {
+  if (!a || !b) return a === b
+  if (a.etag && b.etag) return a.etag === b.etag
+  const aKeys = Object.keys(a.files)
+  const bKeys = Object.keys(b.files)
+  if (aKeys.length !== bKeys.length) return false
+  return aKeys.every(path => {
+    const af = a.files[path]
+    const bf = b.files[path]
+    return Boolean(bf) && af.sha256 === bf.sha256 && af.bytes === bf.bytes && af.key === bf.key
+  })
 }
 
 async function revalidateInBackground(saved: Release) {
@@ -350,25 +385,43 @@ async function revalidateInBackground(saved: Release) {
     })
     if (response.status === 304 || !response.ok) return
     const next = parseRelease(await response.json(), response.headers.get('ETag'))
-    if (next.etag && next.etag === saved.etag) return
+    if (sameRelease(next, saved)) return
+    const worldFiles = new Map<string, Asset>()
+    for (const [path, asset] of Object.entries(next.files)) {
+      if (path.startsWith(world) && path !== scorePath) worldFiles.set(asset.key, asset)
+    }
     const update = async (exclusive: boolean) => {
       const cache = await openCache()
       if (!cache) return
       try {
+        // Re-check under the release lock so a slower tab never overwrites a newer release.
+        const active = await accessCache<Release>(cache, 'releases', manifestUrl)
+        if (!sameRelease(active, saved)) return
+
         const entries = orderedPaths(next.files).map(path => [path, next.files[path]] as const)
         const existing = await readCachedBlobs(cache, entries)
+        let scoreBlob = existing.get(scorePath)
         const missing = entries.filter(([path]) => !existing.has(path))
         let cursor = 0
         let persisted = true
         const workers = Array.from({ length: Math.min(4, missing.length) }, async () => {
-          while (cursor < missing.length) {
-            const [, asset] = missing[cursor++]
+          while (!signal.aborted && cursor < missing.length) {
+            const [path, asset] = missing[cursor++]
             const bytes = await downloadBytes(asset, signal, () => {})
             const blob = await verifyAsset(asset, bytes, signal)
+            if (path === scorePath) scoreBlob = blob
             if (!(await accessCache(cache, 'files', asset.sha256, blob))) persisted = false
           }
         })
-        await Promise.all(workers)
+        try {
+          await Promise.all(workers)
+        } catch (error) {
+          controller.abort()
+          await Promise.allSettled(workers)
+          throw error
+        }
+        if (!scoreBlob) throw new Error('The Earth scoring release is missing its score manifest.')
+        await validateScoreManifest(scoreBlob, worldFiles)
         if (persisted && (await accessCache(cache, 'releases', manifestUrl, next)) && exclusive) {
           await pruneCache(cache, next)
         }
@@ -392,14 +445,20 @@ async function prepareRelease(
   exclusive: boolean,
   { refresh, onAssets }: ReleaseOptions,
 ) {
-  startStartupSpan('release')
   const cache = await openCache()
   try {
     signal.throwIfAborted()
     // Keep the saved release on disk so ordinary navigation can still use it
     // if a forced download fails before the replacement is committed.
-    const saved = refresh ? undefined : await accessCache<Release>(cache, 'releases', manifestUrl)
+    const rawSaved = refresh ? undefined : await accessCache<Release>(cache, 'releases', manifestUrl)
+    const cleanedSaved = rawSaved ? stripIgnoredFiles(rawSaved) : undefined
+    const saved = cleanedSaved?.release
     if (saved) {
+      if (cleanedSaved?.changed && cache && exclusive) {
+        if (await accessCache(cache, 'releases', manifestUrl, saved)) {
+          await pruneCache(cache, saved)
+        }
+      }
       // Stale-while-revalidate: if every file of the saved release is already in
       // IndexedDB, open from disk immediately without blocking on a network RTT.
       const entries = orderedPaths(saved.files).map(path => [path, saved.files[path]] as const)
@@ -412,9 +471,8 @@ async function prepareRelease(
         try {
           await Promise.all(entries.map(([path]) => source.publish(path, existing.get(path)!)))
           signal.throwIfAborted()
-          endStartupSpan('release', 'cached (IDB)')
           void revalidateInBackground(saved)
-          return { assets: source.assets, saved: true }
+          return { assets: source.assets, saved: true, downloadedBytes: 0 }
         } catch {
           signal.throwIfAborted()
         }
@@ -531,8 +589,7 @@ async function prepareRelease(
           if (persisted && cache && exclusive) await pruneCache(cache, current)
         }
         transfer.throwIfAborted()
-        endStartupSpan('release', total ? `downloaded ${(total / 1e6).toFixed(1)} MB` : 'cached (IDB)')
-        return { assets: source.assets, saved: persisted }
+        return { assets: source.assets, saved: persisted, downloadedBytes: total }
       } catch (error) {
         controller.abort(error)
         await Promise.allSettled(verifications)

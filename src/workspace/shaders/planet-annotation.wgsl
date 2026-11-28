@@ -1,33 +1,31 @@
 struct AnnotationView {
   camera: mat4x4f,
-  info: vec4f, // x: body u-offset (2 for moon, 4 for mars), y: reliefFade, z: reference radius (km), w: reserved
+  bodyUOffset: f32, // 2 for moon, 4 for mars
+  reliefFade: f32,
+  radiusKm: f32,
+  relief: f32,
 }
 
 @group(0) @binding(0) var<uniform> view: AnnotationView;
+@group(0) @binding(1) var heights: texture_2d<f32>;
+@group(0) @binding(2) var gridSampler: sampler;
 
 struct Vertex {
   @builtin(position) position: vec4f,
   @location(0) @interpolate(perspective, sample) local: vec3f,
 }
 
-@vertex fn vertexMain(@location(0) position: vec3f) -> Vertex {
-  let refPos = normalize(position) * view.info.z;
-  let pos = mix(refPos, position, view.info.y);
+@vertex fn vertexMain(input: CubePatchIn) -> Vertex {
+  let pos = displacedCubePatchPos(input, heights, gridSampler, view.radiusKm, view.relief, view.reliefFade);
   return Vertex(view.camera * vec4f(pos, 1.), pos);
-}
-
-fn packSplit16(x: f32) -> vec2f {
-  let hi = round(x * 256.) / 256.;
-  return vec2f(hi, x - hi);
 }
 
 fn evalPlanetAnnotation(input: Vertex) -> vec4f {
   let p = normalize(input.local);
   let lon = atan2(p.x, p.z);
   let lat = atan2(p.y, length(p.xz));
-  let pi = 3.141592653589793;
-  let u = lon / (2. * pi) + .5 + view.info.x;
-  let v = lat / pi + .5;
+  let u = lon / (2. * PLANET_PI) + .5 + view.bodyUOffset;
+  let v = lat / PLANET_PI + .5;
   return vec4f(packSplit16(u), packSplit16(v));
 }
 

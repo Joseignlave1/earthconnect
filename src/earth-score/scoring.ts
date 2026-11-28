@@ -1,9 +1,17 @@
-import { createScoreGeometry, GRID_HEIGHT } from './layout.ts'
+import {
+  createScoreGeometry,
+  GRID_HEIGHT,
+  SCORE_GEOMETRY_LATITUDE_OFFSET,
+  SCORE_GEOMETRY_LON_SCALE_OFFSET,
+  SCORE_GEOMETRY_ROW_STRIDE,
+  SCORE_GEOMETRY_VALID_HALF_WIDTH_OFFSET,
+} from './layout.ts'
 import { BLOCK_SIZE, type ScoreManifest } from './manifest.ts'
 
 export const SOURCE_MISSING = 0
 export const SCORE_MISSING = 65535
 export const SCORE_MAX = 65534
+export const LOOKUP_CODES_PER_COLUMN = 65536
 
 // Can also be used by callers binding a chunk's packedInput as array<u32>.
 export const sourceCodeWGSL = /* wgsl */ `
@@ -29,18 +37,36 @@ fn sourceCode(rows: u32, field: u32, row: u32) -> u32 {
 }
 `
 
+export function scoreLookupLayout(manifest: ScoreManifest) {
+  const siteOriginsOffset = manifest.columns.length * LOOKUP_CODES_PER_COLUMN
+  const rowGeometryOffset = siteOriginsOffset + manifest.sites.length
+  const totalWords = rowGeometryOffset + GRID_HEIGHT * SCORE_GEOMETRY_ROW_STRIDE
+  return {
+    codesPerColumn: LOOKUP_CODES_PER_COLUMN,
+    siteOriginsOffset,
+    rowGeometryOffset,
+    rowStride: SCORE_GEOMETRY_ROW_STRIDE,
+    latitudeOffset: SCORE_GEOMETRY_LATITUDE_OFFSET,
+    lonScaleOffset: SCORE_GEOMETRY_LON_SCALE_OFFSET,
+    validHalfWidthOffset: SCORE_GEOMETRY_VALID_HALF_WIDTH_OFFSET,
+    totalWords,
+    totalBytes: totalWords * Uint32Array.BYTES_PER_ELEMENT,
+  }
+}
+
 export function lookupBytes(manifest: ScoreManifest) {
-  return (manifest.columns.length * 65536 + manifest.sites.length + GRID_HEIGHT * 3) * 4
+  return scoreLookupLayout(manifest).totalBytes
 }
 
 export function createLookup(manifest: ScoreManifest) {
-  const values = new Float32Array(lookupBytes(manifest) / 4)
+  const layout = scoreLookupLayout(manifest)
+  const values = new Float32Array(layout.totalWords)
   const words = new Uint32Array(values.buffer)
   for (const [i, { origin, denominator }] of manifest.encodings.entries()) {
-    const start = i * 65536
+    const start = i * layout.codesPerColumn
     words[start] = 0x7fc00000
-    for (let code = 1; code < 65536; code++) values[start + code] = (code - origin) / denominator
+    for (let code = 1; code < layout.codesPerColumn; code++) values[start + code] = (code - origin) / denominator
   }
-  words.set(createScoreGeometry(manifest), manifest.columns.length * 65536)
+  words.set(createScoreGeometry(manifest), layout.siteOriginsOffset)
   return words
 }

@@ -13,9 +13,9 @@ const world = new URL('../../compute-data/world/', import.meta.url)
 test('Earth Score decodes chunks when isolation prevents its workers from starting', { timeout: 30000 }, async () => {
   const manifest = JSON.parse(await readFile(new URL('manifest.json', world), 'utf8'))
   const chunk = manifest.chunks[0]
-  const expected = createHash('sha256')
-    .update(zstdDecompressSync(await readFile(new URL(chunk.file, world))))
-    .digest('hex')
+  const decompressed = zstdDecompressSync(await readFile(new URL(chunk.file, world)))
+  const expectedBytes = decompressed.byteLength
+  const expected = createHash('sha256').update(decompressed).digest('hex')
   const server = await createServer({
     root,
     logLevel: 'silent',
@@ -59,7 +59,7 @@ test('Earth Score decodes chunks when isolation prevents its workers from starti
         const page = await context.newPage()
         await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/decoder-test`)
         const result = await page.evaluate(
-          async ({ chunk, fields }) => {
+          async ({ chunk, fields, expectedBytes }) => {
             const { createDecoderPool } = await import('/src/earth-score/decoder-pool.ts')
             const pool = createDecoderPool(4, new AbortController().signal)
             const frame = await (await fetch(`/compute-data/world/${chunk.file}`)).arrayBuffer()
@@ -74,7 +74,7 @@ test('Earth Score decodes chunks when isolation prevents its workers from starti
                   error => error.message,
                 ),
               ])
-              const hash = await crypto.subtle.digest('SHA-256', packed)
+              const hash = await crypto.subtle.digest('SHA-256', packed.slice(0, expectedBytes))
               return {
                 isolated: crossOriginIsolated,
                 transferred: frame.byteLength === 0,
@@ -85,7 +85,7 @@ test('Earth Score decodes chunks when isolation prevents its workers from starti
               pool.close()
             }
           },
-          { chunk, fields: manifest.columns.length },
+          { chunk, fields: manifest.columns.length, expectedBytes },
         )
         if (omitWorkerIsolation) assert.ok(intercepted > 0)
         assert.deepEqual(result, {

@@ -1,38 +1,9 @@
+import { SCORE_COVERAGE_FIELDS, SCORE_MEASUREMENT_FIELDS } from './custom-shader.ts'
 import type { FieldEncoding, ScoreManifest } from './manifest.ts'
 
-const scoreFields = new Set([
-  'annual_precip_mm',
-  'bare_fraction',
-  'coldest_month_air_c',
-  'dominant_lithology_code',
-  'elevation_median_m',
-  'permafrost_fraction',
-  'permanent_snow_ice_fraction',
-  'relief_21km_m',
-  'relief_5km_m',
-  'slope_mean_deg',
-  'surface_day_c',
-  'surface_high_c',
-  'surface_low_c',
-  'surface_mean_c',
-  'surface_night_c',
-  'surface_range_c',
-  'tpi_21km_m',
-  'tpi_5km_m',
-  'warmest_month_air_c',
-])
-const coverageFields = new Set([
-  'landcover_valid_fraction',
-  'permafrost_valid_fraction',
-  'terrain_valid_fraction',
-  'surface_day_valid_fraction',
-  'surface_night_valid_fraction',
-  'surface_paired_valid_fraction',
-])
 const minimumCoverage = 0.9
 const firstCode = 1
 const lastCode = 65535
-const numericTerm = lastCode + 1
 
 /** The scoring properties of the explorer's Criterion. Sample metadata can also be present. */
 export type EarthQueryCriterion = Readonly<{
@@ -58,7 +29,7 @@ type Family = { sum: number; max: number }
 type QueryPlan = { coverage: Set<string>; terms: QueryTerm[]; families: Map<string, Family>; totalWeight: number }
 const plans = new WeakMap<EarthQuery, QueryPlan>()
 
-/** Snapshot a set of sampled or manually entered criteria for dispatchQuery. */
+/** Snapshot a set of sampled or manually entered criteria for queryShaderSource. */
 export function buildEarthQuery(criteria: readonly EarthQueryCriterion[]): EarthQuery {
   const coverage = new Set<string>()
   const terms: QueryTerm[] = []
@@ -66,9 +37,10 @@ export function buildEarthQuery(criteria: readonly EarthQueryCriterion[]): Earth
   for (const criterion of criteria) {
     const { enabled, key, label, qualityKey } = criterion
     if (!enabled && criterion.min == null && criterion.max == null) continue
-    if (!scoreFields.has(key)) throw new Error(`Unsupported Earth Score field: ${key}`)
+    if (!SCORE_MEASUREMENT_FIELDS.has(key)) throw new Error(`Unsupported Earth Score field: ${key}`)
     if (qualityKey != null && qualityKey !== '') {
-      if (!coverageFields.has(qualityKey)) throw new Error(`Unsupported Earth Score coverage field: ${qualityKey}`)
+      if (!SCORE_COVERAGE_FIELDS.has(qualityKey))
+        throw new Error(`Unsupported Earth Score coverage field: ${qualityKey}`)
       coverage.add(qualityKey)
     }
     const number = (value: number | null) => {
@@ -126,42 +98,73 @@ function codeBound(encoding: FieldEncoding, value: number, exclusive = false) {
   return lo
 }
 
-const headerWords = 4 + 4 * coverageFields.size
+const headerWords = 4 + 4 * SCORE_COVERAGE_FIELDS.size
 const termWords = 8
 
-export function createQueryParameters(manifest: ScoreManifest, query: EarthQuery, maxBytes: number) {
+export type ResolvedCoverage = Readonly<{
+  fieldIndex: number
+  field: string
+  minCode: number
+}>
+
+export type ResolvedSoftTerm =
+  | Readonly<{
+      kind: 'categorical'
+      target: number
+      weight: number
+      categoryCode: number
+      factor: number
+    }>
+  | Readonly<{
+      kind: 'numeric'
+      target: number
+      tolerance: number
+      weight: number
+      pivot: number
+      offset: number
+      factor: number
+    }>
+
+export type ResolvedQueryTerm = Readonly<{
+  fieldIndex: number
+  field: string
+  min: number | null
+  max: number | null
+  minCode: number
+  maxCode: number
+  soft?: ResolvedSoftTerm
+}>
+
+export type ResolvedEarthQuery = Readonly<{
+  coverage: readonly ResolvedCoverage[]
+  terms: readonly ResolvedQueryTerm[]
+}>
+
+export function resolveEarthQuery(manifest: ScoreManifest, query: EarthQuery, maxBytes: number): ResolvedEarthQuery {
   const plan = plans.get(query)
   if (!plan) throw new Error('Expected a query from buildEarthQuery')
   const { terms, coverage, families, totalWeight } = plan
   const size = headerWords + termWords * terms.length
   if (size * 4 > maxBytes) throw new Error('Earth Score query exceeds the device storage limit')
-  const words = new Uint32Array(size)
-  const floats = new Float32Array(words.buffer)
   const fieldIndex = (key: string) => {
     const index = manifest.columns.indexOf(key)
     if (index === -1) throw new Error(`Earth Score data does not contain ${key}`)
     return index
   }
-  words[0] = terms.length
-  words[1] = coverage.size
-  for (const [i, key] of [...coverage].entries()) {
-    const field = fieldIndex(key)
-    words.set([field, codeBound(manifest.encodings[field], minimumCoverage)], 4 + 4 * i)
-  }
-  for (const [i, { field, min, max, soft }] of terms.entries()) {
+  const resolvedCoverage: ResolvedCoverage[] = [...coverage].map(field => {
+    const index = fieldIndex(field)
+    return {
+      fieldIndex: index,
+      field,
+      minCode: codeBound(manifest.encodings[index], minimumCoverage),
+    }
+  })
+  const resolvedTerms: ResolvedQueryTerm[] = terms.map(({ field, min, max, soft }) => {
     const index = fieldIndex(field)
     const encoding = manifest.encodings[index]
-    const start = headerWords + termWords * i
-    words.set(
-      [
-        index,
-        min == null ? firstCode : codeBound(encoding, min),
-        max == null ? lastCode : codeBound(encoding, max, true) - 1,
-        numericTerm,
-      ],
-      start,
-    )
-    if (!soft) continue
+    const minCode = min == null ? firstCode : codeBound(encoding, min)
+    const maxCode = max == null ? lastCode : codeBound(encoding, max, true) - 1
+    if (!soft) return { fieldIndex: index, field, min, max, minCode, maxCode }
     const family = families.get(soft.group)!
     // Apply the square root of the normalized weight before squaring the loss.
     // This retains the effect of small weights on large distances in float32.
@@ -169,25 +172,52 @@ export function createQueryParameters(manifest: ScoreManifest, query: EarthQuery
     const { origin, denominator } = encoding
     if (soft.categorical) {
       const code = codeBound(encoding, soft.target)
-      words[start + 3] = code <= lastCode && (code - origin) / denominator === soft.target ? code : 0
-      floats[start + 6] = 5 * factor
-    } else {
-      // Center the calculation near the target code before converting to f32.
-      // Subtracting two physical f32 values can lose the entire distance at
-      // narrow tolerances, even for samples well inside the encoding's range.
-      const pivot = Math.min(lastCode, Math.max(firstCode, Math.round(soft.target * denominator + origin)))
-      const offset = ((pivot - origin) / denominator - soft.target) * denominator
-      floats.set([pivot, offset, factor / (denominator * soft.tolerance)], start + 4)
+      const categoryCode = code <= lastCode && (code - origin) / denominator === soft.target ? code : 0
+      return {
+        fieldIndex: index,
+        field,
+        min,
+        max,
+        minCode,
+        maxCode,
+        soft: {
+          kind: 'categorical',
+          target: soft.target,
+          weight: soft.weight,
+          categoryCode,
+          factor: Math.fround(5 * factor),
+        },
+      }
     }
-  }
-  return words
+    // Center the calculation near the target code before converting to f32.
+    // Subtracting two physical f32 values can lose the entire distance at
+    // narrow tolerances, even for samples well inside the encoding's range.
+    const pivot = Math.fround(Math.min(lastCode, Math.max(firstCode, Math.round(soft.target * denominator + origin))))
+    const offset = Math.fround(((pivot - origin) / denominator - soft.target) * denominator)
+    return {
+      fieldIndex: index,
+      field,
+      min,
+      max,
+      minCode,
+      maxCode,
+      soft: {
+        kind: 'numeric',
+        target: soft.target,
+        tolerance: soft.tolerance,
+        weight: soft.weight,
+        pivot,
+        offset,
+        factor: Math.fround(factor / (denominator * soft.tolerance)),
+      },
+    }
+  })
+  return { coverage: resolvedCoverage, terms: resolvedTerms }
 }
 
-/** Lower the same validated, encoded plan used by dispatchQuery to editable WGSL. */
+/** Lower a validated, encoded query plan to editable WGSL for dispatchShader. */
 export function createQueryShaderSource(manifest: ScoreManifest, query: EarthQuery, maxBytes: number) {
-  const words = createQueryParameters(manifest, query, maxBytes)
-  const floats = new Float32Array(words.buffer)
-  const plan = plans.get(query)!
+  const resolved = resolveEarthQuery(manifest, query, maxBytes)
   const literal = (value: number) => {
     const text = value.toString()
     return /[.e]/.test(text) ? text : `${text}.0`
@@ -196,34 +226,28 @@ export function createQueryShaderSource(manifest: ScoreManifest, query: EarthQue
     const { origin, denominator } = manifest.encodings[field]
     return `measurement_code(cell.${manifest.columns[field]}, ${literal(origin)}, ${literal(denominator)})`
   }
-  const coverage = [...plan.coverage].map((field, i) => {
-    const start = 4 + i * 4
-    return `  // Require at least 90% ${field.replace('_valid_fraction', '').replaceAll('_', ' ')} coverage.
-  if (${code(words[start])} < ${words[start + 1]}u) { return NO_SCORE; }`
-  })
-  const terms = plan.terms.map((term, i) => {
-    const start = headerWords + i * termWords
-    return {
-      name: `code_${i + 1}`,
-      term,
-      decode: code(words[start]),
-      min: words[start + 1],
-      max: words[start + 2],
-      category: words[start + 3],
-      pivot: floats[start + 4],
-      offset: floats[start + 5],
-      factor: floats[start + 6],
-    }
-  })
+  const coverage = resolved.coverage.map(
+    ({ field, fieldIndex, minCode }) =>
+      `  // Require at least 90% ${field.replace('_valid_fraction', '').replaceAll('_', ' ')} coverage.
+  if (${code(fieldIndex)} < ${minCode}u) { return NO_SCORE; }`,
+  )
+  const terms = resolved.terms.map((term, i) => ({
+    name: `code_${i + 1}`,
+    term,
+    decode: code(term.fieldIndex),
+  }))
   const required = terms.map(
     ({ name, term, decode }) =>
       `  // ${term.field}
   let ${name} = ${decode};
   if (${name} == 0u) { return NO_SCORE; }`,
   )
-  const limits = terms.flatMap(({ name, term, min, max }) => {
+  const limits = terms.flatMap(({ name, term }) => {
     if (term.min == null && term.max == null) return []
-    const tests = [term.min != null && `${name} < ${min}u`, term.max != null && `${name} > ${max}u`].filter(Boolean)
+    const tests = [
+      term.min != null && `${name} < ${term.minCode}u`,
+      term.max != null && `${name} > ${term.maxCode}u`,
+    ].filter(Boolean)
     const bounds = [term.min != null && `minimum ${term.min}`, term.max != null && `maximum ${term.max}`].filter(
       Boolean,
     )
@@ -232,19 +256,19 @@ export function createQueryShaderSource(manifest: ScoreManifest, query: EarthQue
   if (${tests.join(' || ')}) { return 0.0; }`,
     ]
   })
-  const termsCode = terms.flatMap(({ name, term, category, pivot, offset, factor }, i) => {
+  const termsCode = terms.flatMap(({ name, term }, i) => {
     const { soft, field } = term
-    if (!soft || factor === 0) return []
+    if (!soft || soft.factor === 0) return []
     const distance = `distance_${i + 1}`
-    if (category !== numericTerm)
+    if (soft.kind === 'categorical')
       return [
         `  // ${field}: class ${soft.target}, weight ${soft.weight}.
-  let ${distance} = select(${literal(factor)}, 0.0, ${name} == ${category}u);
+  let ${distance} = select(${literal(soft.factor)}, 0.0, ${name} == ${soft.categoryCode}u);
   loss += ${distance} * ${distance};`,
       ]
     return [
       `  // ${field}: target ${soft.target}, tolerance ${soft.tolerance}, weight ${soft.weight}.
-  let ${distance} = (f32(i32(${name}) - ${pivot}i) + ${literal(offset)}) * ${literal(factor)};
+  let ${distance} = (f32(i32(${name}) - ${soft.pivot}i) + ${literal(soft.offset)}) * ${literal(soft.factor)};
   loss += ${distance} * ${distance};`,
     ]
   })

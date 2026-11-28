@@ -1,8 +1,15 @@
 # earthconnect
 
 Earth Connect compares Moon and Mars sites with conditions on Earth. Run
-`npm install` and `npm run dev`, then open the shared sky workspace at
-[localhost:5173](http://localhost:5173/). The same workspace opens at `/find`.
+`npm install` and `npm run dev`, then open [localhost:5173](http://localhost:5173/)
+for the live WebGPU hero view or [`/find`](http://localhost:5173/find) to jump
+straight into the shared sky workspace.
+
+The landing view at `/` stages Mars, Earth, and the Moon directly on the shared
+WebGPU planetary renderer with curated twilight lighting, a live GPU analogue
+heatmap on Earth, and an orbital bridge arc connecting Jezero Crater to its peak
+Earth analogue—transitioning seamlessly into `/find` over the same warm GPU
+context after the initial startup load.
 
 ## WebGPU renderer & data
 

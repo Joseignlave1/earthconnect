@@ -233,17 +233,49 @@ const mars = {
   ],
 } satisfies { type: string; groups: Group[] }
 
-const bodies = { moon, mars }
-const types = [terrain, ...moon.groups.slice(1), ...mars.groups.slice(1)]
+const HEADER = {
+  latitude: 0,
+  longitude: 1,
+  partial: 2,
+  size: 3,
+} as const
+
+type BodyField = Field & { group: Group; valueIndex: number; wordOffset: number }
+type BodyGroup = Readonly<{ name: string; type: string; fields: readonly BodyField[] }>
+type BodySchema = Readonly<{ type: string; groups: readonly BodyGroup[]; fields: readonly BodyField[] }>
+
+function compileBodySchema(def: { type: string; groups: readonly Group[] }): BodySchema {
+  const fields: BodyField[] = []
+  const groups: BodyGroup[] = def.groups.map(group => ({
+    name: group.name,
+    type: group.type,
+    fields: group.fields.map(item => {
+      const valueIndex = fields.length
+      const descriptor: BodyField = { ...item, group, valueIndex, wordOffset: HEADER.size + valueIndex }
+      fields.push(descriptor)
+      return descriptor
+    }),
+  }))
+  return { type: def.type, groups, fields }
+}
+
+const bodies: Record<Body, BodySchema> = {
+  moon: compileBodySchema(moon),
+  mars: compileBodySchema(mars),
+}
+const types = Array.from(
+  new Map(
+    Object.values(bodies)
+      .flatMap(body => body.groups)
+      .map(group => [group.type, group] as const),
+  ).values(),
+)
 export const PLANET_SHADER_RESERVED_NAMES = new Set([
   ...Object.keys(bodies).map(body => `${body}_point`),
   ...Object.values(bodies).map(body => body.type),
   ...types.map(group => group.type),
 ])
-const measurementStart = 3 // latitude, longitude, partial
-const stride =
-  measurementStart +
-  Math.max(...Object.values(bodies).map(body => body.groups.reduce((n, group) => n + group.fields.length, 0)))
+const stride = HEADER.size + Math.max(...Object.values(bodies).map(body => body.fields.length))
 
 export function planetShaderBytes(sampleCount: number) {
   return Math.max(1, sampleCount * stride) * Float32Array.BYTES_PER_ELEMENT
@@ -274,11 +306,8 @@ ${groups.map(group => `  ${group.name}: ${group.type},`).join('\n')}
     ),
   ].join('\n\n') + '\n'
 
-function wgslGroups(body: Body, fieldValue: (field: Field, offset: number) => string) {
-  let offset = 0
-  return bodies[body].groups.map(
-    group => `${group.type}(${group.fields.map(field => fieldValue(field, offset++)).join(', ')})`,
-  )
+function wgslGroups(body: Body, fieldValue: (field: BodyField) => string) {
+  return bodies[body].groups.map(group => `${group.type}(${group.fields.map(fieldValue).join(', ')})`)
 }
 
 export const PLANET_SHADER_DECLARATIONS = (Object.keys(bodies) as Body[])
@@ -346,8 +375,8 @@ ${[...slots.values()]
     ({ body, alias, slot }) => `fn ${alias}(latitude: f32, longitude: f32) -> ${bodies[body].type} {
   let row = ${slot * stride}u;
   return ${bodies[body].type}(
-    ${buffer}[row], ${buffer}[row + 1u], true, ${buffer}[row + 2u] != 0.0,
-    ${wgslGroups(body, (_, index) => `${buffer}[row + ${measurementStart + index}u]`).join(',\n    ')}
+    ${buffer}[row + ${HEADER.latitude}u], ${buffer}[row + ${HEADER.longitude}u], true, ${buffer}[row + ${HEADER.partial}u] != 0.0,
+    ${wgslGroups(body, field => `${buffer}[row + ${field.wordOffset}u]`).join(',\n    ')}
   );
 }`,
   )
@@ -364,21 +393,19 @@ function normalizedPoint(sample: PlanetaryShaderSample) {
   const lon = Math.fround(sample.longitude) || 0
   const longitude = Math.abs(latitude) === 90 ? 0 : lon === 180 ? -180 : lon
   const schema = bodies[sample.body]
-  const values = schema.groups.flatMap(group =>
-    group.fields.map(({ id, units }) => {
-      const measurement = sample.measurements.find(
-        value =>
-          value.variableId === `${sample.body}.${id}` &&
-          value.status === available &&
-          units.includes(value.unit) &&
-          !value.qualityFlags.includes('semantic_review_required') &&
-          typeof value.decoded === 'number' &&
-          Number.isFinite(Math.fround(value.decoded)) &&
-          value.decoded > missing,
-      )
-      return measurement ? Math.fround(measurement.decoded as number) : missing
-    }),
-  )
+  const values = schema.fields.map(({ id, units }) => {
+    const measurement = sample.measurements.find(
+      value =>
+        value.variableId === `${sample.body}.${id}` &&
+        value.status === available &&
+        units.includes(value.unit) &&
+        !value.qualityFlags.includes('semantic_review_required') &&
+        typeof value.decoded === 'number' &&
+        Number.isFinite(Math.fround(value.decoded)) &&
+        value.decoded > missing,
+    )
+    return measurement ? Math.fround(measurement.decoded as number) : missing
+  })
   return { schema, latitude, longitude, partial: sample.partial === true, values }
 }
 
@@ -387,8 +414,10 @@ export function packPlanetaryShaderPoints(samples: readonly PlanetaryShaderSampl
   for (const [slot, sample] of samples.entries()) {
     const { latitude, longitude, partial, values } = normalizedPoint(sample)
     const row = slot * stride
-    packed.set([latitude, longitude, Number(partial)], row)
-    packed.set(values, row + measurementStart)
+    packed[row + HEADER.latitude] = latitude
+    packed[row + HEADER.longitude] = longitude
+    packed[row + HEADER.partial] = Number(partial)
+    packed.set(values, row + HEADER.size)
   }
   return packed
 }
@@ -401,10 +430,9 @@ export function freezePlanetaryShaderPoint(sample: PlanetaryShaderSample) {
     const text = value.toString()
     return /[.e]/.test(text) ? text : `${text}.0`
   }
-  let index = 0
   const groups = point.schema.groups.map(
     group => `  ${group.type}(
-${group.fields.map(field => `    ${literal(point.values[index++])}, // ${field.name}`).join('\n')}
+${group.fields.map(field => `    ${literal(point.values[field.valueIndex])}, // ${field.name}`).join('\n')}
   )`,
   )
   return `${point.schema.type}(

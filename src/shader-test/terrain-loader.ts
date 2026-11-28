@@ -1,9 +1,5 @@
 import {
-  elevationPyramid,
-  loadTerrain,
-  packRg32FloatLevels,
-  packRg8PyramidDirect,
-  poleElevations,
+  prepareTerrainData,
   type PackedTerrainLevel,
   type Terrain,
   type TerrainPackFormat,
@@ -22,22 +18,21 @@ async function prepareTerrainOnMainThread<F extends TerrainPackFormat>(
   url: string,
   format: F,
   signal: AbortSignal,
+  skipMipmaps: boolean,
 ): Promise<PreparedTerrain<F>> {
-  const { decompressZstd } = await import('../earth-score/decode.ts')
-  const terrain = await loadTerrain(url, signal, decompressZstd)
-  signal.throwIfAborted()
-  const poles = poleElevations(terrain)
-  const packed = (
-    format === 'rg8unorm' ? packRg8PyramidDirect(terrain) : packRg32FloatLevels(elevationPyramid(terrain, false))
-  ) as PreparedTerrain<F>['levels']
-  return { terrain, poles, levels: packed }
+  const { decompressTerrainEct2Wasm, decompressZstd } = await import('../earth-score/decode.ts')
+  return prepareTerrainData(url, format, signal, decompressZstd, {
+    skipMipmaps,
+    decodeEct2Wasm: decompressTerrainEct2Wasm,
+  })
 }
 
-/** Decode gzipped terrain and build its mipmap pyramid off the main thread. */
+/** Decode terrain off the main thread; mipmap pyramids are built on the GPU when supported. */
 export function loadPreparedTerrain<F extends TerrainPackFormat>(
   url: string,
   format: F,
   signal: AbortSignal,
+  skipMipmaps = true,
 ): Promise<PreparedTerrain<F>> {
   signal.throwIfAborted()
   const resolved = typeof globalThis.location?.href === 'string' ? new URL(url, globalThis.location.href).href : url
@@ -46,7 +41,7 @@ export function loadPreparedTerrain<F extends TerrainPackFormat>(
     try {
       worker = createTerrainWorker()
     } catch {
-      void prepareTerrainOnMainThread(resolved, format, signal).then(resolve, reject)
+      void prepareTerrainOnMainThread(resolved, format, signal, skipMipmaps).then(resolve, reject)
       return
     }
     let settled = false
@@ -64,7 +59,7 @@ export function loadPreparedTerrain<F extends TerrainPackFormat>(
       if (settled) return
       settled = true
       cleanup()
-      void prepareTerrainOnMainThread(resolved, format, signal).then(resolve, reject)
+      void prepareTerrainOnMainThread(resolved, format, signal, skipMipmaps).then(resolve, reject)
     }
     signal.addEventListener('abort', onAbort, { once: true })
     worker.onmessage = ({ data }: MessageEvent<TerrainWorkerResponse>) => {
@@ -80,7 +75,7 @@ export function loadPreparedTerrain<F extends TerrainPackFormat>(
     }
     worker.onmessageerror = fallback
     try {
-      worker.postMessage({ url: resolved, format } satisfies TerrainWorkerRequest)
+      worker.postMessage({ url: resolved, format, skipMipmaps } satisfies TerrainWorkerRequest)
     } catch {
       fallback()
     }

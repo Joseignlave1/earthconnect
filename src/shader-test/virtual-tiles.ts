@@ -1,6 +1,8 @@
 export type TileEntry = { packId: number; offset: number; length: number }
 
-export type PackHandle = { kind: 'blob'; blob: Blob } | { kind: 'url'; url: string }
+export type PackHandle =
+  | { kind: 'blob'; blob: Blob }
+  | { kind: 'url'; url: string; fullBlob?: Blob; fullBlobPending?: Promise<Blob> }
 
 export type TileVec3 = readonly [number, number, number]
 
@@ -9,6 +11,12 @@ export const VIRTUAL_TILE_INNER = 508
 export const VIRTUAL_TILE_GUTTER = 2
 export const VIRTUAL_TILE_MIPS = 3
 export const MAX_CONCURRENT_TILE_DECODES = 4
+export const TILE_PAGE_EMPTY = 255
+
+const PAGE_FINEST_SLOT_OFFSET = 0
+const PAGE_FINEST_LEVEL_OFFSET = 1
+const PAGE_FALLBACK_SLOT_OFFSET = 2
+const PAGE_FALLBACK_LEVEL_OFFSET = 3
 
 export function tileKey(level: number, tx: number, ty: number) {
   return (level << 16) | (ty << 8) | tx
@@ -47,28 +55,50 @@ export function toPackHandle(resource: Blob | string): PackHandle {
   return typeof resource === 'string' ? { kind: 'url', url: resource } : { kind: 'blob', blob: resource }
 }
 
+async function sliceHandleBlob(blob: Blob, start: number, length: number, signal: AbortSignal): Promise<ArrayBuffer> {
+  const buf = await blob.slice(start, start + length).arrayBuffer()
+  signal.throwIfAborted()
+  return buf
+}
+
 export async function readPackRange(
   handle: PackHandle,
   start: number,
   length: number,
   signal: AbortSignal,
 ): Promise<ArrayBuffer> {
-  if (handle.kind === 'blob') {
-    const buf = await handle.blob.slice(start, start + length).arrayBuffer()
+  if (handle.kind === 'blob') return sliceHandleBlob(handle.blob, start, length, signal)
+  if (handle.fullBlob) return sliceHandleBlob(handle.fullBlob, start, length, signal)
+  if (handle.fullBlobPending) {
+    const blob = await handle.fullBlobPending
     signal.throwIfAborted()
-    return buf
+    return sliceHandleBlob(blob, start, length, signal)
   }
   const response = await fetch(handle.url, {
     signal,
     headers: { Range: `bytes=${start}-${start + length - 1}` },
   })
   if (!response.ok) throw new Error(`Tile range fetch failed (${response.status}).`)
+  // If a server ignored Range and returned the full file (HTTP 200), cache it as a Blob
+  // so subsequent range reads slice locally without re-downloading the entire pack.
+  if (response.status === 200) {
+    const pending = (handle.fullBlobPending ??= response.blob().then(
+      blob => {
+        handle.fullBlob = blob
+        handle.fullBlobPending = undefined
+        return blob
+      },
+      error => {
+        handle.fullBlobPending = undefined
+        throw error
+      },
+    ))
+    const blob = await pending
+    signal.throwIfAborted()
+    return sliceHandleBlob(blob, start, length, signal)
+  }
   const buf = await response.arrayBuffer()
   signal.throwIfAborted()
-  // If a server ignored Range and returned the full file, slice the requested window.
-  if (response.status === 200 && buf.byteLength > length) {
-    return buf.slice(start, start + length)
-  }
   return buf
 }
 
@@ -82,6 +112,10 @@ export async function readTileWebpBlob(
     signal.throwIfAborted()
     return handle.blob.slice(offset, offset + length, 'image/webp')
   }
+  if (handle.fullBlob) {
+    signal.throwIfAborted()
+    return handle.fullBlob.slice(offset, offset + length, 'image/webp')
+  }
   const buf = await readPackRange(handle, offset, length, signal)
   return new Blob([buf], { type: 'image/webp' })
 }
@@ -94,7 +128,7 @@ export async function loadPackIndexEntries(
   const headBuf = await readPackRange(handle, 0, 16, signal)
   if (signal.aborted) return null
   const header = parseTilePackHeader(headBuf)
-  if (!header) return null
+  if (!header || header.packId !== packId) return null
   const tableBuf = await readPackRange(handle, 16, header.count * 12, signal)
   if (signal.aborted || tableBuf.byteLength < header.count * 12) return null
   return parseTilePackIndex(tableBuf, packId, header.count)
@@ -119,7 +153,7 @@ export function paintTilePageTable<S extends { level: number; tx: number; ty: nu
   slots: readonly (S | null)[],
   matches: (slot: S) => boolean = () => true,
 ) {
-  data.fill(255)
+  data.fill(TILE_PAGE_EMPTY)
   // Paint coarser levels first so (r,g) holds finest resident tile and (b,a) holds coarser fallback.
   for (let level = 0; level < levelCount; level++) {
     const span = 1 << (levelCount - 1 - level)
@@ -132,12 +166,12 @@ export function paintTilePageTable<S extends { level: number; tx: number; ty: nu
         const rowOff = (y0 + dy) * pageWidth
         for (let dx = 0; dx < span; dx++) {
           const idx = (rowOff + x0 + dx) * 4
-          if (data[idx] < 255) {
-            data[idx + 2] = data[idx]
-            data[idx + 3] = data[idx + 1]
+          if (data[idx + PAGE_FINEST_SLOT_OFFSET] < TILE_PAGE_EMPTY) {
+            data[idx + PAGE_FALLBACK_SLOT_OFFSET] = data[idx + PAGE_FINEST_SLOT_OFFSET]
+            data[idx + PAGE_FALLBACK_LEVEL_OFFSET] = data[idx + PAGE_FINEST_LEVEL_OFFSET]
           }
-          data[idx] = slotIndex
-          data[idx + 1] = level
+          data[idx + PAGE_FINEST_SLOT_OFFSET] = slotIndex
+          data[idx + PAGE_FINEST_LEVEL_OFFSET] = level
         }
       }
     }

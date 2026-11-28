@@ -1,3 +1,5 @@
+import { checkedGpu } from '../earth-score/gpu.ts'
+import { purgeLegacyGpuCacheOnce, transcodeSrgbTextureToBc7Gpu } from './bc7-gpu.ts'
 import fullscreenWgsl from './shaders/fullscreen.wgsl?raw'
 import mipBlitWgsl from './shaders/mip-blit.wgsl?raw'
 
@@ -21,10 +23,11 @@ export async function shaderModule(device: GPUDevice, label: string, code: strin
 export function uploadBuffer(
   device: GPUDevice,
   label: string,
-  data: Float32Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+  data: Float32Array<ArrayBuffer> | Uint32Array<ArrayBuffer> | Uint16Array<ArrayBuffer>,
   usage: GPUBufferUsageFlags,
 ) {
-  const buffer = device.createBuffer({ label, size: data.byteLength, usage, mappedAtCreation: true })
+  const size = Math.ceil(data.byteLength / 4) * 4
+  const buffer = device.createBuffer({ label, size, usage, mappedAtCreation: true })
   new Uint8Array(buffer.getMappedRange()).set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength))
   buffer.unmap()
   return buffer
@@ -88,7 +91,7 @@ export async function copyExternalImageChunked(
   const rowsPerChunk = Math.max(1, Math.floor(maxChunkBytes / bytesPerRow))
   if (source.height <= rowsPerChunk) {
     queue.copyExternalImageToTexture({ source }, { texture }, [source.width, source.height])
-    await waitForQueue(queue, signal)
+    if (source.width * source.height * 4 >= maxChunkBytes / 2) await waitForQueue(queue, signal)
     return
   }
   for (let y = 0; y < source.height; y += rowsPerChunk) {
@@ -191,4 +194,98 @@ export function generateMipmaps(
     }
   }
   if (ownEncoder) device.queue.submit([cmd.finish()])
+}
+
+export type SrgbTextureLoadOptions = {
+  label: string
+  mipLabel?: string
+  downloadErrorMessage?: string
+  maxWidth?: number
+  addressModeU?: GPUAddressMode
+  validateGpu?: boolean
+  createStepLabel?: string
+  uploadStepLabel?: string
+  bc7?: boolean
+}
+
+/**
+ * Fetch an image, decode without color-space conversion, upload into a mipmapped
+ * texture in bounded strips, and generate GPU mipmaps. When the device supports
+ * `texture-compression-bc`, transcodes on the GPU into `bc7-rgba-unorm-srgb`
+ * (~7–56 ms, 4× less VRAM, zero CPU readback or disk bloat).
+ * Destroys the texture on any error or abort; callers own lifetime on success.
+ */
+export async function loadSrgbMipmappedTexture(
+  device: GPUDevice,
+  url: string,
+  signal: AbortSignal,
+  options: SrgbTextureLoadOptions,
+): Promise<GPUTexture> {
+  purgeLegacyGpuCacheOnce()
+  const useBc7 = options.bc7 !== false && device.features.has('texture-compression-bc')
+
+  const response = await fetch(url, { signal })
+  if (!response.ok) {
+    throw new Error(options.downloadErrorMessage ?? `${options.label} download failed (${response.status}).`)
+  }
+  const blob = await response.blob()
+  const bitmap = await createImageBitmap(
+    blob,
+    options.maxWidth
+      ? {
+          colorSpaceConversion: 'none',
+          resizeWidth: options.maxWidth,
+          resizeHeight: options.maxWidth >> 1,
+          resizeQuality: 'high',
+        }
+      : { colorSpaceConversion: 'none' },
+  )
+  let texture: GPUTexture | undefined
+  try {
+    signal.throwIfAborted()
+    const createTexture = () => {
+      texture = device.createTexture({
+        label: options.label,
+        size: [bitmap.width, bitmap.height],
+        mipLevelCount: Math.floor(Math.log2(Math.max(bitmap.width, bitmap.height))) + 1,
+        format: 'rgba8unorm-srgb',
+        viewFormats: useBc7 ? ['rgba8unorm'] : [],
+        usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+      })
+      return texture
+    }
+    const created = options.validateGpu
+      ? await checkedGpu(device, createTexture, options.createStepLabel ?? `Creating ${options.label}`)
+      : createTexture()
+    signal.throwIfAborted()
+    await copyExternalImageChunked(device.queue, bitmap, created, signal)
+    signal.throwIfAborted()
+    const buildMips = () => {
+      generateMipmaps(device, created, {
+        label: options.mipLabel ?? `${options.label} mipmaps`,
+        addressModeU: options.addressModeU,
+      })
+      return created
+    }
+    const finished = options.validateGpu
+      ? await checkedGpu(device, buildMips, options.uploadStepLabel ?? `Uploading ${options.label}`)
+      : buildMips()
+    signal.throwIfAborted()
+    if (useBc7) {
+      const bc7Texture = transcodeSrgbTextureToBc7Gpu(device, finished, options.label)
+      // Release the temporary RGBA texture as soon as the GPU finishes reading it for BC7 encode.
+      void device.queue
+        .onSubmittedWorkDone()
+        .catch(() => undefined)
+        .finally(() => finished.destroy())
+      texture = bc7Texture
+      return bc7Texture
+    }
+    return finished
+  } catch (error) {
+    texture?.destroy()
+    throw error
+  } finally {
+    bitmap.close()
+  }
 }

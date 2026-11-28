@@ -163,18 +163,7 @@ export async function startWgslLanguageServer(
       return request<Hover | null>('textDocument/hover', { textDocument: { uri }, position })
     },
     async syntaxTree(signal?: AbortSignal) {
-      for (let attempt = 0; attempt < 8; attempt++) {
-        signal?.throwIfAborted()
-        try {
-          const tree = await request<string>('wgsl-analyzer/viewSyntaxTree', { textDocument: { uri } })
-          if (tree) return tree
-        } catch (error) {
-          // Initial indexing and edits can invalidate an analyzer snapshot.
-          if (!(error instanceof WgslRequestError) || error.code !== -32801) throw error
-        }
-        await new Promise(resolve => setTimeout(resolve, 25 * (attempt + 1)))
-      }
-      throw new Error('The WGSL analyzer could not produce a syntax tree.')
+      return requestSyntaxTree(uri, signal)
     },
     syntaxTreeFor(text: string, signal?: AbortSignal) {
       const task = analysisQueue.then(async () => {
@@ -194,17 +183,7 @@ export async function startWgslLanguageServer(
             contentChanges: [{ text }],
           })
         }
-        for (let attempt = 0; attempt < 8; attempt++) {
-          signal?.throwIfAborted()
-          try {
-            const tree = await request<string>('wgsl-analyzer/viewSyntaxTree', { textDocument: { uri: analysisUri } })
-            if (tree) return tree
-          } catch (error) {
-            if (!(error instanceof WgslRequestError) || error.code !== -32801) throw error
-          }
-          await new Promise(resolve => setTimeout(resolve, 25 * (attempt + 1)))
-        }
-        throw new Error('The WGSL analyzer could not produce a syntax tree.')
+        return requestSyntaxTree(analysisUri, signal)
       })
       analysisQueue = task.then(
         () => undefined,
@@ -213,5 +192,20 @@ export async function startWgslLanguageServer(
       return task
     },
     dispose,
+  }
+
+  async function requestSyntaxTree(targetUri: string, signal?: AbortSignal) {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      signal?.throwIfAborted()
+      try {
+        const tree = await request<string>('wgsl-analyzer/viewSyntaxTree', { textDocument: { uri: targetUri } })
+        if (tree) return tree
+      } catch (error) {
+        // Initial indexing and edits can invalidate an analyzer snapshot.
+        if (!(error instanceof WgslRequestError) || error.code !== -32801) throw error
+      }
+      await new Promise(resolve => setTimeout(resolve, 25 * (attempt + 1)))
+    }
+    throw new Error('The WGSL analyzer could not produce a syntax tree.')
   }
 }

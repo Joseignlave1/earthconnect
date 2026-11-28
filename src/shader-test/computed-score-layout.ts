@@ -1,7 +1,8 @@
 import type { EarthScore, ScoreChunk } from '../earth-score/index.ts'
+import { GRID_COLS, GRID_ROWS, parseSiteKey, PIXELS_PER_SITE } from '../earth-score/layout.ts'
 import { MISSING, SIZE } from './world-grid.ts'
 
-export const tileCells = SIZE ** 2
+export const tileCells = PIXELS_PER_SITE
 export const scoreMipCount = Math.floor(Math.log2(SIZE)) + 1
 export const maxBatchLayers = 64
 
@@ -24,11 +25,10 @@ export function computedScoreLayout(earth: Pick<EarthScore, 'chunks' | 'layout'>
   ) {
     throw new Error('Earth Score does not match the lab’s native score grid.')
   }
-  const lookup = new Uint16Array(36 * 18).fill(MISSING)
+  const lookup = new Uint16Array(GRID_COLS * GRID_ROWS).fill(MISSING)
   layout.sites.forEach((site, index) => {
-    const h = Number(site.slice(1, 3)),
-      v = Number(site.slice(4, 6))
-    lookup[v * 36 + h] = index
+    const { h, v } = parseSiteKey(site)
+    lookup[v * GRID_COLS + h] = index
   })
   const batches: ScoreBatch[] = []
   let nextSite = 0

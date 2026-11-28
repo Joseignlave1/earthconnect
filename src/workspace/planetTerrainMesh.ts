@@ -1,4 +1,4 @@
-import { createMesh, type Vec3 } from '../shader-test/geometry.ts'
+import { createMesh, sphericalNormal, type Vec3 } from '../shader-test/geometry.ts'
 import { elevationAt, poleElevations, type Terrain } from '../shader-test/terrain.ts'
 import { bodyRadius } from './solarSystem.ts'
 
@@ -12,12 +12,6 @@ export const PLANET_TERRAIN_SETTINGS = {
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value))
 
-function normalAt(longitude: number, latitude: number): Vec3 {
-  if (Math.abs(latitude) === Math.PI / 2) return [0, Math.sign(latitude), 0]
-  const c = Math.cos(latitude)
-  return [c * Math.sin(longitude), Math.sin(latitude), c * Math.cos(longitude)]
-}
-
 const planetColumns = 512,
   planetRows = 256
 let sharedPlanetGrid: ReturnType<typeof createMesh> | undefined
@@ -26,27 +20,59 @@ function getPlanetGrid() {
   return (sharedPlanetGrid ??= createMesh(planetColumns, planetRows))
 }
 
-export type PlanetTerrain = ReturnType<typeof buildPlanetTerrain>
+/** Standalone geographic elevation sampler closing both poles consistently with the DEM. */
+export function createPlanetElevationSampler(terrain: Terrain) {
+  const [south, north] = poleElevations(terrain)
+  return (longitude: number, latitude: number) => {
+    if (latitude <= -Math.PI / 2) return south
+    if (latitude >= Math.PI / 2) return north
+    return elevationAt(terrain, longitude, latitude)
+  }
+}
 
-export function buildPlanetTerrain(body: TerrainBody, terrain: Terrain, retainElevation = true) {
+export type PlanetPickingMesh = {
+  radius: number
+  columns: number
+  rows: number
+  positions: Float32Array
+  indices: Uint32Array
+  blocks: { x: number; y: number; endX: number; endY: number; min: Vec3; max: Vec3 }[]
+  positionAt: (longitude: number, latitude: number) => Vec3
+}
+
+/** Compute a single displaced 3D surface point without building the full picking mesh. */
+export function samplePlanetPosition(body: TerrainBody, terrain: Terrain, longitude: number, latitude: number): Vec3 {
+  const { relief } = PLANET_TERRAIN_SETTINGS[body]
+  const radius = bodyRadius(body)
+  const elevation = createPlanetElevationSampler(terrain)(longitude, latitude)
+  const magnitude = radius + (elevation * relief) / 1000
+  const [x, y, z] = sphericalNormal(longitude, latitude)
+  return [magnitude * x, magnitude * y, magnitude * z]
+}
+
+/**
+ * Build a 512x256 CPU picking and marker-placement mesh for Moon/Mars.
+ * GPU rendering uses DEM-displaced cube-sphere patches; this mesh accelerates
+ * ray/triangle picking and marker coordinate interpolation on the CPU.
+ */
+export function buildPlanetPickingMesh(body: TerrainBody, terrain: Terrain): PlanetPickingMesh {
   const { relief } = PLANET_TERRAIN_SETTINGS[body]
   const radius = bodyRadius(body)
   const columns = planetColumns,
     rows = planetRows
   const { uv, indices } = getPlanetGrid()
-  const [south, north] = poleElevations(terrain)
-  const readElevation = (longitude: number, latitude: number) => {
-    if (latitude <= -Math.PI / 2) return south
-    if (latitude >= Math.PI / 2) return north
-    return elevationAt(terrain, longitude, latitude)
-  }
-  const positions = new Float32Array((uv.length / 2) * 3)
-  for (let vertex = 0; vertex < uv.length / 2; vertex++) {
+  const readElevation = createPlanetElevationSampler(terrain)
+  const vertexCount = uv.length / 2
+  const positions = new Float32Array(vertexCount * 3)
+  for (let vertex = 0; vertex < vertexCount; vertex++) {
     const longitude = (uv[vertex * 2] - 0.5) * 2 * Math.PI
     const latitude = (uv[vertex * 2 + 1] - 0.5) * Math.PI
     const magnitude = radius + (readElevation(longitude, latitude) * relief) / 1000
-    const [x, y, z] = normalAt(longitude, latitude)
-    positions.set([magnitude * x, magnitude * y, magnitude * z], vertex * 3)
+    const [x, y, z] = sphericalNormal(longitude, latitude)
+    const o = vertex * 3
+    positions[o] = magnitude * x
+    positions[o + 1] = magnitude * y
+    positions[o + 2] = magnitude * z
   }
 
   const positionAt = (longitude: number, latitude: number): Vec3 => {
@@ -94,7 +120,18 @@ export function buildPlanetTerrain(body: TerrainBody, terrain: Terrain, retainEl
     positions,
     indices,
     blocks,
-    elevationAt: retainElevation ? readElevation : () => 0,
     positionAt,
+  }
+}
+
+export type PlanetTerrain = PlanetPickingMesh & {
+  elevationAt: (longitude: number, latitude: number) => number
+}
+
+/** Build the picking mesh together with an elevation reader for CPU tests. */
+export function buildPlanetTerrain(body: TerrainBody, terrain: Terrain): PlanetTerrain {
+  return {
+    ...buildPlanetPickingMesh(body, terrain),
+    elevationAt: createPlanetElevationSampler(terrain),
   }
 }

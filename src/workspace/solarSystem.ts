@@ -9,7 +9,9 @@ import {
   SiderealTime,
 } from 'astronomy-engine'
 
-export type Vec3 = readonly [number, number, number]
+import { vec3Dot, type ReadonlyVec3 } from '../shader-test/vec3.ts'
+
+export type Vec3 = ReadonlyVec3
 
 /** Body-fixed +X (0° E), +Y (90° E), and +Z (north) as columns in world space. */
 export type BodyRotation = readonly [Vec3, Vec3, Vec3]
@@ -45,10 +47,6 @@ const kilometersPerAu = 149597870.7
 const radiansPerDegree = Math.PI / 180
 const equatorialToEcliptic = Rotation_EQJ_ECL().rot as unknown as BodyRotation
 
-function dot(left: Vec3, right: Vec3): number {
-  return left[0] * right[0] + left[1] * right[1] + left[2] * right[2]
-}
-
 /** Rotate a body-fixed direction into J2000 ecliptic axes. */
 export function bodyToWorld([x, y, z]: BodyRotation, direction: Vec3): Vec3 {
   return [
@@ -60,7 +58,7 @@ export function bodyToWorld([x, y, z]: BodyRotation, direction: Vec3): Vec3 {
 
 /** Rotate a J2000 ecliptic direction into the body's geographic axes. */
 export function worldToBody([x, y, z]: BodyRotation, direction: Vec3): Vec3 {
-  return [dot(x, direction), dot(y, direction), dot(z, direction)]
+  return [vec3Dot(x, direction), vec3Dot(y, direction), vec3Dot(z, direction)]
 }
 
 type AstroTime = ReturnType<typeof MakeTime>

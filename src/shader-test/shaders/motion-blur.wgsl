@@ -1,8 +1,19 @@
 struct Motion {
   currentToPrevious: mat3x3f,
-  eyeDeltaAndNear: vec4f,
-  projection: vec4f,
-  shutter: vec4f, // fraction of frame interval, maximum trail span, subpixel cutoff, reserved
+  eyeDelta: vec3f,
+  near: f32,
+  projectionScale: vec2f,
+  _padProj0: f32,
+  _padProj1: f32,
+  shutterFraction: f32,
+  maxTrailPx: f32,
+  minTrailPx: f32,
+  _padShutter: f32,
+}
+
+struct BlurVelocity {
+  velocity: vec2f,
+  skip: bool,
 }
 
 @group(0) @binding(0) var<uniform> motion: Motion;
@@ -15,49 +26,48 @@ struct Motion {
 
 // Composite placed world markers into linear HDR taps so they blur along the
 // planet's exact 3D velocity with full depth-aware silhouette protection.
-fn applyWorldMarker(s: vec4f, coordinates: vec2f, anyMarker: bool) -> vec4f {
-  if (!anyMarker) { return s; }
-  return evalWorldMarkerSample(
-    s, coordinates, p.selEarth, p.selMoon, p.selMars,
-    p.state.x, p.effects.x, p.effects.z, p.hoverScreen.w > .5,
-  );
-}
-
 fn sampleWorldSample(pixel: vec2i, k: i32, dk: f32, anyMarker: bool) -> vec4f {
   let s = textureLoad(sceneMsaa, pixel, k);
   if (!anyMarker || dk <= 0.) { return s; }
-  let g = textureLoad(geography, pixel, k);
-  let coords = vec2f(g.x + g.y, g.z + g.w);
-  return applyWorldMarker(s, coords, true);
+  let geo = decodeGeo(textureLoad(geography, pixel, k));
+  return evalWorldMarkerSample(
+    s, geo, p.selEarth, p.selMoon, p.selMars,
+    p.earthMorph, p.exposure, p.pixelRatio, p.hdr > .5,
+  );
 }
 
 fn nearSelectedMarker(pixel: vec2i) -> bool {
-  let g = textureLoad(geography, pixel, 0);
-  let coordinates = vec2f(g.x + g.y, g.z + g.w);
-  if (coordinates.y == -1.) { return true; }
-  let bodyId = i32(floor(coordinates.x * .5));
-  let sel = select(select(p.selEarth, p.selMoon, bodyId == 1), p.selMars, bodyId == 2);
-  if (sel.z <= .005) { return false; }
-  let uv = vec2f(coordinates.x - f32(bodyId) * 2., coordinates.y);
-  let bodyMorph = select(1., p.state.x, bodyId == 0);
+  let geo = decodeGeo(textureLoad(geography, pixel, 0));
+  if (!geo.valid) { return true; }
+  let sel = markerForBody(geo.bodyId, p.selEarth, p.selMoon, p.selMars);
+  if (sel.opacity <= .005) { return false; }
+  let bodyMorph = select(1., p.earthMorph, geo.bodyId == 0);
   // Marker radius (16 px) + max blur trail span (20 px) + safety margin.
-  return length(worldTangent(uv, sel.xy, bodyMorph, sel.w)) <= 42.;
+  return length(worldTangent(geo.uv, sel.uv, bodyMorph, sel.unitsPerPixel)) <= 42.;
+}
+
+fn computeBlurVelocity(uv: vec2f, dk: f32, size: vec2f) -> BlurVelocity {
+  let ndc = uv * vec2f(2., -2.) + vec2f(-1., 1.);
+  let ray = vec3f(ndc * motion.projectionScale, -1.);
+  // Reverse-Z stores near / viewDistance. Divide the transformed position by
+  // that distance before projecting. Clear sky is at infinity and only rotates.
+  let previous = motion.currentToPrevious * ray + motion.eyeDelta * (dk / motion.near);
+  if (previous.z >= -0.0001) { return BlurVelocity(vec2f(0.), true); }
+  let previousNdc = previous.xy / (-previous.z * motion.projectionScale);
+  var velocity = (previousNdc - ndc) * vec2f(.5, -.5) * size * motion.shutterFraction;
+  let speed = length(velocity);
+  if (speed < motion.minTrailPx) { return BlurVelocity(vec2f(0.), true); }
+  velocity *= min(1., motion.maxTrailPx / speed);
+  return BlurVelocity(velocity, false);
 }
 
 fn blurUniformResolved(
   pixel: vec2i, dk: f32, uv: vec2f, pos: vec2f, size: vec2f,
 ) -> vec4f {
   let color = textureLoad(sceneResolved, pixel, 0);
-  let ndc = uv * vec2f(2., -2.) + vec2f(-1., 1.);
-  let ray = vec3f(ndc * motion.projection.xy, -1.);
-  let previous = motion.currentToPrevious * ray +
-    motion.eyeDeltaAndNear.xyz * (dk / motion.eyeDeltaAndNear.w);
-  if (previous.z >= -0.0001) { return color; }
-  let previousNdc = previous.xy / (-previous.z * motion.projection.zw);
-  var velocity = (previousNdc - ndc) * vec2f(.5, -.5) * size * motion.shutter.x;
-  let speed = length(velocity);
-  if (speed < motion.shutter.z) { return color; }
-  velocity *= min(1., motion.shutter.y / speed);
+  let blur = computeBlurVelocity(uv, dk, size);
+  if (blur.skip) { return color; }
+  let velocity = blur.velocity;
 
   let isSolid = dk > 0.;
   var sum = color;
@@ -92,18 +102,9 @@ fn blurSample(
   pixel: vec2i, k: i32, dk: f32, uv: vec2f, pos: vec2f, size: vec2f, anyMarker: bool,
 ) -> vec4f {
   let color = sampleWorldSample(pixel, k, dk, anyMarker);
-  let ndc = uv * vec2f(2., -2.) + vec2f(-1., 1.);
-  let ray = vec3f(ndc * motion.projection.xy, -1.);
-  // Reverse-Z stores near / viewDistance. Divide the transformed position by
-  // that distance before projecting. Clear sky is at infinity and only rotates.
-  let previous = motion.currentToPrevious * ray +
-    motion.eyeDeltaAndNear.xyz * (dk / motion.eyeDeltaAndNear.w);
-  if (previous.z >= -0.0001) { return color; }
-  let previousNdc = previous.xy / (-previous.z * motion.projection.zw);
-  var velocity = (previousNdc - ndc) * vec2f(.5, -.5) * size * motion.shutter.x;
-  let speed = length(velocity);
-  if (speed < motion.shutter.z) { return color; }
-  velocity *= min(1., motion.shutter.y / speed);
+  let blur = computeBlurVelocity(uv, dk, size);
+  if (blur.skip) { return color; }
+  let velocity = blur.velocity;
 
   var sum = color;
   var weights = 1.;
@@ -133,8 +134,8 @@ fn blurSample(
   // sample visibility, and exact per-sample marker ownership via sample-aligned 4x MSAA geography.
   let size = vec2f(textureDimensions(sceneMsaa));
   let pixel = vec2i(input.position.xy);
-  let anyMarker = p.selEarth.z > .005 || p.selMoon.z > .005 || p.selMars.z > .005;
-  let hasOrbits = p.state.z > .5;
+  let anyMarker = p.selEarth.opacity > .005 || p.selMoon.opacity > .005 || p.selMars.opacity > .005;
+  let hasOrbits = p.hasOrbits > .5;
   let d = array<f32, 4>(
     textureLoad(sceneDepth, pixel, 0),
     textureLoad(sceneDepth, pixel, 1),
@@ -189,9 +190,9 @@ fn blurSample(
   // Exact zero-velocity counterpart to blurFragment: evaluates per-sample selected world markers
   // on each MSAA sample's own color, composites foreground orbits over markers, and resolves.
   let pixel = vec2i(input.position.xy);
-  let bakeMarkers = p.state.w > .5;
-  let anyMarker = bakeMarkers && (p.selEarth.z > .005 || p.selMoon.z > .005 || p.selMars.z > .005);
-  let hasOrbits = p.state.z > .5;
+  let bakeMarkers = p.bakeMarkers > .5;
+  let anyMarker = bakeMarkers && (p.selEarth.opacity > .005 || p.selMoon.opacity > .005 || p.selMars.opacity > .005);
+  let hasOrbits = p.hasOrbits > .5;
   var outSum = vec4f(0.);
   for (var k = 0; k < 4; k++) {
     let dk = textureLoad(sceneDepth, pixel, k);

@@ -94,3 +94,87 @@ test('the lexical gate sees complete identifiers following WGSL line breaks', ()
   const source = '// ignore moon_point\u2028mars_point'
   assert.equal(mentionsPlanetaryName(source), source.indexOf('mars_point'))
 })
+
+test('hexadecimal float literals without exponents or ending in hex digit f parse accurately', () => {
+  const makeCallFixture = (latLit: string, lonLit: string) => {
+    const source = `fn s() { let p = moon_point(${latLit}, ${lonLit}); }`
+    const enc = new TextEncoder()
+    const byteOf = (needle: string, from = 0) => {
+      const idx = source.indexOf(needle, from)
+      const start = enc.encode(source.slice(0, idx)).length
+      const end = start + enc.encode(needle).length
+      return { start: [start, 0], end: [end, 0] }
+    }
+    const callSpan = byteOf(`moon_point(${latLit}, ${lonLit})`)
+    const nameSpan = byteOf('moon_point')
+    const latSpan = byteOf(latLit, source.indexOf('('))
+    const lonSpan = byteOf(lonLit, source.indexOf(','))
+    const closeSpan = byteOf(')', source.indexOf(','))
+    const tree = {
+      type: 'Node',
+      kind: 'SourceFile',
+      start: [0, 0],
+      end: [enc.encode(source).length, 0],
+      children: [
+        {
+          type: 'Node',
+          kind: 'Function',
+          start: [0, 0],
+          end: [enc.encode(source).length, 0],
+          children: [
+            {
+              type: 'Node',
+              kind: 'FunctionCall',
+              ...callSpan,
+              children: [
+                {
+                  type: 'Node',
+                  kind: 'IdentExpression',
+                  ...nameSpan,
+                  children: [
+                    {
+                      type: 'Node',
+                      kind: 'Path',
+                      ...nameSpan,
+                      children: [{ type: 'Token', kind: 'Identifier', ...nameSpan }],
+                    },
+                  ],
+                },
+                {
+                  type: 'Node',
+                  kind: 'Arguments',
+                  start: latSpan.start,
+                  end: closeSpan.end,
+                  children: [
+                    {
+                      type: 'Node',
+                      kind: 'Literal',
+                      ...latSpan,
+                      children: [{ type: 'Token', kind: 'FloatLiteral', ...latSpan }],
+                    },
+                    {
+                      type: 'Node',
+                      kind: 'Literal',
+                      ...lonSpan,
+                      children: [{ type: 'Token', kind: 'FloatLiteral', ...lonSpan }],
+                    },
+                    { type: 'Token', kind: 'ParenthesisRight', ...closeSpan },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }
+    return readPlanetaryCalls(source, JSON.stringify(tree))
+  }
+
+  const [a] = makeCallFixture('0X.3', '0x1.')
+  assert.equal(a.latitude, 3 / 16)
+  assert.equal(a.longitude, 1)
+
+  const [b] = makeCallFixture('0x.f', '0x1.8p2f')
+  assert.equal(b.latitude, 15 / 16)
+  assert.equal(b.longitude, 6)
+})

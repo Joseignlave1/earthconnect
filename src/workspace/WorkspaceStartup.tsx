@@ -1,54 +1,128 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { loadWorkspaceRelease, type DownloadProgress } from './workspaceRelease.ts'
-import type { WorkspaceAssets } from './workspaceAssets.ts'
-import { markStartup, reportStartupTiming } from './startupTiming.ts'
+import { ConstellationLogo } from '../hero/ConstellationLogo.tsx'
 import { WEBGPU_UNAVAILABLE_MESSAGE } from '../shader-test/surface-device.ts'
+import { endStartupSpan, reportStartupTiming, startStartupSpan } from './startupTiming.ts'
+import type { WorkspaceAssets } from './workspaceAssets.ts'
+import { type DownloadProgress, loadWorkspaceRelease } from './workspaceRelease.ts'
 import './WorkspaceStartup.css'
 
 const decimal = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const mb = (bytes: number) => decimal.format(bytes / 1_000_000)
+// Hold route-transition overlay long enough after the constellation logo finishes
+// fading in (~360ms) so fast transitions never flash and cut away abruptly.
+const MIN_TRANSITION_LOGO_HOLD_MS = 550
 
 export function WorkspaceStartup({
   open,
   embedded,
   loadInitialRelease,
 }: {
-  open(assets: WorkspaceAssets, onReady: () => void, signal: AbortSignal): Promise<ReactNode>
+  open(assets: WorkspaceAssets, onReady: (ready?: boolean) => void, signal: AbortSignal): Promise<ReactNode>
   embedded?: () => WorkspaceAssets
   loadInitialRelease?: typeof loadWorkspaceRelease
 }) {
   const [attempt, setAttempt] = useState(0)
   const [progress, setProgress] = useState<DownloadProgress>()
   const [unsaved, setUnsaved] = useState(false)
-  const [authorized, setAuthorized] = useState(false)
   const [opening, setOpening] = useState(false)
   const [error, setError] = useState('')
   const [workspace, setWorkspace] = useState<{ id: number; view: ReactNode }>()
   const [ready, setReady] = useState(false)
+  const [transitioning, setTransitioning] = useState(false)
+  const [logoCycle, setLogoCycle] = useState(0)
+  const [logoReady, setLogoReady] = useState(false)
+  const [logoDismissed, setLogoDismissed] = useState(false)
   const [slow, setSlow] = useState(false)
   const nextView = useRef(0)
+  const readyToken = useRef(0)
+  const isTransitioningRef = useRef(false)
+  const logoReadyAtRef = useRef(0)
+  const pendingTransitionRevealRef = useRef<(() => void) | null>(null)
+  const revealDelayTimerRef = useRef<number | undefined>(undefined)
+
+  const scheduleTransitionReveal = useCallback((run: () => void) => {
+    window.clearTimeout(revealDelayTimerRef.current)
+    revealDelayTimerRef.current = undefined
+    const shownAt = logoReadyAtRef.current
+    if (shownAt === 0) {
+      pendingTransitionRevealRef.current = run
+      return
+    }
+    const remaining = Math.max(0, MIN_TRANSITION_LOGO_HOLD_MS - (performance.now() - shownAt))
+    if (remaining > 0) {
+      revealDelayTimerRef.current = window.setTimeout(() => {
+        revealDelayTimerRef.current = undefined
+        run()
+      }, remaining)
+    } else {
+      run()
+    }
+  }, [])
+
   const openView = useCallback(
     async (assets: WorkspaceAssets, signal: AbortSignal) => {
       const id = ++nextView.current
       const isCurrent = () => id === nextView.current && !signal.aborted
+      isTransitioningRef.current = false
+      logoReadyAtRef.current = 0
+      pendingTransitionRevealRef.current = null
+      window.clearTimeout(revealDelayTimerRef.current)
+      revealDelayTimerRef.current = undefined
       setReady(false)
+      setTransitioning(false)
       setWorkspace(undefined)
       setError('')
-      let reported = false
-      const onReady = () => {
-        if (reported) return
-        reported = true
-        // Leave a full paint opportunity for Monaco, the preview controls and
-        // the already completed WebGPU canvas before removing the overlay.
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            if (isCurrent()) {
-              markStartup('revealed')
-              reportStartupTiming()
+      let initialReported = false
+      signal.addEventListener(
+        'abort',
+        () => {
+          pendingTransitionRevealRef.current = null
+          window.clearTimeout(revealDelayTimerRef.current)
+          revealDelayTimerRef.current = undefined
+        },
+        { once: true },
+      )
+      const onReady = (isReady = true) => {
+        if (!isCurrent()) return
+        const token = ++readyToken.current
+        pendingTransitionRevealRef.current = null
+        window.clearTimeout(revealDelayTimerRef.current)
+        revealDelayTimerRef.current = undefined
+        if (!isReady) {
+          isTransitioningRef.current = true
+          logoReadyAtRef.current = 0
+          setTransitioning(true)
+          setReady(false)
+          setLogoReady(false)
+          setLogoDismissed(false)
+          setLogoCycle(value => value + 1)
+          return
+        }
+        const finishReveal = () => {
+          // Leave a full paint opportunity for Monaco, the preview controls and
+          // the already completed WebGPU canvas before removing the overlay.
+          if (!initialReported) startStartupSpan('reveal', 'settle')
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              if (!isCurrent() || token !== readyToken.current) return
+              if (!initialReported) {
+                initialReported = true
+                endStartupSpan('reveal')
+                reportStartupTiming()
+              }
+              isTransitioningRef.current = false
+              setTransitioning(false)
               setReady(true)
-            }
-          }),
-        )
+            }),
+          )
+        }
+        if (isTransitioningRef.current) {
+          scheduleTransitionReveal(() => {
+            if (isCurrent() && token === readyToken.current) finishReveal()
+          })
+        } else {
+          finishReveal()
+        }
       }
       try {
         const view = await open(assets, onReady, signal)
@@ -57,11 +131,34 @@ export function WorkspaceStartup({
         if (isCurrent()) setError(cause instanceof Error ? cause.message : String(cause))
       }
     },
-    [open],
+    [open, scheduleTransitionReveal],
   )
 
-  const revealed = authorized && ready && !error
+  const revealed = opening && ready && !error
   const finalizing = !!progress?.total && progress.downloaded === progress.total
+  // Keep the WebGPU logo alive through the 220ms fade-out so it never snaps back to blank,
+  // then tear down its GPU resources & stop rAF completely once hidden.
+  const handleLogoReady = useCallback(() => {
+    setLogoReady(true)
+    if (logoReadyAtRef.current === 0) logoReadyAtRef.current = performance.now()
+    const pending = pendingTransitionRevealRef.current
+    if (pending) {
+      pendingTransitionRevealRef.current = null
+      scheduleTransitionReveal(pending)
+    }
+  }, [scheduleTransitionReveal])
+  useEffect(() => {
+    if (logoReady || revealed || error) return
+    const safety = window.setTimeout(handleLogoReady, 2000)
+    return () => window.clearTimeout(safety)
+  }, [logoReady, revealed, error, handleLogoReady])
+  useEffect(() => {
+    if (!revealed) return
+    const timer = window.setTimeout(() => setLogoDismissed(true), 280)
+    return () => window.clearTimeout(timer)
+  }, [revealed])
+  const logoMounted = !revealed || !logoDismissed
+  const startupContentVisible = logoReady || Boolean(error)
 
   useEffect(() => {
     if ((!opening && !finalizing) || revealed || error || unsaved) return
@@ -92,29 +189,48 @@ export function WorkspaceStartup({
         await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
         signal.throwIfAborted()
         setOpening(true)
-        setAuthorized(true)
         const assets = embedded()
         signal.addEventListener('abort', assets.dispose, { once: true })
         await openView(assets, signal)
         return
       }
       const load = attempt === 0 && loadInitialRelease ? loadInitialRelease : loadWorkspaceRelease
-      const release = await load(
-        signal,
-        state => {
-          if (!signal.aborted) setProgress(state)
+      let lastProgressFlush = 0
+      let pendingProgress: DownloadProgress | undefined
+      let progressTimer: number | undefined
+      const flushProgress = (state: DownloadProgress) => {
+        pendingProgress = undefined
+        lastProgressFlush = performance.now()
+        if (!signal.aborted) setProgress(state)
+      }
+      const onProgress = (state: DownloadProgress) => {
+        if (signal.aborted) return
+        const now = performance.now()
+        const isEdge = state.downloaded === 0 || (state.total > 0 && state.downloaded >= state.total) || state.fallback
+        if (isEdge || now - lastProgressFlush >= 50) {
+          window.clearTimeout(progressTimer)
+          progressTimer = undefined
+          flushProgress(state)
+        } else {
+          pendingProgress = state
+          if (progressTimer === undefined) {
+            progressTimer = window.setTimeout(() => {
+              progressTimer = undefined
+              if (pendingProgress) flushProgress(pendingProgress)
+            }, 50)
+          }
+        }
+      }
+      signal.addEventListener('abort', () => window.clearTimeout(progressTimer), { once: true })
+      const release = await load(signal, onProgress, {
+        refresh,
+        onAssets: assets => {
+          if (!signal.aborted) void openView(assets, signal)
         },
-        {
-          refresh,
-          onAssets: assets => {
-            if (!signal.aborted) void openView(assets, signal)
-          },
-        },
-      )
+      })
       signal.throwIfAborted()
       if (release.saved) {
         setOpening(true)
-        setAuthorized(true)
       } else {
         setUnsaved(true)
       }
@@ -130,13 +246,17 @@ export function WorkspaceStartup({
 
   function retry() {
     nextView.current++
+    readyToken.current++
     setWorkspace(undefined)
     setReady(false)
+    setTransitioning(false)
+    setLogoReady(false)
+    setLogoDismissed(false)
+    setLogoCycle(value => value + 1)
     setSlow(false)
     setError('')
     setProgress(undefined)
     setUnsaved(false)
-    setAuthorized(false)
     setOpening(false)
     setAttempt(value => value + 1)
   }
@@ -146,6 +266,7 @@ export function WorkspaceStartup({
   let status = 'Checking Earth data…'
   if (error) status = 'Could not open Earth Connect.'
   else if (slow) status = 'Earth Connect is taking longer to open.'
+  else if (transitioning) status = 'Opening Earth Connect…'
   else if (opening)
     status = embedded
       ? 'Opening embedded data…'
@@ -168,17 +289,13 @@ export function WorkspaceStartup({
         className="workspace-startup"
         aria-label="Earth Connect startup"
         inert={revealed}
+        data-transitioning={transitioning || undefined}
         data-revealed={revealed || undefined}
         data-offline={offline || undefined}
       >
-        <div className="workspace-startup-content">
-          <div className="brand" aria-label="Earth Connect">
-            <span className="brand-symbol" aria-hidden="true">
-              <i />
-            </span>
-            <span>EARTH</span> CONNECT
-          </div>
-          {!error && (!unsaved || opening) && (
+        <div className="workspace-startup-content" data-ready={startupContentVisible || undefined}>
+          {logoMounted && <ConstellationLogo key={logoCycle} onReady={handleLogoReady} />}
+          {!error && !transitioning && (!unsaved || opening) && (
             <progress
               aria-label="Earth data download"
               max={progress?.total || 1}
@@ -206,7 +323,6 @@ export function WorkspaceStartup({
               type="button"
               onClick={() => {
                 setOpening(true)
-                setAuthorized(true)
               }}
             >
               Continue without saving

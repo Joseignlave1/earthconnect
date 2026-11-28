@@ -1,17 +1,15 @@
 import { strict as assert } from 'node:assert'
 import test from 'node:test'
-import type { SampleMeasurement, SampleResult } from '../src/earthIndexApi.ts'
 import {
   createPlanetaryPointCache,
   formatPointCall,
+  type CachedPlanetarySample,
   type PersistedPointRecord,
   type PlanetaryPointStorage,
 } from '../src/workspace/planetaryPointCache.ts'
 
-const complete: SampleResult = {
-  measurements: [
-    { variableId: 'moon.slope_1km', unit: 'degree', status: 1, qualityFlags: [], decoded: 12.5 } as SampleMeasurement,
-  ],
+const complete: CachedPlanetarySample = {
+  measurements: [{ variableId: 'moon.slope_1km', unit: 'degree', status: 1, qualityFlags: [], decoded: 12.5 }],
   partial: false,
   cached: false,
 }
@@ -53,7 +51,7 @@ test('samples are shared between consumers and keyed by body and canonical coord
 })
 
 test('cancelled revisions do not consume responses, while the next revision can reuse the request', async () => {
-  const response = Promise.withResolvers<SampleResult>()
+  const response = Promise.withResolvers<CachedPlanetarySample>()
   let calls = 0
   const read = createPlanetaryPointCache(() => {
     calls++
@@ -92,10 +90,8 @@ test('complete samples persist across sessions and evict lowest-frecency entries
   const storage = memoryStorage()
   const signal = new AbortController().signal
   let calls = 0
-  const makeSample = (value: number): SampleResult => ({
-    measurements: [
-      { variableId: 'moon.elevation', unit: 'm', status: 1, qualityFlags: [], decoded: value } as SampleMeasurement,
-    ],
+  const makeSample = (value: number): CachedPlanetarySample => ({
+    measurements: [{ variableId: 'moon.elevation', unit: 'm', status: 1, qualityFlags: [], decoded: value }],
     partial: false,
     cached: false,
   })
@@ -142,4 +138,61 @@ test('complete samples persist across sessions and evict lowest-frecency entries
   const fetched2 = await second(p2, signal)
   assert.equal(fetched2.measurements[0].decoded, 200)
   assert.equal(calls, 4)
+})
+
+test('hydration evicts lowest-frecency entries regardless of storage enumeration order', async t => {
+  t.mock.timers.enable({ apis: ['Date'] })
+  const now = Date.now()
+  const records = [
+    {
+      key: 'moon/1/1',
+      sample: {
+        measurements: [
+          { variableId: 'moon.elevation', unit: 'm', status: 1, qualityFlags: [], decoded: 100 } as SampleMeasurement,
+        ],
+        partial: false,
+        cached: true,
+      },
+      bytes: 180,
+      score: 100,
+      lastUsed: now,
+    },
+    {
+      key: 'moon/2/2',
+      sample: {
+        measurements: [
+          { variableId: 'moon.elevation', unit: 'm', status: 1, qualityFlags: [], decoded: 1 } as SampleMeasurement,
+        ],
+        partial: false,
+        cached: true,
+      },
+      bytes: 180,
+      score: 1,
+      lastUsed: now,
+    },
+  ]
+  const deleted: string[] = []
+  const storage: PlanetaryPointStorage = {
+    async loadAll() {
+      return records
+    },
+    async put() {},
+    async delete(key) {
+      deleted.push(key)
+    },
+  }
+  const signal = new AbortController().signal
+  let fetches = 0
+  const cache = createPlanetaryPointCache(
+    async () => {
+      fetches++
+      return { measurements: [], partial: false, cached: false }
+    },
+    signal,
+    { maxBytes: 200, storage },
+  )
+  const hit = await cache({ body: 'moon', latitude: 1, longitude: 1 }, signal)
+  assert.equal(hit.measurements[0].decoded, 100)
+  assert.equal(fetches, 0)
+  assert.deepEqual(deleted, ['moon/2/2'])
 })

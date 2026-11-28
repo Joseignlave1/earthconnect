@@ -1,3 +1,13 @@
+import {
+  vec3Add,
+  vec3Cross,
+  vec3Dot,
+  vec3Length,
+  vec3Normalize,
+  vec3Scale,
+  vec3Sub,
+  type MutableVec3,
+} from '../shader-test/vec3.ts'
 import { cameraBasis, FOV, type Camera, type Rotation } from '../shader-test/geometry.ts'
 import { bodyToWorld, worldToBody, type BodyId, type BodyState, type Vec3 } from './solarSystem.ts'
 import { baselineProgress, flightDuration, smootherStep } from './flightEasing.ts'
@@ -7,7 +17,7 @@ export type SourceBody = Extract<SolarFocus, 'moon' | 'mars'>
 export type SolarBodies = Record<BodyId, BodyState>
 type Basis = { right: Vec3; up: Vec3; back: Vec3 }
 export type SolarFrame = Basis & { eye: Vec3; near: number; aspect: number }
-type MutableVec = [number, number, number]
+type MutableVec = MutableVec3
 const coordinateAxes: readonly Vec3[] = [
   [1, 0, 0],
   [0, 1, 0],
@@ -18,17 +28,13 @@ const orbitNorth: Vec3 = [0, 0, 1]
 // for the navigation and readouts over the edges of the viewport.
 const innerSystemRadius = 310_000_000
 
-export const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
-export const subtract = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-export const scale = (a: Vec3, n: number): Vec3 => [a[0] * n, a[1] * n, a[2] * n]
-export const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-const cross = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-]
-export const length = (v: Vec3) => Math.hypot(...v)
-export const normalized = (v: Vec3) => scale(v, 1 / Math.max(1e-30, length(v)))
+export const add = vec3Add
+export const subtract = vec3Sub
+export const scale = vec3Scale
+export const dot = vec3Dot
+export const cross = vec3Cross
+export const length = vec3Length
+export const normalized = (v: Vec3): Vec3 => vec3Normalize(v, 1e-30)
 const mix = (a: Vec3, b: Vec3, t: number) => add(scale(a, 1 - t), scale(b, t))
 
 export function geographicToWorld(body: BodyState, [x, y, z]: Vec3): Vec3 {
@@ -452,6 +458,14 @@ export class SolarCamera {
   }
   get transitioning() {
     return Boolean(this.flight)
+  }
+  /** Smoothly fades high-res virtual tiles 1 -> 0 over the first 220 ms of a camera flight
+   * so grazing departures blend cleanly into uniform global 8K textures without unrendered edges. */
+  flightTileFade(now: number): number {
+    if (!this.flight || this.flight.instant) return 1
+    const t = Math.max(0, Math.min(1, (now - this.flight.start) / 220))
+    const smooth = t * t * (3 - 2 * t)
+    return 1 - smooth
   }
 
   takeArrival() {

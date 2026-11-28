@@ -1,5 +1,6 @@
 import { createDecoderPool } from './decoder-pool.ts'
 import { makeScorePipeline, prepareScoreShader } from './custom-shader.ts'
+import { EPB2_MAGIC, Epb2GpuUnpacker } from './epb2-gpu.ts'
 import { checkDeviceLimits, checkedGpu, deviceLifetime } from './gpu.ts'
 import { planetShaderBytes, packPlanetaryShaderPoints, type PlanetaryShaderData } from './planetShaderSchema.ts'
 import { createLayout, PIXELS_PER_SITE, type ChunkLayout, type ScoreLayout } from './layout.ts'
@@ -9,12 +10,13 @@ import { createLookup } from './scoring.ts'
 
 export {
   DEFAULT_SCORE_SHADER,
+  EARTH_CELL_FIELDS,
   SCORE_SHADER_EXAMPLES,
   SCORE_SHADER_FIELDS,
   SCORE_SHADER_PRELUDE,
   ScoreShaderError,
 } from './custom-shader.ts'
-export type { ScoreShaderDiagnostic } from './custom-shader.ts'
+export type { EarthCellFieldDescriptor, ScoreShaderDiagnostic, ScoreShaderFieldDescriptor } from './custom-shader.ts'
 export { freezePlanetaryShaderPoint } from './planetShaderSchema.ts'
 export type {
   PlanetaryShaderCall,
@@ -58,6 +60,13 @@ export type EarthScoreOptions = Readonly<{
 const workerCount = Math.min(6, Math.max(3, Math.floor((globalThis.navigator?.hardwareConcurrency || 4) * 0.6)))
 const jobSlots = workerCount + 4
 const shaderChunksPerFence = 4
+const uploadMainThreadBudgetMs = 6
+
+function yieldToMain(): Promise<void> {
+  const sched = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler
+  if (typeof sched?.yield === 'function') return sched.yield()
+  return new Promise(resolve => setTimeout(resolve, 0))
+}
 
 // A caller can cancel while the shared queue is waiting on unrelated GPU work.
 function waitForLoad<T>(work: Promise<T>, signal: AbortSignal) {
@@ -152,6 +161,8 @@ export async function loadEarthScore(
 
     const residents: { output: ScoreChunk; defaultGroup: GPUBindGroup; firstSiteOffset: number }[] = []
     const decoder = createDecoderPool(Math.min(workerCount, manifest.chunks.length), loading)
+    const maxChunkRows = manifest.chunks.reduce((max, chunk) => Math.max(max, chunk.rows), 0)
+    let epb2Unpacker: Epb2GpuUnpacker | undefined
     try {
       const jobs = new Map<number, Promise<{ index: number; packed: ArrayBuffer } | { error: unknown }>>()
       let next = 0
@@ -177,26 +188,41 @@ export async function loadEarthScore(
       for (let i = 0; i < jobSlots; i++) launch()
       const checks: Promise<unknown>[] = []
       let uploaded = 0
+      let sliceStart = performance.now()
       while (jobs.size) {
         const ready = await Promise.race(jobs.values())
         loading.throwIfAborted()
         if ('error' in ready) throw ready.error
         const { index, packed } = ready
         const range = layout.chunks[index]
+        const targetPackedBytes = manifest.chunks[index].packedBytes
+        const isEpb2 = packed.byteLength >= 4 && new DataView(packed, 0, 4).getUint32(0, true) === EPB2_MAGIC
         jobs.delete(index)
         launch()
         const check = checkedGpu(
           device,
           () => {
-            const inputBuffer = device.createBuffer({
-              label: `Earth Score input ${index}`,
-              size: packed.byteLength,
-              usage: GPUBufferUsage.STORAGE,
-              mappedAtCreation: true,
-            })
-            buffers.add(inputBuffer)
-            new Uint8Array(inputBuffer.getMappedRange()).set(new Uint8Array(packed))
-            inputBuffer.unmap()
+            let inputBuffer: GPUBuffer
+            if (isEpb2) {
+              epb2Unpacker ??= new Epb2GpuUnpacker(device, maxChunkRows, fields.length)
+              inputBuffer = device.createBuffer({
+                label: `Earth Score input ${index}`,
+                size: targetPackedBytes,
+                usage: GPUBufferUsage.STORAGE,
+              })
+              buffers.add(inputBuffer)
+              epb2Unpacker.unpackToBuffer(packed, inputBuffer)
+            } else {
+              inputBuffer = device.createBuffer({
+                label: `Earth Score input ${index}`,
+                size: packed.byteLength,
+                usage: GPUBufferUsage.STORAGE,
+                mappedAtCreation: true,
+              })
+              buffers.add(inputBuffer)
+              new Uint8Array(inputBuffer.getMappedRange()).set(new Uint8Array(packed))
+              inputBuffer.unmap()
+            }
             const scores = buffer(
               `Earth Score output ${index}`,
               range.rows * 4,
@@ -229,13 +255,24 @@ export async function loadEarthScore(
         )
         // Flush pending unmap copies every 4 chunks without stalling on a CPU/GPU fence
         // so Dawn reclaims staging memory incrementally at full decode speed.
-        if ((++uploaded & 3) === 0) queue.submit([])
+        if (!isEpb2 && (++uploaded & 3) === 0) queue.submit([])
+        // Yield briefly only when continuous main-thread copy time exceeds ~6 ms so pointer
+        // events stay responsive while Zstd decoder workers continue in parallel.
+        if (jobs.size && performance.now() - sliceStart >= uploadMainThreadBudgetMs) {
+          await yieldToMain()
+          loading.throwIfAborted()
+          sliceStart = performance.now()
+        }
       }
       if (uploaded & 3) queue.submit([])
       const completed = await waitForLoad(Promise.all(checks), loading)
       const error = completed.find(Boolean)
       if (error) throw error
+      if (epb2Unpacker) {
+        await waitForLoad(queue.onSubmittedWorkDone(), loading)
+      }
     } finally {
+      epb2Unpacker?.destroy()
       decoder.close()
     }
     loading.throwIfAborted()

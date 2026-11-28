@@ -1,20 +1,20 @@
-struct EarthAtmo {
-  sphere: vec4f,
-  params: vec4f,
-  pole: vec4f,
+struct PlanetAtmo {
+  center: vec3f,
+  radius: f32,
+  strength: f32,
+  isMars: f32,
+  isSmall: f32,
+  _padParam: f32,
+  poleAxis: vec3f,
+  poleStretch: f32,
 }
 
-@group(0) @binding(1) var<uniform> atmo: EarthAtmo;
+@group(0) @binding(1) var<uniform> atmo: PlanetAtmo;
 
 struct AtmoSample {
   radiance: vec3f,
   depth: f32,
   valid: bool,
-}
-
-fn rayFromMapped(mapped: vec2f) -> vec3f {
-  let p = vec2f(mapped.x * view.right.w, mapped.y) * view.up.w;
-  return normalize(vec3f(p, -1.));
 }
 
 fn evalAtmoB(mapped: vec2f, centerS: vec3f, pAxis: vec3f, stretch: f32) -> f32 {
@@ -25,23 +25,23 @@ fn evalAtmoB(mapped: vec2f, centerS: vec3f, pAxis: vec3f, stretch: f32) -> f32 {
 }
 
 fn computeEarthAtmo(input: ScreenVertex) -> AtmoSample {
-  if (atmo.params.x <= .001) { return AtmoSample(vec3f(0.), 0., false); }
-  let isMars = atmo.params.y > .5;
-  let isSmall = atmo.params.z > .5;
+  if (atmo.strength <= .001) { return AtmoSample(vec3f(0.), 0., false); }
+  let isMars = atmo.isMars > .5;
+  let isSmall = atmo.isSmall > .5;
   // Evaluate pixel-center NDC and analytical radial step directly from framebuffer coordinates
   // so radial footprints and shell integrals have no hardware quad-derivative dependence.
   let pxCenter = floor(input.position.xy) + vec2f(.5);
-  let ndc = vec2f(pxCenter.x * view.screen.x - 1., 1. - pxCenter.y * view.screen.y);
-  let mappedNdc = view.crop.xy + ndc * view.crop.zw;
-  let mappedStep = view.screen.xy * .5 * view.crop.zw;
+  let ndc = pixelToNdc(pxCenter);
+  let mappedNdc = mapCrop(ndc);
+  let mappedStep = view.invScreenSize * .5 * view.cropScale;
   let ray = rayFromMapped(mappedNdc);
-  let center = atmo.sphere.xyz;
-  let radius = atmo.sphere.w;
+  let center = atmo.center;
+  let radius = atmo.radius;
   // Transform into ellipsoid-normalized space (using Earth's camera-space polar axis and
   // WGS84 flattening; identity for Mars) so bEllip == radius coincides exactly with the
   // solid horizon at every latitude and camera roll angle.
-  let pAxis = atmo.pole.xyz;
-  let stretch = atmo.pole.w;
+  let pAxis = atmo.poleAxis;
+  let stretch = atmo.poleStretch;
   let rayS = normalize(ray + pAxis * (dot(ray, pAxis) * stretch));
   let centerS = center + pAxis * (dot(center, pAxis) * stretch);
   let t = dot(ray, center);
@@ -53,7 +53,7 @@ fn computeEarthAtmo(input: ScreenVertex) -> AtmoSample {
     - evalAtmoB(mappedNdc - vec2f(mappedStep.x, 0.), centerS, pAxis, stretch);
   let dbY = evalAtmoB(mappedNdc + vec2f(0., mappedStep.y), centerS, pAxis, stretch)
     - evalAtmoB(mappedNdc - vec2f(0., mappedStep.y), centerS, pAxis, stretch);
-  let db = max(length(vec2f(dbX, dbY)), max(t, 0.) * view.light.w * .5);
+  let db = max(length(vec2f(dbX, dbY)), max(t, 0.) * view.pixelAngularScale * .5);
   let maxScale = select(1.058, 1.032, isMars);
   // Displaced 3D terrain can dip below the reference radius (e.g. Mars's northern lowlands
   // and Hellas Basin sit up to ~25 km below MOLA datum with 3x relief). Extend the inner
@@ -61,7 +61,7 @@ fn computeEarthAtmo(input: ScreenVertex) -> AtmoSample {
   // so hardware/4-sample depth testing clips the atmosphere seamlessly against the real mesh
   // silhouette instead of leaving a dark gap between depressed terrain and `radius`.
   let minScale = select(select(.998, .988, isMars), 1., isSmall);
-  if (t <= view.back.w || bEllip - .5 * db >= radius * maxScale || bEllip + .5 * db <= radius * minScale) {
+  if (t <= view.near || bEllip - .5 * db >= radius * maxScale || bEllip + .5 * db <= radius * minScale) {
     return AtmoSample(vec3f(0.), 0., false);
   }
   let shellWidth = select(.046, .024, isMars);
@@ -96,7 +96,7 @@ fn computeEarthAtmo(input: ScreenVertex) -> AtmoSample {
   let denom = select(max(a1 - max(altMin, a0), 1e-4), w, isSmall);
   let shell = (flatSpan + expContrib) / denom;
   let limbNormal = offset / max(length(offset), 1.e-4);
-  let sunDir = normalize(view.light.xyz - center);
+  let sunDir = normalize(view.lightPos - center);
   let sunDot = dot(limbNormal, sunDir);
   let day = smoothstep(-.14, .26, sunDot);
   let backScatter = pow(max(0., dot(ray, sunDir)), 5.);
@@ -110,12 +110,12 @@ fn computeEarthAtmo(input: ScreenVertex) -> AtmoSample {
     vec3f(.38, .56, .80) * .08 * twilight +
     vec3f(.10, .06, .04) * .06 * (1. - day),
     isMars,
-  ) * shell * atmo.params.x;
+  ) * shell * atmo.strength;
   // For 3D displaced meshes, place the atmosphere depth plane slightly past the planet center plane
   // so steep front-facing limb relief never fails depth test against the atmosphere while still
   // occluding properly behind closer bodies and staying strictly in front of the infinite sky.
-  let atmoT = select(t + radius * .05, max(view.back.w * 1.01, t - radius * 1.01), isSmall);
+  let atmoT = select(t + radius * .05, max(view.near * 1.01, t - radius * 1.01), isSmall);
   let depth = -ray.z * atmoT;
-  if (depth <= view.back.w) { return AtmoSample(vec3f(0.), 0., false); }
-  return AtmoSample(radiance, view.back.w / depth, true);
+  if (depth <= view.near) { return AtmoSample(vec3f(0.), 0., false); }
+  return AtmoSample(radiance, view.near / depth, true);
 }

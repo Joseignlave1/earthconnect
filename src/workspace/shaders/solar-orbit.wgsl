@@ -2,8 +2,11 @@
 
 struct OrbitVertex {
   @builtin(position) position: vec4f,
-  @location(0) @interpolate(flat) segA: vec4f, // x,y: A in framebuffer px (y-down), z: zA (near/aw), w: halfWidthPx
-  @location(1) @interpolate(flat) segB: vec4f, // x,y: B in framebuffer px (y-down), z: zB (near/bw), w: reserved
+  @location(0) @interpolate(flat) startPx: vec2f,
+  @location(1) @interpolate(flat) startDepth: f32,
+  @location(2) @interpolate(flat) halfWidthPx: f32,
+  @location(3) @interpolate(flat) endPx: vec2f,
+  @location(4) @interpolate(flat) endDepth: f32,
 }
 
 @vertex fn orbitVertex(
@@ -11,7 +14,7 @@ struct OrbitVertex {
   @location(1) segA: vec4f,
   @location(2) segB: vec4f,
 ) -> OrbitVertex {
-  return OrbitVertex(position, segA, segB);
+  return OrbitVertex(position, segA.xy, segA.z, segA.w, segB.xy, segB.z);
 }
 
 struct OrbitCovOut {
@@ -30,10 +33,10 @@ struct OrbitCovOut {
   let basePx = floor(input.position.xy);
   let destCenter = basePx + vec2f(.5);
   let occ = textureLoad(sceneDepth, vec2i(basePx), i32(sampleIdx));
-  let a = input.segA.xy;
-  let b = input.segB.xy;
-  let zA = input.segA.z;
-  let zB = input.segB.z;
+  let a = input.startPx;
+  let b = input.endPx;
+  let zA = input.startDepth;
+  let zB = input.endDepth;
   let visA = zA > occ;
   let visB = zB > occ;
   if (!visA && !visB) { discard; }
@@ -53,7 +56,7 @@ struct OrbitCovOut {
     let t = clamp(dot(destCenter - a, ab) / abLenSq, t0, t1);
     dist = length(destCenter - (a + ab * t));
   }
-  let cov = clamp(input.segA.w + .5 - dist, 0., 1.);
+  let cov = clamp(input.halfWidthPx + .5 - dist, 0., 1.);
   if (cov <= .002) { discard; }
   return OrbitCovOut(vec4f(cov), 1u << sampleIdx);
 }

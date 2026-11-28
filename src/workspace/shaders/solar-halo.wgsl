@@ -1,5 +1,7 @@
 struct HaloParams {
-  sun: vec4f, // ndcX, ndcY, visibility [0..1], aspect
+  sunNdc: vec2f,
+  visibility: f32,
+  aspect: f32,
 }
 
 @group(0) @binding(1) var<uniform> halo: HaloParams;
@@ -12,17 +14,17 @@ struct Halo {
 @fragment fn haloFragment(input: ScreenVertex) -> Halo {
   let ndc = vec2f(input.uv.x * 2. - 1., 1. - input.uv.y * 2.);
   let ray = viewRay(ndc);
-  let sun = view.light.xyz;
+  let sun = view.lightPos;
   let sunDist = length(sun);
-  if (sunDist <= view.back.w) { discard; }
+  if (sunDist <= view.near) { discard; }
   let sunDir = sun / sunDist;
   let cosAngle = dot(ray, sunDir);
   let distance = cosAngle * sunDist;
-  if (cosAngle <= 0. || distance <= view.back.w) { discard; }
-  let sunAngRadius = max(695700. / sunDist, view.light.w * 2.6);
+  if (cosAngle <= 0. || distance <= view.near) { discard; }
+  let sunAngRadius = max(695700. / sunDist, view.pixelAngularScale * 2.6);
   let r = length(ray - sunDir * cosAngle) / sunAngRadius;
   if (r >= 24.) { discard; }
-  let sunVis = halo.sun.z;
+  let sunVis = halo.visibility;
   // Pure ray-free multi-scale optical glare with micro R/G/B glass dispersion.
   let rVec = vec3f(r * .95, r, r * 1.055);
   let outerFade = smoothstep(24., 7., r);
@@ -39,8 +41,8 @@ struct Halo {
     vec3f(1., .96, .88) * diamond
   ) * outerFade;
   let depth = -ray.z * distance;
-  if (depth <= view.back.w) { discard; }
-  return Halo(vec4f(color, 0.), view.back.w / depth);
+  if (depth <= view.near) { discard; }
+  return Halo(vec4f(color, 0.), view.near / depth);
 }
 
 // Mechanical barrel vignetting: intersecting two offset aperture circles squeezes off-axis
@@ -68,9 +70,9 @@ fn chromaticGhost(p: vec2f, sun: vec2f, axis: vec2f, ecc: f32, pos: f32, radius:
 // Foreground camera-lens pass (no depth test): reflections float in front of planets and
 // vanish smoothly via sunVis whenever a planet eclipses the Sun.
 @fragment fn lensFlareFragment(input: ScreenVertex) -> @location(0) vec4f {
-  let sunVis = halo.sun.z;
-  let sunNdc = halo.sun.xy;
-  let aspect = halo.sun.w;
+  let sunVis = halo.visibility;
+  let sunNdc = halo.sunNdc;
+  let aspect = halo.aspect;
   let sunSensor = sunNdc * vec2f(aspect, 1.);
   let sunEcc = length(sunSensor);
   let onScreen = smoothstep(1.55, .82, max(abs(sunNdc.x), abs(sunNdc.y)));

@@ -49,12 +49,15 @@ let writeQueue = Promise.resolve()
 function openProjectDatabase(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === 'undefined') return Promise.resolve(null)
   if (!openDatabasePromise) {
-    openDatabasePromise = new Promise(resolve => {
+    const pending = new Promise<IDBDatabase | null>(resolve => {
       let settled = false
       const finish = (db: IDBDatabase | null) => {
-        if (settled) return
+        if (settled) {
+          db?.close()
+          return
+        }
         settled = true
-        if (!db) openDatabasePromise = null
+        if (!db && openDatabasePromise === pending) openDatabasePromise = null
         resolve(db)
       }
       try {
@@ -66,12 +69,16 @@ function openProjectDatabase(): Promise<IDBDatabase | null> {
         }
         request.onsuccess = () => {
           const db = request.result
+          if (settled) {
+            db.close()
+            return
+          }
           db.onversionchange = () => {
             db.close()
-            openDatabasePromise = null
+            if (openDatabasePromise === pending) openDatabasePromise = null
           }
           db.onclose = () => {
-            openDatabasePromise = null
+            if (openDatabasePromise === pending) openDatabasePromise = null
           }
           finish(db)
         }
@@ -81,6 +88,7 @@ function openProjectDatabase(): Promise<IDBDatabase | null> {
         finish(null)
       }
     })
+    openDatabasePromise = pending
   }
   return openDatabasePromise
 }
@@ -214,19 +222,28 @@ function parseShaderProject(saved: unknown): ShaderProject | null {
   return null
 }
 
-function readLegacyProject(): ShaderProject | null {
+function readLegacyEntry(): { project: ShaderProject; pendingFallback: boolean } | null {
   try {
     const raw = localStorage.getItem(legacyStorageKey)
     if (!raw) return null
-    return parseShaderProject(JSON.parse(raw))
+    const parsedJson: unknown = JSON.parse(raw)
+    const project = parseShaderProject(parsedJson)
+    if (!project) return null
+    const pendingFallback =
+      typeof parsedJson === 'object' &&
+      parsedJson !== null &&
+      'fallbackPending' in parsedJson &&
+      (parsedJson as { fallbackPending?: unknown }).fallbackPending === true
+    return { project, pendingFallback }
   } catch {
     return null
   }
 }
 
-function writeLegacyProject(project: ShaderProject) {
+function writeLegacyProject(project: ShaderProject, pendingFallback = false) {
   try {
-    localStorage.setItem(legacyStorageKey, JSON.stringify(project))
+    const payload = pendingFallback ? { ...project, fallbackPending: true } : project
+    localStorage.setItem(legacyStorageKey, JSON.stringify(payload))
   } catch {
     /* Storage may be unavailable. */
   }
@@ -264,6 +281,20 @@ function cloneProject(project: ShaderProject): ShaderProject {
 }
 
 export async function readShaderProject(storage: ShaderProjectStorage | null = defaultStorage): Promise<ShaderProject> {
+  const legacyEntry = readLegacyEntry()
+  // If a prior save fell back to localStorage while IndexedDB failed, prefer that newer copy
+  // and migrate it before reading an older IndexedDB record.
+  if (legacyEntry?.pendingFallback) {
+    if (storage) {
+      try {
+        await enqueueWrite(() => storage.save(cloneProject(legacyEntry.project)))
+        clearLegacyProject()
+      } catch {
+        /* Keep the pending fallback copy until IndexedDB accepts writes again. */
+      }
+    }
+    return legacyEntry.project
+  }
   if (storage) {
     try {
       const parsed = parseShaderProject(await storage.load())
@@ -272,17 +303,16 @@ export async function readShaderProject(storage: ShaderProjectStorage | null = d
       /* Fall back to legacy storage or defaults when IndexedDB is unavailable. */
     }
   }
-  const legacy = readLegacyProject()
-  if (legacy) {
+  if (legacyEntry) {
     if (storage) {
       try {
-        await enqueueWrite(() => storage.save(cloneProject(legacy)))
+        await enqueueWrite(() => storage.save(cloneProject(legacyEntry.project)))
         clearLegacyProject()
       } catch {
         /* Keep the legacy copy if IndexedDB migration failed. */
       }
     }
-    return legacy
+    return legacyEntry.project
   }
   return defaultShaderProject()
 }
@@ -296,12 +326,13 @@ export function saveShaderProject(
     if (storage) {
       try {
         await storage.save(snapshot)
+        clearLegacyProject()
         return
       } catch {
         /* Fall back to localStorage when IndexedDB is unavailable. */
       }
     }
-    writeLegacyProject(snapshot)
+    writeLegacyProject(snapshot, true)
   })
 }
 

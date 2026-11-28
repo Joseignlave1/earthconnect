@@ -235,3 +235,29 @@ test('a project restores its active shader when every WGSL tab is closed', async
   const files = resolveShaderFiles(restored, '// basin')
   assert.equal(assembleShaderProject(selectShaderModule(files, restored.activeFileId)).source, '// retained shader')
 })
+
+test('a fallback localStorage save wins over an older IndexedDB snapshot on reload and migrates', async t => {
+  const legacy = mockLegacyStorage(t, null)
+  const storage = memoryProjectStorage()
+  const initial = await readShaderProject(storage)
+  await saveShaderProject(initial, storage)
+
+  const edited = {
+    ...initial,
+    files: initial.files.map(file => (file.id === 'score' ? { ...file, source: '// newer fallback edit' } : file)),
+  }
+  const writeFailingStorage: ShaderProjectStorage = {
+    load: () => storage.load(),
+    async save() {
+      throw new Error('IDB quota')
+    },
+  }
+  await saveShaderProject(edited, writeFailingStorage)
+  assert.notEqual(legacy.value, null)
+
+  // On next reload, IndexedDB is readable again with the older copy, yet the fallback wins and migrates.
+  const reloaded = await readShaderProject(storage)
+  assert.equal(reloaded.files.find(file => file.id === 'score')?.source, '// newer fallback edit')
+  assert.equal(storage.saved?.files.find(file => file.id === 'score')?.source, '// newer fallback edit')
+  assert.equal(legacy.value, null)
+})

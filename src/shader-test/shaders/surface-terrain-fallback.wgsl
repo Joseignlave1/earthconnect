@@ -2,8 +2,7 @@
 // sampling helper changes; heights and coast distances are never quantized.
 fn terrainTexel(pixel: vec2i, lod: i32) -> vec2f {
   let size = vec2i(textureDimensions(terrain, lod));
-  let p = vec2i(((pixel.x % size.x) + size.x) % size.x, clamp(pixel.y, 0, size.y - 1));
-  return textureLoad(terrain, p, lod).rg;
+  return textureLoad(terrain, wrapClampTexel(pixel, size), lod).rg;
 }
 
 fn terrainBilinear(uv: vec2f, lod: i32) -> vec2f {

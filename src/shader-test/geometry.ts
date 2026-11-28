@@ -1,4 +1,6 @@
-export type Vec3 = [number, number, number]
+import { vec3Cross, vec3Dot, vec3Sub, type MutableVec3, type ReadonlyVec3 } from './vec3.ts'
+
+export type Vec3 = MutableVec3
 export type Rotation = [number, number, number, number]
 export type Selection = { longitude: number; latitude: number; position: Vec3; elevation?: number }
 export type Camera = {
@@ -15,6 +17,51 @@ export const COLUMNS = 512
 export const ROWS = 256
 export const EARTH_AXIS = 6378137
 export const EARTH_FLATTENING = 1 / 298.257223563
+export const EARTH_E2 = EARTH_FLATTENING * (2 - EARTH_FLATTENING)
+
+export function sphericalNormal(longitude: number, latitude: number): Vec3 {
+  if (Math.abs(latitude) === Math.PI / 2) return [0, Math.sign(latitude), 0]
+  const c = Math.cos(latitude)
+  return [c * Math.sin(longitude), Math.sin(latitude), c * Math.cos(longitude)]
+}
+
+export function wgs84UnitPoint(longitude: number, latitude: number, heightRatio = 0): Vec3 {
+  const cos = Math.abs(latitude) === Math.PI / 2 ? 0 : Math.cos(latitude)
+  const sin = Math.sin(latitude)
+  const n = 1 / Math.sqrt(1 - EARTH_E2 * sin * sin)
+  return [
+    (n + heightRatio) * cos * Math.sin(longitude),
+    (n * (1 - EARTH_E2) + heightRatio) * sin,
+    (n + heightRatio) * cos * Math.cos(longitude),
+  ]
+}
+
+export function intersectsAabb(
+  minBound: ReadonlyVec3,
+  maxBound: ReadonlyVec3,
+  eye: ReadonlyVec3,
+  ray: ReadonlyVec3,
+  nearest: number,
+  pad = 0,
+  dirEps = 1e-15,
+) {
+  let near = 0,
+    far = nearest
+  for (let axis = 0; axis < 3; axis++) {
+    const min = minBound[axis] - pad,
+      max = maxBound[axis] + pad
+    if (Math.abs(ray[axis]) < dirEps) {
+      if (eye[axis] < min || eye[axis] > max) return false
+    } else {
+      const a = (min - eye[axis]) / ray[axis],
+        b = (max - eye[axis]) / ray[axis]
+      near = Math.max(near, Math.min(a, b))
+      far = Math.min(far, Math.max(a, b))
+      if (near > far) return false
+    }
+  }
+  return true
+}
 
 export function ease(value: number) {
   return value * value * (3 - 2 * value)
@@ -70,17 +117,10 @@ export function surfacePoint(
   elevation = 0,
   exaggeration = 1,
 ): Vec3 {
-  const cos = Math.abs(latitude) === Math.PI / 2 ? 0 : Math.cos(latitude),
-    sin = Math.sin(latitude)
-  const e2 = EARTH_FLATTENING * (2 - EARTH_FLATTENING)
-  const n = 1 / Math.sqrt(1 - e2 * sin * sin)
   const height = (Math.max(0, elevation) / EARTH_AXIS) * exaggeration
+  const [sx, sy, sz] = wgs84UnitPoint(longitude, latitude, height)
   const [px, py] = equalEarthProject(longitude, latitude)
-  return [
-    px * (1 - morph) + (n + height) * cos * Math.sin(longitude) * morph,
-    py * (1 - morph) + (n * (1 - e2) + height) * sin * morph,
-    height * (1 - morph) + (n + height) * cos * Math.cos(longitude) * morph,
-  ]
+  return [px * (1 - morph) + sx * morph, py * (1 - morph) + sy * morph, height * (1 - morph) + sz * morph]
 }
 
 // Compose in camera space: dragging always turns around the current screen axes,
@@ -93,6 +133,22 @@ export function orbitRotation(rotation: Rotation, horizontal: number, vertical: 
     dy = horizontal * scale,
     dw = Math.cos(angle / 2)
   return composeRotation(rotation, [dx, dy, 0, dw])
+}
+
+/**
+ * Production globe pointer-drag rotation: converts screen-space pixel deltas from the
+ * grab point into screen-axis orbit angles scaled by the visible altitude above the surface.
+ */
+export function dragGlobeRotation(
+  camera: Camera,
+  fallbackRotation: Rotation,
+  dxPx: number,
+  dyPx: number,
+  viewportHeight: number,
+  morph = 1,
+): Rotation {
+  const scale = (2 * Math.tan(FOV / 2) * Math.max(0.001, camera.distance - ease(morph))) / Math.max(1, viewportHeight)
+  return orbitRotation(camera.rotation ?? fallbackRotation, dxPx * scale, dyPx * scale)
 }
 
 function composeRotation(a: Rotation, b: Rotation): Rotation {
@@ -251,13 +307,9 @@ export function createMesh(columns = COLUMNS, rows = ROWS) {
   return { uv, indices, columns, rows }
 }
 
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-const cross = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-]
-const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+const sub = vec3Sub
+const cross = vec3Cross
+const dot = vec3Dot
 
 type TerrainSurface = { heightAt: (longitude: number, latitude: number) => number; exaggeration: number }
 type PickBlock = { x: number; y: number; endX: number; endY: number; min: Vec3; max: Vec3 }
@@ -297,22 +349,7 @@ function preparePickGeometry(
 }
 
 function intersectsBlock(block: PickBlock, eye: Vec3, direction: Vec3, nearest: number) {
-  let near = 0,
-    far = nearest
-  for (let axis = 0; axis < 3; axis++) {
-    const min = block.min[axis] - 1e-9,
-      max = block.max[axis] + 1e-9
-    if (Math.abs(direction[axis]) < 1e-15) {
-      if (eye[axis] < min || eye[axis] > max) return false
-    } else {
-      const a = (min - eye[axis]) / direction[axis],
-        b = (max - eye[axis]) / direction[axis]
-      near = Math.max(near, Math.min(a, b))
-      far = Math.min(far, Math.max(a, b))
-      if (near > far) return false
-    }
-  }
-  return true
+  return intersectsAabb(block.min, block.max, eye, direction, nearest, 1e-9, 1e-15)
 }
 
 // Geometry is invariant during camera motion. Rebuild only when the surface

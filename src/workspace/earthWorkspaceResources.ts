@@ -61,8 +61,9 @@ export function createEarthWorkspaceResources(acquireDevice = createSurfaceDevic
     const key = `${format}:${path}`
     let pending = terrains.get(key) as Promise<PreparedTerrain<F>> | undefined
     if (!pending) {
-      const controller = new AbortController()
-      pending = getUrl(controller.signal).then(url => loadPreparedTerrain(url, format, controller.signal))
+      // Bind shared terrain downloads to the resource owner's lifetime while keeping
+      // individual consumer cancellation independent via raceAbort below.
+      pending = getUrl(pointLifetime).then(url => loadPreparedTerrain(url, format, pointLifetime))
       terrains.set(key, pending)
       void pending.catch(() => {
         if (terrains.get(key) === pending) terrains.delete(key)

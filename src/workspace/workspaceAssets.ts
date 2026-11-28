@@ -2,6 +2,16 @@
 // Actual asset URLs, including their content hashes, come from the CDN manifest.
 export const scoreManifestUrl = 'https://workspace.invalid/compute-data/world/manifest.json'
 
+const assetCacheKeys = new Map<string, string>()
+
+export function registerAssetCacheKey(url: string, key: string) {
+  assetCacheKeys.set(url, key)
+}
+
+export function getAssetCacheKey(url: string): string | undefined {
+  return assetCacheKeys.get(url)
+}
+
 export type WorkspaceAssets = {
   blob(path: string, signal: AbortSignal): Promise<Blob>
   url(path: string, signal: AbortSignal): Promise<string>
@@ -12,6 +22,7 @@ export type WorkspaceAssets = {
 export function workspaceAssets(
   get: (path: string, signal: AbortSignal) => Blob | Promise<Blob>,
   resolveDirectUrl?: (path: string, signal: AbortSignal) => Promise<string | undefined>,
+  resolveCacheKey?: (path: string) => string | undefined,
 ): WorkspaceAssets {
   const objectUrls = new Map<string, string>()
   const directUrls = new Map<string, string>()
@@ -34,6 +45,7 @@ export function workspaceAssets(
         signal.throwIfAborted()
         if (direct) {
           directUrls.set(path, direct)
+          registerAssetCacheKey(direct, resolveCacheKey?.(path) ?? `dev:${path}`)
           return direct
         }
       }
@@ -42,6 +54,8 @@ export function workspaceAssets(
       if (!url) {
         url = URL.createObjectURL(data)
         objectUrls.set(path, url)
+        const key = resolveCacheKey?.(path)
+        if (key) registerAssetCacheKey(url, key)
       }
       return url
     },
@@ -49,9 +63,29 @@ export function workspaceAssets(
       return new Response(await blob(new URL(url).pathname.slice(1), signal))
     },
     dispose() {
-      for (const url of objectUrls.values()) URL.revokeObjectURL(url)
+      for (const url of objectUrls.values()) {
+        assetCacheKeys.delete(url)
+        URL.revokeObjectURL(url)
+      }
       objectUrls.clear()
       directUrls.clear()
     },
+  }
+}
+
+/** Shared tile-pack loader used by both the landing atlas and the full workspace. */
+export async function loadWorkspaceTilePack(
+  assets: WorkspaceAssets,
+  path: string,
+  signal: AbortSignal,
+): Promise<Blob | string | null> {
+  try {
+    if (import.meta.env.DEV) {
+      const url = await assets.url(path, signal)
+      if (!url.startsWith('blob:')) return url
+    }
+    return await assets.blob(path, signal)
+  } catch {
+    return null
   }
 }

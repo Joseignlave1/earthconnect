@@ -2,26 +2,59 @@ override TILE_SIZE: u32 = 256u;
 override BANK_SIZE: u32 = 256u;
 override HIGHLIGHT_START: f32 = 0.22;
 override HIGHLIGHT_FULL: f32 = 0.32;
+override VIRTUAL_TILE_SIZE: f32 = 512.0;
+override VIRTUAL_TILE_INNER: f32 = 508.0;
+override VIRTUAL_TILE_GUTTER: f32 = 2.0;
+override EARTH_TILE_BASE_COLS: f32 = 32.0;
+override EARTH_TILE_BASE_ROWS: f32 = 16.0;
 
-// Every field after the matrix is a vec4, shared with the packed CPU uniform
-// buffer. Keeping the layout explicit avoids per-frame bind-group allocation.
+// Explicit 16-byte-aligned uniform layout shared with the CPU writer.
 struct SurfaceUniforms {
   camera: mat4x4f,
   anchors: vec4f,
-  style: vec4f,      // baseline, contrast, top band, emission
-  context: vec4f,    // floor, opacity, minimum filter, highlight opacity
-  view: vec4f,       // morph, relief, best score, mip count
-  contour: vec4f,    // land interval, depth interval, opacity, pixel ratio
-  detail: vec4f,     // minor/fine contour opacity, reserved, HDR
-  flags: vec4f,      // automatic palette, grid, preserve peaks, imagery
-  status: vec4f,     // terrain ready, native depth, earthReady, earthTilesReady
-  poles: vec4f,      // south pole height, north pole height, mesh relief, small-planet radial pad
-  sun: vec4f,        // Earth-fixed unit sun direction, reserved
-  eye: vec4f,        // Earth-fixed camera eye in Earth-radius units, reserved
-  camRight: vec4f,   // Earth-fixed camera right, w: tan(FOV/2) * aspect
-  camUp: vec4f,      // Earth-fixed camera up, w: tan(FOV/2)
-  camBack: vec4f,    // Earth-fixed camera back, w: view depth of Earth center (Earth radii)
-  centerInfo: vec4f, // centerNdcX, centerNdcY, 2 / outWidth, 2 / outHeight
+  cutoff: f32,
+  contrast: f32,
+  topRange: f32,
+  emission: f32,
+  contextFloor: f32,
+  contextOpacity: f32,
+  minimumScore: f32,
+  highlightOpacity: f32,
+  morph: f32,
+  relief: f32,
+  bestScore: f32,
+  scoreMipCount: f32,
+  landContourInterval: f32,
+  depthContourInterval: f32,
+  contourOpacity: f32,
+  pixelRatio: f32,
+  contourDetail: vec2f,
+  _padDetail: f32,
+  hdr: f32,
+  autoPalette: f32,
+  showGrid: f32,
+  preservePeaks: f32,
+  showImagery: f32,
+  terrainReady: f32,
+  nativeDepth: f32,
+  earthReady: f32,
+  earthTilesReady: f32,
+  southPoleHeight: f32,
+  northPoleHeight: f32,
+  meshRelief: f32,
+  _padPoles: f32,
+  sunDirection: vec3f,
+  _padSun: f32,
+  eyePos: vec3f,
+  _padEye: f32,
+  camRight: vec3f,
+  tanHalfFovX: f32,
+  camUp: vec3f,
+  tanHalfFovY: f32,
+  camBack: vec3f,
+  centerDepth: f32,
+  centerNdc: vec2f,
+  invViewportPx: vec2f,
 }
 
 @group(0) @binding(0) var<uniform> u: SurfaceUniforms;
@@ -33,12 +66,20 @@ struct SurfaceUniforms {
 
 const PI: f32 = 3.141592653589793;
 
-fn elevation(uv: vec2f) -> f32 {
-  if (uv.y == 0.) { return u.poles.x; }
-  if (uv.y == 1.) { return u.poles.y; }
-  // Sample mip 2 (~40 km footprint) to match the 512x256 mesh spacing so vertices form smooth
-  // mountain ridges instead of snagging on single 10 km spikes at the limb.
-  return terrainLevel(vec2f(uv.x, 1. - clamp(uv.y, 0., 1.)), 2.).r;
+fn elevation(uv: vec2f, demMip: f32) -> f32 {
+  if (uv.y <= 0.) { return u.southPoleHeight; }
+  if (uv.y >= 1.) { return u.northPoleHeight; }
+  if (u.terrainReady < .5) { return 0.; }
+  let maxLod = max(0., f32(textureNumLevels(terrain)) - 1.);
+  return terrainLevel(vec2f(uv.x, 1. - clamp(uv.y, 0., 1.)), clamp(demMip, 0., maxLod)).r;
+}
+
+struct EarthPatchIn {
+  @location(0) local: vec3f,
+  @location(1) patchOrigin: vec2f,
+  @location(2) patchSize: vec2f,
+  @location(3) demMip: f32,
+  @location(4) skirtDepth: f32,
 }
 
 struct SurfaceVertex {
@@ -48,27 +89,28 @@ struct SurfaceVertex {
   @location(2) worldPos: vec3f,
 }
 
-fn computeSurfaceVertex(uv: vec2f) -> SurfaceVertex {
+fn computeSurfaceVertex(input: EarthPatchIn) -> SurfaceVertex {
+  let uv = input.patchOrigin + input.local.xy * input.patchSize;
   let lon = (uv.x - .5) * 2. * PI;
   let lat = (uv.y - .5) * PI;
-  let smallPad = u.poles.w;
-  let height = select(max(0., elevation(uv)) / 6378137. * u.poles.z, 0., smallPad > 0.);
+  let skirt = input.local.z * input.skirtDepth;
+  let height = max(0., elevation(uv, input.demMip)) / 6378137. * u.meshRelief;
   let e2 = .0066943799901413165;
   let n = inverseSqrt(1. - e2 * sin(lat) * sin(lat));
   var normal = vec3f(cos(lat) * sin(lon), sin(lat), cos(lat) * cos(lon));
-  if (uv.y == 0. || uv.y == 1.) { normal = vec3f(0., sign(lat), 0.); }
+  if (uv.y <= 0. || uv.y >= 1.) { normal = vec3f(0., sign(lat), 0.); }
   let baseSphere = vec3f(n * normal.x, n * (1. - e2) * normal.y, n * normal.z);
-  let sphere = select(baseSphere + normal * height, baseSphere * (1. + smallPad), smallPad > 0.);
-  let plane = vec3f(equalEarth(lon, lat), height);
-  let position = vec4f(mix(plane, sphere, u.view.x), 1.);
+  let sphere = baseSphere + normal * (height - skirt);
+  let plane = vec3f(equalEarth(lon, lat), height - skirt);
+  let position = vec4f(mix(plane, sphere, u.morph), 1.);
   var clip = u.camera * position;
   // The standalone lab uses OpenGL depth. The solar scene uses native reverse-Z.
-  if (u.status.y < .5) { clip.z = (clip.z + clip.w) * .5; }
+  if (u.nativeDepth < .5) { clip.z = (clip.z + clip.w) * .5; }
   return SurfaceVertex(clip, uv, normal, position.xyz);
 }
 
-@vertex fn surfaceVertex(@location(0) uv: vec2f) -> SurfaceVertex {
-  return computeSurfaceVertex(uv);
+@vertex fn surfaceVertex(input: EarthPatchIn) -> SurfaceVertex {
+  return computeSurfaceVertex(input);
 }
 
 struct AnnotationVertex {
@@ -77,8 +119,8 @@ struct AnnotationVertex {
   @location(1) @interpolate(perspective, sample) geodetic: vec3f,
 }
 
-@vertex fn annotationVertex(@location(0) uv: vec2f) -> AnnotationVertex {
-  let v = computeSurfaceVertex(uv);
+@vertex fn annotationVertex(input: EarthPatchIn) -> AnnotationVertex {
+  let v = computeSurfaceVertex(input);
   return AnnotationVertex(v.position, v.uv, v.geodetic);
 }
 
@@ -87,21 +129,20 @@ struct SmallSurfaceVertex {
 }
 
 @vertex fn smallSurfaceVertex(@builtin(vertex_index) vertex: u32) -> SmallSurfaceVertex {
-  let corners = array<vec2f, 6>(vec2f(-1., -1.), vec2f(1., -1.), vec2f(-1., 1.), vec2f(-1., 1.), vec2f(1., -1.), vec2f(1., 1.));
-  let depth = u.camBack.w;
+  let depth = u.centerDepth;
   if (depth <= 1.001) { return SmallSurfaceVertex(vec4f(2., 2., 0., 1.)); }
   let clipCenter = u.camera * vec4f(0., 0., 0., 1.);
   if (clipCenter.w <= 0.) { return SmallSurfaceVertex(vec4f(2., 2., 0., 1.)); }
   let center = clipCenter.xy / clipCenter.w;
-  let cx = -dot(u.eye.xyz, u.camRight.xyz);
-  let cy = -dot(u.eye.xyz, u.camUp.xyz);
+  let cx = -dot(u.eyePos, u.camRight);
+  let cy = -dot(u.eyePos, u.camUp);
   let d2x = cx * cx + depth * depth;
   let d2y = cy * cy + depth * depth;
   let denom = max(depth * depth - 1., 1e-6);
-  let extX = (sqrt(max(0., d2x - 1.)) + abs(cx) / depth) / (denom * u.camRight.w);
-  let extY = (sqrt(max(0., d2y - 1.)) + abs(cy) / depth) / (denom * u.camUp.w);
-  let pad = vec2f(3. * u.centerInfo.z, 3. * u.centerInfo.w);
-  let corner = center + corners[vertex] * (vec2f(extX, extY) + pad);
+  let extX = (sqrt(max(0., d2x - 1.)) + abs(cx) / depth) / (denom * u.tanHalfFovX);
+  let extY = (sqrt(max(0., d2y - 1.)) + abs(cy) / depth) / (denom * u.tanHalfFovY);
+  let pad = 3. * u.invViewportPx;
+  let corner = center + unitQuadCorner(vertex) * (vec2f(extX, extY) + pad);
   return SmallSurfaceVertex(vec4f(corner, 0., 1.));
 }
 
@@ -148,7 +189,7 @@ fn surfaceUvFrom(rawUv: vec2f, rawGeodetic: vec3f) -> vec2f {
   var longitude = 0.;
   if (length(geodetic.xz) > .00000001) { longitude = atan2(geodetic.x, geodetic.z); }
   let globeUv = vec2f(longitude / (2. * PI) + .5, atan2(geodetic.y, length(geodetic.xz)) / PI + .5);
-  var uv = rawUv + wrappedGradient(globeUv - rawUv) * u.view.x;
+  var uv = rawUv + wrappedGradient(globeUv - rawUv) * u.morph;
   uv.x = fract(uv.x);
   return uv;
 }
@@ -220,8 +261,29 @@ fn loadScoreBilinear(address: vec2f, lod: i32, cellStep: vec2f) -> ScoreSample {
   return ScoreSample(avg, wSum, density);
 }
 
+struct ScorePointSample {
+  score: f32,
+  valid: f32,
+}
+
+struct ScoreProjection {
+  address: vec2f,
+  dx: vec2f,
+  dy: vec2f,
+}
+
+fn projectScoreUv(uv: vec2f, uvDx: vec2f, uvDy: vec2f) -> ScoreProjection {
+  let latitude = (uv.y - .5) * PI;
+  let cosLat = cos(latitude);
+  let sinTerm = (uv.x - .5) * PI * sin(latitude);
+  let address = vec2f(18. + (uv.x - .5) * 36. * cosLat, (1. - uv.y) * 18.);
+  let dx = vec2f(36. * (cosLat * uvDx.x - sinTerm * uvDx.y), -18. * uvDx.y);
+  let dy = vec2f(36. * (cosLat * uvDy.x - sinTerm * uvDy.y), -18. * uvDy.y);
+  return ScoreProjection(address, dx, dy);
+}
+
 fn sampleScoreTrilinear(address: vec2f, lodF: f32, cellStep: vec2f) -> ScoreSample {
-  let maxLod = i32(u.view.w) - 1;
+  let maxLod = i32(u.scoreMipCount) - 1;
   let clamped = clamp(lodF, 0., f32(maxLod));
   let lo = i32(floor(clamped));
   let hi = min(lo + 1, maxLod);
@@ -235,55 +297,53 @@ fn sampleScoreTrilinear(address: vec2f, lodF: f32, cellStep: vec2f) -> ScoreSamp
   return ScoreSample(mix(a.score, b.score, t), mix(a.valid, b.valid, t), mix(a.density, b.density, t));
 }
 
-fn loadScorePointTrilinear(address: vec2f, lodF: f32) -> vec2f {
-  let maxLod = i32(u.view.w) - 1;
+fn loadScorePointTrilinear(address: vec2f, lodF: f32) -> ScorePointSample {
+  let maxLod = i32(u.scoreMipCount) - 1;
   let clamped = clamp(lodF, 0., f32(maxLod));
   let lo = i32(floor(clamped));
   let hi = min(lo + 1, maxLod);
   let t = clamped - f32(lo);
   let cLo = loadScore(address, lo);
   if (hi == lo || t <= .001) {
-    return select(vec2f(0., 0.), vec2f(f32(cLo) / 65534., 1.), cLo != 65535u);
+    if (cLo == 65535u) { return ScorePointSample(0., 0.); }
+    return ScorePointSample(f32(cLo) / 65534., 1.);
   }
   let cHi = loadScore(address, hi);
   let vLo = select(0., 1., cLo != 65535u);
   let vHi = select(0., 1., cHi != 65535u);
   let valid = mix(vLo, vHi, t);
-  if (valid <= .001) { return vec2f(0., 0.); }
+  if (valid <= .001) { return ScorePointSample(0., 0.); }
   let sLo = select(0., f32(cLo) / 65534., cLo != 65535u);
   let sHi = select(0., f32(cHi) / 65534., cHi != 65535u);
   let score = (sLo * vLo * (1. - t) + sHi * vHi * t) / valid;
-  return vec2f(score, valid);
+  return ScorePointSample(score, valid);
 }
 
 fn scoreCode(uv: vec2f) -> u32 {
-  let latitude = (uv.y - .5) * PI;
-  let address = vec2f(18. + (uv.x - .5) * 36. * cos(latitude), (1. - uv.y) * 18.);
   let uvDx = wrappedGradient(dpdx(uv));
   let uvDy = wrappedGradient(dpdy(uv));
-  if (u.flags.z <= .5) { return loadScore(address, 0); }
-  let addressDx = vec2f(36. * (cos(latitude) * uvDx.x - (uv.x - .5) * PI * sin(latitude) * uvDx.y), -18. * uvDx.y);
-  let addressDy = vec2f(36. * (cos(latitude) * uvDy.x - (uv.x - .5) * PI * sin(latitude) * uvDy.y), -18. * uvDy.y);
-  let majorLength = max(length(addressDx), length(addressDy));
-  let singleLod = i32(clamp(floor(log2(max(1., majorLength * f32(TILE_SIZE)))), 0., u.view.w - 1.));
-  return loadScore(address, singleLod);
+  let proj = projectScoreUv(uv, uvDx, uvDy);
+  if (u.preservePeaks <= .5) { return loadScore(proj.address, 0); }
+  let majorLength = max(length(proj.dx), length(proj.dy));
+  let singleLod = i32(clamp(floor(log2(max(1., majorLength * f32(TILE_SIZE)))), 0., u.scoreMipCount - 1.));
+  return loadScore(proj.address, singleLod);
 }
 
 fn sampleScore(uv: vec2f, uvDx: vec2f, uvDy: vec2f) -> ScoreSample {
-  let latitude = (uv.y - .5) * PI;
-  let address = vec2f(18. + (uv.x - .5) * 36. * cos(latitude), (1. - uv.y) * 18.);
-  let addressDx = vec2f(36. * (cos(latitude) * uvDx.x - (uv.x - .5) * PI * sin(latitude) * uvDx.y), -18. * uvDx.y);
-  let addressDy = vec2f(36. * (cos(latitude) * uvDy.x - (uv.x - .5) * PI * sin(latitude) * uvDy.y), -18. * uvDy.y);
+  let proj = projectScoreUv(uv, uvDx, uvDy);
+  let address = proj.address;
+  let addressDx = proj.dx;
+  let addressDy = proj.dy;
   let tileSizeF = f32(TILE_SIZE);
   let cellStep = max(abs(addressDx), abs(addressDy)) * tileSizeF;
-  if (u.flags.z <= .5) {
+  if (u.preservePeaks <= .5) {
     let s = loadScoreBilinear(address, 0, cellStep);
     return ScoreSample(s.score, s.valid, 1.);
   }
   let dxLength = length(addressDx);
   let dyLength = length(addressDy);
   let majorLength = max(dxLength, dyLength);
-  let singleLodF = clamp(log2(max(1., majorLength * tileSizeF)), 0., u.view.w - 1.);
+  let singleLodF = clamp(log2(max(1., majorLength * tileSizeF)), 0., u.scoreMipCount - 1.);
   if (singleLodF <= .001) {
     let s = loadScoreBilinear(address, 0, cellStep);
     return ScoreSample(s.score, s.valid, 1.);
@@ -307,7 +367,7 @@ fn sampleScore(uv: vec2f, uvDx: vec2f, uvDy: vec2f) -> ScoreSample {
     return ScoreSample(center.score, center.valid, balanced);
   }
   let maxTaps = 7.;
-  let anisoLodF = clamp(log2(max(1., max(span / maxTaps, width) * tileSizeF)), 0., u.view.w - 1.);
+  let anisoLodF = clamp(log2(max(1., max(span / maxTaps, width) * tileSizeF)), 0., u.scoreMipCount - 1.);
   let taps = u32(clamp(2. * ceil((anisoRatio - 1.) * .5) + 1., 3., maxTaps));
   var sumScore = 0.;
   var sumValid = 0.;
@@ -315,10 +375,10 @@ fn sampleScore(uv: vec2f, uvDx: vec2f, uvDy: vec2f) -> ScoreSample {
   for (var tap = 0u; tap < taps; tap++) {
     let offset = ((f32(tap) + .5) / f32(taps) - .5) * span;
     let s = loadScorePointTrilinear(address + axis * offset, anisoLodF);
-    if (s.y > .001) {
-      sumScore += s.x * s.y;
-      sumValid += s.y;
-      bestScore = max(bestScore, s.x);
+    if (s.valid > .001) {
+      sumScore += s.score * s.valid;
+      sumValid += s.valid;
+      bestScore = max(bestScore, s.score);
     }
   }
   let anisoValid = sumValid / f32(taps);
@@ -362,6 +422,93 @@ struct EarthImagery {
   color: vec3f,
   tileWeight: f32,
   landMask: f32,
+  normalLocal: vec3f,
+  normalWeight: f32,
+}
+
+fn calibrateS2(rawRgb: vec3f) -> vec3f {
+  // Calibrate Sentinel-2 L3 BOA reflectance (baseline-lifted & brighter) to natural linear
+  // exposure and white balance while keeping bright snow/ice crisp neutral white.
+  // Matches scripts/ecv3/bake_earth_orbital_8k.py so orbital 8K -> L0..L5 tiles are seamless.
+  let snow = smoothstep(.45, .80, min(rawRgb.r, min(rawRgb.g, rawRgb.b)));
+  let scale = mix(vec3f(.593, .507, .516), vec3f(.57, .57, .59), snow);
+  return clamp(
+    scale * pow(max(rawRgb - vec3f(.030, .030, .040), vec3f(0.)), vec3f(1.50, 1.45, 1.55)),
+    vec3f(0.),
+    vec3f(1.),
+  );
+}
+
+fn earthSlotFade(idx: u32) -> f32 {
+  return earthTileFades[idx >> 2u][idx & 3u];
+}
+
+struct EarthAlbedoSample {
+  rgb: vec3f,
+  land: f32,
+  w: f32,
+}
+
+fn sampleEarthAlbedoSlot(
+  slot: u32,
+  level: u32,
+  cell: vec2i,
+  tileCoord: vec2f,
+  imgDx: vec2f,
+  imgDy: vec2f,
+) -> EarthAlbedoSample {
+  let innerScale = VIRTUAL_TILE_INNER / VIRTUAL_TILE_SIZE;
+  let baseGrid = vec2f(EARTH_TILE_BASE_COLS, EARTH_TILE_BASE_ROWS);
+  let maxShift = 5u;
+  let grid = baseGrid * exp2(f32(level));
+  let gradScale = grid * innerScale;
+  let dx = imgDx * gradScale;
+  let dy = imgDy * gradScale;
+  let tileMip = log2(max(1., max(length(dx), length(dy)) * VIRTUAL_TILE_SIZE));
+  if (level == 0u && tileMip >= 1.5) {
+    return EarthAlbedoSample(vec3f(0.), 0., 0.);
+  }
+  // Integer-cell tile origin eliminates 1 px wrap hairlines at tile edges.
+  let tileOrigin = vec2f(vec2u(cell) >> vec2u(maxShift - min(level, maxShift)));
+  let localUv = clamp(tileCoord * grid - tileOrigin, vec2f(0.), vec2f(1.));
+  let tileUv = localUv * innerScale + (VIRTUAL_TILE_GUTTER / VIRTUAL_TILE_SIZE);
+  let high = textureSampleGrad(earthTilePool, earthTileSampler, tileUv, i32(slot), dx, dy);
+  // Alpha encodes exact 30 m Copernicus land fraction in [0.5 .. 1.0] (128=water, 255=land).
+  let highLand = clamp((high.a - .5) * 2., 0., 1.);
+  let s2Cal = calibrateS2(high.rgb);
+  let highRgb = mix(high.rgb, s2Cal, highLand);
+  // L0 fades smoothly into the unified 8K Sentinel-2 orbital texture; L1..L5 also fade
+  // gracefully if their 5-mip chain runs out on rapid zoom-out or grazing views.
+  let w = select(1. - smoothstep(3.5, 4.5, tileMip), 1. - smoothstep(.75, 1.45, tileMip), level == 0u);
+  return EarthAlbedoSample(highRgb, highLand, w);
+}
+
+fn sampleEarthNormalSlot(
+  slot: u32,
+  level: u32,
+  cell: vec2i,
+  tileCoord: vec2f,
+  imgDx: vec2f,
+  imgDy: vec2f,
+) -> vec4f {
+  let innerScale = VIRTUAL_TILE_INNER / VIRTUAL_TILE_SIZE;
+  let baseGrid = vec2f(EARTH_TILE_BASE_COLS, EARTH_TILE_BASE_ROWS);
+  let maxShift = 5u;
+  let grid = baseGrid * exp2(f32(level));
+  let gradScale = grid * innerScale;
+  let dx = imgDx * gradScale;
+  let dy = imgDy * gradScale;
+  let tileMip = log2(max(1., max(length(dx), length(dy)) * VIRTUAL_TILE_SIZE));
+  if (level == 0u && tileMip >= 1.5) {
+    return vec4f(0., 0., 1., 0.);
+  }
+  let origin = vec2f(vec2u(cell) >> vec2u(maxShift - min(level, maxShift)));
+  let localUv = clamp(tileCoord * grid - origin, vec2f(0.), vec2f(1.));
+  let tileUv = localUv * innerScale + (VIRTUAL_TILE_GUTTER / VIRTUAL_TILE_SIZE);
+  let ns = textureSampleGrad(earthNormalPool, earthTileSampler, tileUv, i32(slot), dx, dy);
+  let n = normalize(vec3f(ns.xy * 2. - 1., max(.05, ns.z)));
+  let w = select(1. - smoothstep(3.5, 4.5, tileMip), 1. - smoothstep(.75, 1.45, tileMip), level == 0u);
+  return vec4f(n, w);
 }
 
 fn sampleEarthImagery(uv: vec2f, uvDx: vec2f, uvDy: vec2f, coast: f32) -> EarthImagery {
@@ -369,40 +516,97 @@ fn sampleEarthImagery(uv: vec2f, uvDx: vec2f, uvDy: vec2f, coast: f32) -> EarthI
   let imgDx = vec2f(uvDx.x, -uvDx.y);
   let imgDy = vec2f(uvDy.x, -uvDy.y);
   let coarseLand = smoothstep(-.25, .25, coast);
-  if (u.status.w > .5) {
+  var outColor = textureSampleGrad(earth, geographicSampler, imgUv, imgDx, imgDy).rgb;
+  var outTileW = 0.;
+  var outLand = coarseLand;
+  var outNormal = vec3f(0., 0., 1.);
+  var outNormalW = 0.;
+
+  if (u.earthTilesReady > .001) {
     let tileCoord = vec2f(fract(imgUv.x), clamp(imgUv.y, 0., .999999));
-    let cell = vec2i(clamp(floor(tileCoord * vec2f(160., 80.)), vec2f(0.), vec2f(159., 79.)));
+    let fullDims = vec2i(textureDimensions(earthTilePage));
+    let halfH = fullDims.y >> 1;
+    let pageDims = vec2f(f32(fullDims.x), f32(halfH));
+    let cell = vec2i(clamp(floor(tileCoord * pageDims), vec2f(0.), pageDims - 1.));
+    let innerScale = VIRTUAL_TILE_INNER / VIRTUAL_TILE_SIZE;
+    let baseGrid = vec2f(EARTH_TILE_BASE_COLS, EARTH_TILE_BASE_ROWS);
+
+    // Top half of earthTilePage: Sentinel-2 RGB + 30 m Copernicus land/water alpha
     let entry = textureLoad(earthTilePage, cell, 0);
     if (entry.r < 255u) {
-      let innerScale = 508. / 512.;
       var slot = entry.r;
-      var grid = vec2f(40., 20.) * exp2(f32(entry.g));
-      var gradScale = grid * innerScale;
-      var dx = imgDx * gradScale;
-      var dy = imgDy * gradScale;
-      var tileMip = log2(max(1., max(length(dx), length(dy)) * 512.));
-      if (tileMip > 1.75 && entry.b < 255u) {
+      var level = entry.g;
+      let grad0 = baseGrid * exp2(f32(level)) * innerScale;
+      let mip0 = log2(max(1., max(length(imgDx * grad0), length(imgDy * grad0)) * VIRTUAL_TILE_SIZE));
+      var usedFallback = false;
+      if (mip0 > 1.75 && entry.b < 255u) {
         slot = entry.b;
-        grid = vec2f(40., 20.) * exp2(f32(entry.a));
-        gradScale = grid * innerScale;
-        dx = imgDx * gradScale;
-        dy = imgDy * gradScale;
-        tileMip = log2(max(1., max(length(dx), length(dy)) * 512.));
+        level = entry.a;
+        usedFallback = true;
       }
-      if (tileMip < 2.8) {
-        let localUv = fract(tileCoord * grid);
-        let tileUv = localUv * innerScale + (2. / 512.);
-        let high = textureSampleGrad(earthTilePool, earthTileSampler, tileUv, i32(slot), dx, dy);
-        // Alpha encodes exact ~463m GEBCO + lake land fraction in [0.5 .. 1.0] (128=water, 255=land).
-        let highLand = clamp((high.a - .5) * 2., 0., 1.);
-        if (tileMip <= 2.0) { return EarthImagery(high.rgb, 1., highLand); }
-        let base = textureSampleGrad(earth, geographicSampler, imgUv, imgDx, imgDy).rgb;
-        let w = 1. - smoothstep(2.0, 2.8, tileMip);
-        return EarthImagery(mix(base, high.rgb, w), w, mix(coarseLand, highLand, w));
+      let fade = earthSlotFade(slot);
+      let primary = sampleEarthAlbedoSlot(slot, level, cell, tileCoord, imgDx, imgDy);
+      if (fade >= .999) {
+        if (primary.w > .001) {
+          let w = primary.w * u.earthTilesReady;
+          outColor = mix(outColor, primary.rgb, w);
+          outTileW = w;
+          outLand = mix(coarseLand, primary.land, w);
+        }
+      } else if (!usedFallback && entry.b < 255u) {
+        let parentFade = earthSlotFade(entry.b);
+        let parent = sampleEarthAlbedoSlot(entry.b, entry.a, cell, tileCoord, imgDx, imgDy);
+        let pW = parent.w * parentFade * u.earthTilesReady;
+        let cW = primary.w * u.earthTilesReady;
+        let parentColor = mix(outColor, parent.rgb, pW);
+        let childColor = mix(outColor, primary.rgb, cW);
+        let parentLand = mix(coarseLand, parent.land, pW);
+        let childLand = mix(coarseLand, primary.land, cW);
+        outColor = mix(parentColor, childColor, fade);
+        outTileW = mix(pW, cW, fade);
+        outLand = mix(parentLand, childLand, fade);
+      } else if (primary.w * fade > .001) {
+        let w = primary.w * fade * u.earthTilesReady;
+        outColor = mix(outColor, primary.rgb, w);
+        outTileW = w;
+        outLand = mix(coarseLand, primary.land, w);
+      }
+    }
+
+    // Bottom half of earthTilePage: 60 m Copernicus 10-bit DEM tangent-space normals
+    let nEntry = textureLoad(earthTilePage, cell + vec2i(0, halfH), 0);
+    if (nEntry.r < 255u) {
+      var nSlot = nEntry.r;
+      var nLevel = nEntry.g;
+      let nGrad0 = baseGrid * exp2(f32(nLevel)) * innerScale;
+      let nMip0 = log2(max(1., max(length(imgDx * nGrad0), length(imgDy * nGrad0)) * VIRTUAL_TILE_SIZE));
+      var usedNFallback = false;
+      if (nMip0 > 1.75 && nEntry.b < 255u) {
+        nSlot = nEntry.b;
+        nLevel = nEntry.a;
+        usedNFallback = true;
+      }
+      let nFade = earthSlotFade(160u + nSlot);
+      let primaryN = sampleEarthNormalSlot(nSlot, nLevel, cell, tileCoord, imgDx, imgDy);
+      if (nFade >= .999) {
+        outNormal = primaryN.xyz;
+        outNormalW = primaryN.w * u.earthTilesReady;
+      } else if (!usedNFallback && nEntry.b < 255u) {
+        let parentNFade = earthSlotFade(160u + nEntry.b);
+        let parentN = sampleEarthNormalSlot(nEntry.b, nEntry.a, cell, tileCoord, imgDx, imgDy);
+        let pNW = parentN.w * parentNFade;
+        let cNW = primaryN.w;
+        let nwSum = pNW * (1. - nFade) + cNW * nFade;
+        let nMixT = select(1., (cNW * nFade) / max(1e-5, nwSum), nwSum > 1e-4);
+        outNormal = normalize(mix(parentN.xyz, primaryN.xyz, nMixT));
+        outNormalW = mix(pNW, cNW, nFade) * u.earthTilesReady;
+      } else {
+        outNormal = primaryN.xyz;
+        outNormalW = primaryN.w * nFade * u.earthTilesReady;
       }
     }
   }
-  return EarthImagery(textureSampleGrad(earth, geographicSampler, imgUv, imgDx, imgDy).rgb, 0., coarseLand);
+  return EarthImagery(outColor, outTileW, outLand, outNormal, outNormalW);
 }
 
 fn oceanHash3(p: vec3f) -> f32 {
@@ -429,6 +633,9 @@ fn oceanNoise3(p: vec3f) -> f32 {
   return mix(nxy.x, nxy.y, u.z);
 }
 
+// Precomputed mix(0.66, 1.52, smoothstep(0.24, 0.78, 0.5)) — Naga does not support smoothstep() in const expressions.
+const OCEAN_WIND_MEAN_ROUGHNESS: f32 = 1.06612203;
+
 // Seam-free 3D mesoscale ocean wind field (~150-1000 km fronts & calm slicks) modulating
 // Cox-Munk RMS wave slope, analytically band-limited using a proven Frobenius Jacobian bound
 // (||J_p||_2 <= 1 + 0.22 * 5.2 * sqrt(3) * 1.875 * wWarp ≈ 1 + 3.72 * wWarp) so all
@@ -439,13 +646,13 @@ fn oceanWindRoughness(n: vec3f, nDx: vec3f, nDy: vec3f) -> f32 {
   let flowDy = vec3f(nDy.x, nDy.y * 1.45, nDy.z);
   let flowStep = max(length(flowDx), length(flowDy));
   // Even without warp stretching, once the lowest octave (7.5) exceeds Nyquist all octaves are 0.5.
-  if (7.5 * flowStep >= .85) { return mix(.66, 1.52, smoothstep(.24, .78, .5)); }
+  if (7.5 * flowStep >= .85) { return OCEAN_WIND_MEAN_ROUGHNESS; }
   let wWarp = 1. - smoothstep(.30, .85, 5.2 * flowStep);
   let pStep = flowStep * (1. + 3.72 * wWarp);
   let w0 = 1. - smoothstep(.30, .85, 7.5 * pStep);
   let w1 = 1. - smoothstep(.30, .85, 17.5 * pStep);
   let w2 = 1. - smoothstep(.30, .85, 38. * pStep);
-  if (w0 <= .001 && w1 <= .001 && w2 <= .001) { return mix(.66, 1.52, smoothstep(.24, .78, .5)); }
+  if (w0 <= .001 && w1 <= .001 && w2 <= .001) { return OCEAN_WIND_MEAN_ROUGHNESS; }
   var warp = vec3f(0.);
   if (wWarp > .001) {
     warp = (vec3f(
@@ -475,7 +682,7 @@ fn earthRawHeightLod(nDx: vec3f, nDy: vec3f) -> f32 {
 fn evalEarthTerrain(uv: vec2f, uvDx: vec2f, uvDy: vec2f, rawHeightLod: f32) -> vec2f {
   let pair = terrainPair(uv, uvDx, uvDy);
   var height = pair.r;
-  if (u.status.x > .5 && rawHeightLod < -1.) {
+  if (u.terrainReady > .5 && rawHeightLod < -1.) {
     let bicubicW = 1. - smoothstep(-2., -1., rawHeightLod);
     height = mix(height, sampleHeightBicubic(vec2f(uv.x, 1. - uv.y)), bicubicW);
   }
@@ -484,14 +691,14 @@ fn evalEarthTerrain(uv: vec2f, uvDx: vec2f, uvDy: vec2f, rawHeightLod: f32) -> v
 
 fn evalEarthPalette(sample: ScoreSample) -> f32 {
   let score = sample.score;
-  let base = u.style.x;
-  let best = u.view.z;
+  let base = u.cutoff;
+  let best = u.bestScore;
   var strength = 0.;
   if (sample.valid > .001 && score > base && best > base) {
     strength = clamp((score - base) / max(.000001, best - base), 0., 1.);
   }
-  let automatic = u.flags.x > .5;
-  return select(palettePosition(strength, u.style.z, u.style.y), autoPalette(score, base, u.anchors), automatic);
+  let automatic = u.autoPalette > .5;
+  return select(palettePosition(strength, u.topRange, u.contrast), autoPalette(score, base, u.anchors), automatic);
 }
 
 fn evalHeatColor(displayPalette: f32, palette: f32, localRelief: f32, contour: f32, pGrad: f32, showIso: bool) -> vec3f {
@@ -500,7 +707,7 @@ fn evalHeatColor(displayPalette: f32, palette: f32, localRelief: f32, contour: f
   let reliefShade = mix(1., localRelief, .55 * (1. - .60 * pow(displayPalette, 3.)));
   var heat = magma(displayPalette) * reliefShade;
   // Let subtle elevation contours etch through zoomed-in hotspots.
-  heat = mix(heat, heat * .80, contour * u.contour.z * .38);
+  heat = mix(heat, heat * .80, contour * u.contourOpacity * .38);
   // Crisp warm-gold iso-contour ring around top-tier peaks when zoomed into coherent fields.
   let isoRing = (1. - smoothstep(.6, 1.8, abs(palette - .84) / pGrad)) * smoothstep(.24, .06, pGrad);
   return mix(heat, vec3f(1., .86, .52), isoRing * .32 * select(0., 1., showIso));
@@ -514,21 +721,21 @@ fn shadeEarth(
   flatEdgeGrad: vec2f,
 ) -> vec3f {
   let score = sample.score;
-  let base = u.style.x;
-  let best = u.view.z;
-  let visibleScore = sample.valid > .001 && score >= u.context.z;
+  let base = u.cutoff;
+  let best = u.bestScore;
+  let visibleScore = sample.valid > .001 && score >= u.minimumScore;
   var strength = 0.;
   if (sample.valid > .001 && score > base && best > base) { strength = clamp((score - base) / max(.000001, best - base), 0., 1.); }
-  let automatic = u.flags.x > .5;
-  let contextStrength = clamp((score - u.context.x) / max(.000001, 1. - u.context.x), 0., 1.);
-  let contextCoverageRaw = select(0., smoothstep(0., .22, contextStrength) * u.context.y * sample.valid, visibleScore);
+  let automatic = u.autoPalette > .5;
+  let contextStrength = clamp((score - u.contextFloor) / max(.000001, 1. - u.contextFloor), 0., 1.);
+  let contextCoverageRaw = select(0., smoothstep(0., .22, contextStrength) * u.contextOpacity * sample.valid, visibleScore);
   // Progressive opacity: translucent violet outer fringe lets basemap relief breathe,
   // while high-scoring crimson/orange/gold hotspots become bold and unmistakable.
   let onset = smoothstep(HIGHLIGHT_START - .02, HIGHLIGHT_FULL + .02, palette);
   let tier = smoothstep(HIGHLIGHT_START, .90, palette);
   let densityMod = mix(.64, 1., smoothstep(.15, .85, sample.density));
   let progressive = onset * mix(.44, 1.20, pow(tier, .85)) * densityMod;
-  let coverageRaw = select(0., clamp(progressive * u.context.w * sample.valid, 0., .95), visibleScore && best > base);
+  let coverageRaw = select(0., clamp(progressive * u.highlightOpacity * sample.valid, 0., .95), visibleScore && best > base);
   let satSample = sampleEarthImagery(uv, uvDx, uvDy, coast);
   // Both 8K Blue Marble and 500 m virtual tiles are rgba8unorm-srgb (linear mipmaps & samples).
   let satellite = toDisplay(satSample.color);
@@ -536,8 +743,8 @@ fn shadeEarth(
   let exactLandMask = satSample.landMask;
   let waterMask = 1. - exactLandMask;
   // Physical solar & viewing vectors (used for per-fragment hillshading, water SSS, Fresnel sheen, glint, and atmosphere).
-  let V = normalize(u.eye.xyz - worldPos);
-  let L = normalize(u.sun.xyz);
+  let V = normalize(u.eyePos - worldPos);
+  let L = normalize(u.sunDirection);
   let geoLon = (uv.x - .5) * 2. * PI;
   let geoLat = (uv.y - .5) * PI;
   let cosLon = cos(geoLon);
@@ -556,9 +763,9 @@ fn shadeEarth(
   let nDet = max(0., nxx * nyy - nxy * nxy);
   let nMax = max(1e-12, .5 * (nxx + nyy + length(vec2f(nxx - nyy, 2. * nxy))));
   let minorAngle = max(sqrt(nDet / nMax), smallAngle);
-  let globeScaleLod = log2(max(1., minorAngle * (18. * f32(TILE_SIZE) / PI) * u.contour.w));
-  let farEmberFade = 1. - smoothstep(3.5, 5.2, globeScaleLod) * u.view.x;
-  let farInflation = smoothstep(3.8, 6.6, globeScaleLod) * u.view.x * select(0., 1., u.flags.z > .5);
+  let globeScaleLod = log2(max(1., minorAngle * (18. * f32(TILE_SIZE) / PI) * u.pixelRatio));
+  let farEmberFade = 1. - smoothstep(3.5, 5.2, globeScaleLod) * u.morph;
+  let farInflation = smoothstep(3.8, 6.6, globeScaleLod) * u.morph * select(0., 1., u.preservePeaks > .5);
   let displayPalette = palette * mix(1., .72, farInflation);
   let contextCoverage = contextCoverageRaw * mix(1., .40, farInflation);
   let coverage = coverageRaw * mix(1., .42, farInflation);
@@ -569,42 +776,57 @@ fn shadeEarth(
   let imgDy = vec2f(uvDy.x, -uvDy.y);
   var hillNormal = geoDir;
   var valleyAo = 1.;
-  if (u.status.x > .5) {
+  if (u.terrainReady > .5) {
     let normalSample = textureSampleGrad(terrainNormals, geographicSampler, sampleUv, imgDx, imgDy);
-    let reliefScale = u.view.y / 20.;
-    let localN = normalize(vec3f((normalSample.xy * 2. - 1.) * reliefScale, max(.02, normalSample.z)));
+    let reliefScale = u.relief / 20.;
+    var localN = normalize(vec3f((normalSample.xy * 2. - 1.) * reliefScale, max(.02, normalSample.z)));
+    if (satSample.normalWeight > .001 && exactLandMask > .01) {
+      let hiScale = clamp(reliefScale, 0., 1.5);
+      let hiLocalN = normalize(vec3f(satSample.normalLocal.xy * hiScale, max(.05, satSample.normalLocal.z)));
+      localN = normalize(mix(localN, hiLocalN, satSample.normalWeight * exactLandMask));
+    }
     hillNormal = normalize(geoEast * localN.x + geoNorth * localN.y + geoDir * localN.z);
     let ridge = normalSample.a * 2. - 1.;
     valleyAo = 1. + ridge * .13 * exactLandMask * clamp(reliefScale, 0., 1.25);
+  } else if (satSample.normalWeight > .001 && exactLandMask > .01) {
+    let hiScale = clamp(u.relief / 20., 0., 1.5);
+    let hiLocalN = normalize(vec3f(satSample.normalLocal.xy * hiScale, max(.05, satSample.normalLocal.z)));
+    let localN = normalize(mix(vec3f(0., 0., 1.), hiLocalN, satSample.normalWeight * exactLandMask));
+    hillNormal = normalize(geoEast * localN.x + geoNorth * localN.y + geoDir * localN.z);
   }
   let oneMinusV = clamp(1. - dot(N, V), 1.e-4, 1.);
   let ndotl = dot(N, L);
   let daylight = smoothstep(-.035, .045, ndotl);
   let sunDay = smoothstep(-.10, .22, ndotl);
-  // Single unified linear-space lighting pass for both hemispheres: camera-aligned oblique fill
-  // keeps night relief and sunlit shadows legible while warm direct sun sculpts the day side.
+  // Distance-aware unified linear-space lighting pass for both hemispheres: keep the dramatic
+  // midnight-blue night side from space/Hero while smoothly lifting night-side ambient when
+  // zoomed in so dark-cartographic forests, rivers, and 60 m DEM relief stay legible past ACES's
+  // dark toe while preserving a smooth day/night terminator.
+  let zoomInspect = 1. - smoothstep(.0006, .0045, minorAngle * u.pixelRatio);
   let fillSide = normalize(cross(V, vec3f(0., 1., 0.)) + vec3f(1e-4, 0., 0.));
   let fillDir = normalize(geoDir + .42 * V + .26 * fillSide + .22 * vec3f(0., 1., 0.));
   let fill = max(0., dot(hillNormal, fillDir));
   let ambientRelief = (.56 + .48 * fill) * valleyAo;
   let sunDiffuse = max(0., dot(hillNormal, L)) * daylight;
-  let globeLightLinear = vec3f(.24, .28, .36) * ambientRelief + vec3f(.82, .80, .75) * sunDiffuse;
+  let nightAmbient = mix(vec3f(.24, .28, .36), vec3f(.58, .62, .70), zoomInspect);
+  let sunLight = mix(vec3f(.82, .80, .75), vec3f(.50, .48, .44), zoomInspect);
+  let globeLightLinear = nightAmbient * ambientRelief + sunLight * sunDiffuse;
   // Utilitarian flat map uses classic NW cartographic hillshade across all longitudes.
   let flatSun = normalize(geoDir * .70710678 - geoEast * .5 + geoNorth * .5);
   let flatDiffuse = max(0., dot(hillNormal, flatSun));
   let flatLightLinear = vec3f((.34 + .52 * flatDiffuse) * valleyAo);
-  let lightLinear = mix(flatLightLinear, globeLightLinear, u.view.x);
-  let localRelief = clamp(mix((.62 + .54 * flatDiffuse) * valleyAo, ambientRelief, u.view.x), .68, 1.32);
+  let lightLinear = mix(flatLightLinear, globeLightLinear, u.morph);
+  let localRelief = clamp(mix((.62 + .54 * flatDiffuse) * valleyAo, ambientRelief, u.morph), .68, 1.32);
 
   var background = vec3f(.17, .185, .20);
   var waterSssLinear = vec3f(0.);
-  if (u.flags.w > .5) {
+  if (u.showImagery > .5) {
     background = satellite * .78;
   } else {
     // Dark cartographic satellite basemap: brings out real biomes, mountain chains,
     // and optical bathymetry while softly compressing polar ice caps.
     var land = vec3f(.19, .205, .22);
-    if (u.status.z > .5) {
+    if (u.earthReady > .5) {
       let luma = dot(satellite, vec3f(.299, .587, .114));
       let iceCompress = 1. / (1. + max(0., luma - .42) * 1.65);
       let muted = mix(vec3f(luma), satellite, .60) * iceCompress;
@@ -633,7 +855,7 @@ fn shadeEarth(
       clamp((dNorm - .35) / .37, 0., 1.),
     );
     // Tint shallow water with muted local satellite chroma so reefs, bays, and warm desert coasts blend naturally.
-    if (u.status.z > .5) {
+    if (u.earthReady > .5) {
       let satLuma = dot(satellite, vec3f(.299, .587, .114));
       let satMuted = mix(vec3f(satLuma), satellite, .58);
       let satWater = vec3f(.028, .044, .064) + satMuted * vec3f(.34, .42, .46);
@@ -643,24 +865,24 @@ fn shadeEarth(
     }
     // Two-layer water optics: look into the depth volume at nadir; cool sky Fresnel sheen at grazing angles.
     // Underwater bathymetry hillshade is carried once in linear light by lightLinear.
-    let skySheen = vec3f(.09, .18, .32) * pow(oneMinusV, 3.2) * .24 * u.view.x;
+    let skySheen = vec3f(.09, .18, .32) * pow(oneMinusV, 3.2) * .24 * u.morph;
     ocean += skySheen * (1. - .45 * slopeZone);
     background = mix(ocean, land, exactLandMask);
 
     // Subtle sunlit shallow-water subsurface scattering (soft sea-glass lift over shallow shelves & reefs).
     let sssDepth = exp(-depth / 200.) * (1. - .38 * oneMinusV);
-    let sssSun = mix(.58, smoothstep(-.02, .28, ndotl), u.view.x);
+    let sssSun = mix(.58, smoothstep(-.02, .28, ndotl), u.morph);
     let sssTint = mix(vec3f(.025, .145, .185), clamp(satellite * vec3f(.32, .56, .58), vec3f(.02, .10, .14), vec3f(.12, .28, .30)), .45);
     waterSssLinear = sssTint * sssDepth * sssSun * .11 * waterMask * (1. - coverage);
   }
-  let contour = terrainContoursSplit(height, hGrad, u.contour.x, u.contour.y, u.detail.xy, u.contour.w);
+  let contour = terrainContoursSplit(height, hGrad, u.landContourInterval, u.depthContourInterval, u.contourDetail, u.pixelRatio);
   let contourColor = select(vec3f(.40, .43, .47), vec3f(.24, .44, .58), height < 0.);
-  background = mix(background, contourColor, contour * u.contour.z * select(.55, 1., u.flags.w < .5 && u.status.z < .5));
+  background = mix(background, contourColor, contour * u.contourOpacity * select(.55, 1., u.showImagery < .5 && u.earthReady < .5));
   let coastPixels = abs(coast) / max(.0001, coastGrad);
   let shore = 1. - smoothstep(.35, 1.15, coastPixels);
   // Completely fade out the coarse 4K shoreline vector once 500 m alpha-masked shorelines take over.
   let shoreStrength = .36 * (1. - highResImagery) * (1. - .75 * coverage);
-  background = mix(background, vec3f(.20, .54, .76), select(0., shore * shoreStrength, u.status.x > .5));
+  background = mix(background, vec3f(.20, .54, .76), select(0., shore * shoreStrength, u.terrainReady > .5));
   // Physical Cox-Munk / GGX ocean sun glint with V·H Schlick Fresnel (F0 = 0.02) and
   // two-way Rayleigh/aerosol airmass reddening near the terminator (fades out on flat map).
   let hv = L + V;
@@ -670,7 +892,7 @@ fn shadeEarth(
   let nlSpec = max(ndotl, 0.);
   let nvSpec = max(dot(N, V), .05);
   let specDay = smoothstep(-.02, .07, ndotl);
-  let glintMask = waterMask * specDay * u.view.x * (1. - coverage);
+  let glintMask = waterMask * specDay * u.morph * (1. - coverage);
   // Rotation-invariant geometric specular AA (largest eigenvalue of normal covariance);
   // adaptive angular gate widens with specAaSq while still skipping negligible far tails.
   let specAaSq = min(.35 * nMax, .18);
@@ -707,12 +929,12 @@ fn shadeEarth(
     vec3f(.20, .52, 1.0) * (fresnel * .28 + horizon * .52) * sunDay +
     vec3f(1., .42, .12) * twilight * .13 +
     vec3f(.05, .12, .24) * horizon * .22 * (1. - sunDay)
-  ) * u.view.x * (1. - .55 * coverage);
+  ) * u.morph * (1. - .55 * coverage);
   let baseLinear = toLinear(background);
   let litLinear = baseLinear * lightLinear;
   let pGrad = max(1e-4, pGradIn);
   var result: vec3f;
-  if (u.detail.w > .5) {
+  if (u.hdr > .5) {
     var surfaceLinear = litLinear + waterSssLinear + specLinear;
     if (contextCoverage > .001) {
       let contextHeat = magma(.08 + .11 * sqrt(contextStrength));
@@ -722,7 +944,7 @@ fn shadeEarth(
       let heat = evalHeatColor(displayPalette, palette, localRelief, contour, pGrad, visibleScore && best > base);
       let heatLinear = toLinear(clamp(heat, vec3f(0.), vec3f(1.))) * mix(.68, 1.16, farEmberFade);
       let peakGlow = pow(select(strength, palette, automatic), 5.5) * densityMod * farEmberFade;
-      let ember = mix(heatLinear, vec3f(1., .58, .14), .28) * (u.style.w * 1.15 * peakGlow);
+      let ember = mix(heatLinear, vec3f(1., .58, .14), .28) * (u.emission * 1.15 * peakGlow);
       surfaceLinear = mix(surfaceLinear, heatLinear + ember, coverage);
     }
     result = surfaceLinear + atmoLinear;
@@ -738,32 +960,32 @@ fn shadeEarth(
     }
     result = litDisplay + pow(max(waterSssLinear + specLinear + atmoLinear, vec3f(0.)), vec3f(1. / 2.2));
   }
-  if (u.flags.y > .5) {
+  if (u.showGrid > .5) {
     let lines = uv * vec2f(24., 12.);
     // Use longitude-aligned angular footprint away from the pole, blending to full pixelAngle
     // right inside the polar cap so unresolved meridians converge smoothly to mean duty.
     let lonAngular = mix(max(abs(dot(nDx, geoEast)), abs(dot(nDy, geoEast))), pixelAngle, smoothstep(.08, .02, cosLat));
     let polarStepU = 24. * lonAngular / max(2. * PI * cosLat, 1e-5);
-    let stepU = max(length(vec2f(uvDx.x, uvDy.x)) * 24., polarStepU * u.view.x);
+    let stepU = max(length(vec2f(uvDx.x, uvDy.x)) * 24., polarStepU * u.morph);
     let stepV = length(vec2f(uvDx.y, uvDy.y)) * 12.;
-    let gridWidth = 1.1 * u.contour.w;
-    let gridAa = mix(1., .7, smoothstep(1., 1.8, u.contour.w));
+    let gridWidth = 1.1 * u.pixelRatio;
+    let gridAa = mix(1., .7, smoothstep(1., 1.8, u.pixelRatio));
     let line = max(
       filteredPulse(lines.x, stepU, gridWidth, gridAa, .45, 0.),
       filteredPulse(lines.y, stepV, gridWidth, gridAa, .45, 0.),
     );
     let gridColor = vec3f(.61, .72, .77);
-    result = mix(result, select(gridColor, toLinear(gridColor), u.detail.w > .5), line * .17);
+    result = mix(result, select(gridColor, toLinear(gridColor), u.hdr > .5), line * .17);
   }
   // Subtle ~1 CSS px neatline framing the Equal Earth flat map against deep space.
-  let flatEdgeWeight = 1. - smoothstep(.02, .22, u.view.x);
+  let flatEdgeWeight = 1. - smoothstep(.02, .22, u.morph);
   if (flatEdgeWeight > .001) {
     let edgeDistX = min(inputUv.x, 1. - inputUv.x) / max(1e-6, flatEdgeGrad.x);
     let edgeDistY = min(inputUv.y, 1. - inputUv.y) / max(1e-6, flatEdgeGrad.y);
-    let edgeCssPx = min(edgeDistX, edgeDistY) / max(1., u.contour.w);
+    let edgeCssPx = min(edgeDistX, edgeDistY) / max(1., u.pixelRatio);
     let neatline = (1. - smoothstep(.65, 1.65, edgeCssPx)) * flatEdgeWeight;
     let borderColor = vec3f(.38, .48, .60);
-    result = mix(result, select(borderColor, toLinear(borderColor), u.detail.w > .5), neatline * .44);
+    result = mix(result, select(borderColor, toLinear(borderColor), u.hdr > .5), neatline * .44);
   }
   return result;
 }
@@ -800,13 +1022,13 @@ struct EarthRayHit {
 }
 
 fn evalEarthRay(destPos: vec2f) -> EarthRayHit {
-  let ndc = vec2f(destPos.x * u.centerInfo.z - 1., 1. - destPos.y * u.centerInfo.w);
-  let tanX = u.camRight.w;
-  let tanY = u.camUp.w;
-  let depth = u.camBack.w;
-  let dNdc = ndc - u.centerInfo.xy;
-  let evalPos = u.camRight.xyz * (dNdc.x * depth * tanX) + u.camUp.xyz * (dNdc.y * depth * tanY);
-  let dirLocal = normalize(u.camRight.xyz * (ndc.x * tanX) + u.camUp.xyz * (ndc.y * tanY) - u.camBack.xyz);
+  let ndc = vec2f(destPos.x * u.invViewportPx.x - 1., 1. - destPos.y * u.invViewportPx.y);
+  let tanX = u.tanHalfFovX;
+  let tanY = u.tanHalfFovY;
+  let depth = u.centerDepth;
+  let dNdc = ndc - u.centerNdc;
+  let evalPos = u.camRight * (dNdc.x * depth * tanX) + u.camUp * (dNdc.y * depth * tanY);
+  let dirLocal = normalize(u.camRight * (ndc.x * tanX) + u.camUp * (ndc.y * tanY) - u.camBack);
   let invAxis = vec3f(1., 1.003364089821, 1.);
   let posE = evalPos * invAxis;
   let dirE = normalize(dirLocal * invAxis);
@@ -869,7 +1091,7 @@ fn evalEarthRay(destPos: vec2f) -> EarthRayHit {
   let sample0 = sampleScore(h0.uv, uvDx, uvDy);
   let palette0 = evalEarthPalette(sample0);
   var pGrad = 0.;
-  if (u.context.w > .001 && u.view.z > u.style.x) {
+  if (u.highlightOpacity > .001 && u.bestScore > u.cutoff) {
     var pDx: f32;
     if (hXp.hit != hXm.hit) {
       let pSide = evalEarthPalette(sampleScore(select(hXm.uv, hXp.uv, hXp.hit), uvDx, uvDy));
@@ -887,13 +1109,13 @@ fn evalEarthRay(destPos: vec2f) -> EarthRayHit {
     pGrad = abs(pDx) + abs(pDy);
   }
   let flatEdgeGrad = vec2f(length(vec2f(uvDx.x, uvDy.x)), length(vec2f(uvDx.y, uvDy.y)));
-  let smallAngle = max(u.camBack.w * u.camUp.w * u.centerInfo.w, 1e-4);
+  let smallAngle = max(u.centerDepth * u.tanHalfFovY * u.invViewportPx.y, 1e-4);
   let result = shadeEarth(
     h0.uv, h0.N, h0.worldPos, h0.uv, smallAngle, uvDx, uvDy, nDx, nDy,
     sample0, palette0, pGrad, tc0.x, tc0.y, hGrad, coastGrad, flatEdgeGrad,
   );
   var clip = u.camera * vec4f(h0.worldPos, 1.);
-  if (u.status.y < .5) { clip.z = (clip.z + clip.w) * .5; }
+  if (u.nativeDepth < .5) { clip.z = (clip.z + clip.w) * .5; }
   return SmallSurfaceOut(vec4f(result, 1.), clip.z / clip.w, 1u << sampleIdx);
 }
 
@@ -910,7 +1132,7 @@ struct SmallAnnotationOut {
   let h0 = evalEarthRay(input.position.xy);
   if (!h0.hit) { discard; }
   var clip = u.camera * vec4f(h0.worldPos, 1.);
-  if (u.status.y < .5) { clip.z = (clip.z + clip.w) * .5; }
+  if (u.nativeDepth < .5) { clip.z = (clip.z + clip.w) * .5; }
   return SmallAnnotationOut(vec4f(packSplit16(h0.uv.x), packSplit16(h0.uv.y)), clip.z / clip.w, 1u << sampleIdx);
 }
 
@@ -928,7 +1150,7 @@ struct SmallCoverageAnnotationOut {
   let h0 = evalEarthRay(input.position.xy);
   if (!h0.hit) { discard; }
   var clip = u.camera * vec4f(h0.worldPos, 1.);
-  if (u.status.y < .5) { clip.z = (clip.z + clip.w) * .5; }
+  if (u.nativeDepth < .5) { clip.z = (clip.z + clip.w) * .5; }
   return SmallCoverageAnnotationOut(
     vec4f(packSplit16(h0.uv.x), packSplit16(h0.uv.y)),
     vec2f(1., select(1., 0., scoreCode(h0.uv) == 65535u)),

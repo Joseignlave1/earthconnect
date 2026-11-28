@@ -1,17 +1,20 @@
-type Span = { start: number; end?: number; detail?: string }
+export type StartupPhase = 'bootstrap' | 'prepare' | 'settle'
 
-const marks = new Map<string, number>()
+const PHASE_ORDER: readonly StartupPhase[] = ['bootstrap', 'prepare', 'settle']
+
+type Span = {
+  phase: StartupPhase
+  start: number
+  end?: number
+  detail?: string
+}
+
 const spans = new Map<string, Span>()
 let reported = false
 
-export function markStartup(name: string) {
-  if (reported || marks.has(name)) return
-  marks.set(name, performance.now())
-}
-
-export function startStartupSpan(name: string, detail?: string) {
+export function startStartupSpan(name: string, phase: StartupPhase = 'prepare', detail?: string) {
   if (reported || spans.has(name)) return
-  spans.set(name, { start: performance.now(), detail })
+  spans.set(name, { phase, start: performance.now(), detail })
 }
 
 export function endStartupSpan(name: string, detail?: string) {
@@ -22,27 +25,48 @@ export function endStartupSpan(name: string, detail?: string) {
   if (detail !== undefined) span.detail = detail
 }
 
-export function reportStartupTiming(note?: string) {
+export function reportStartupTiming() {
   if (reported) return
   reported = true
   const total = performance.now()
   const fmt = (ms: number) => `${Math.round(ms)} ms`
-  const rows: { phase: string; start: number; end: number; detail?: string }[] = []
-  for (const [phase, span] of spans) {
-    rows.push({ phase, start: span.start, end: span.end ?? total, detail: span.detail })
+
+  type Row = { name: string; phase: StartupPhase; start: number; end: number; open: boolean; detail?: string }
+  const byPhase = new Map<StartupPhase, Row[]>()
+  for (const [name, span] of spans) {
+    const list = byPhase.get(span.phase) ?? []
+    list.push({
+      name,
+      phase: span.phase,
+      start: span.start,
+      end: span.end ?? total,
+      open: span.end === undefined,
+      detail: span.detail,
+    })
+    byPhase.set(span.phase, list)
   }
-  for (const [phase, at] of marks) {
-    rows.push({ phase, start: at, end: at })
+
+  let nameWidth = 10
+  for (const list of byPhase.values()) {
+    for (const row of list) nameWidth = Math.max(nameWidth, row.name.length)
   }
-  rows.sort((a, b) => a.start - b.start)
-  const width = Math.max(...rows.map(row => row.phase.length), 8)
-  const lines = rows.map(row => {
-    const label = row.phase.padEnd(width)
-    const timing =
-      row.end > row.start
-        ? `${fmt(row.end - row.start).padStart(7)}  (${fmt(row.start)} → ${fmt(row.end)})`
-        : `      —  (at ${fmt(row.start)})`
-    return `  ${label}  ${timing}${row.detail ? `  ${row.detail}` : ''}`
-  })
-  console.log(`[Earth Connect] ready in ${fmt(total)}${note ? ` (${note})` : ''}\n${lines.join('\n')}`)
+
+  const lines: string[] = []
+  for (const phase of PHASE_ORDER) {
+    const rows = byPhase.get(phase)
+    if (!rows?.length) continue
+    rows.sort((a, b) => a.start - b.start)
+    const phaseStart = Math.min(...rows.map(r => r.start))
+    const phaseEnd = Math.max(...rows.map(r => r.end))
+    const phaseDur = fmt(phaseEnd - phaseStart).padStart(7)
+    lines.push(`  ${phase.padEnd(nameWidth + 2)}  ${phaseDur}  (${fmt(phaseStart)} → ${fmt(phaseEnd)})`)
+    for (const row of rows) {
+      const label = row.name.padEnd(nameWidth)
+      const timing = row.open
+        ? `${fmt(row.end - row.start).padStart(7)}  (open since ${fmt(row.start)}, elapsed so far)`
+        : `${fmt(row.end - row.start).padStart(7)}  (${fmt(row.start)} → ${fmt(row.end)})`
+      lines.push(`    ${label}  ${timing}${row.detail ? `  ${row.detail}` : ''}`)
+    }
+  }
+  console.log(`[Earth Connect] ready in ${fmt(total)}\n${lines.join('\n')}`)
 }

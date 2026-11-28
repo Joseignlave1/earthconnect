@@ -69,15 +69,12 @@ type FileEntry = {
   model: editor.ITextModel
 }
 
-type LayoutTab = string | { previewFileId: string }
-
-type EditorLayout = {
-  layout: EditorGroupLayout
-  groups: { tabs: LayoutTab[]; active?: LayoutTab }[]
-  activeGroup: number
-}
-
-const layoutKey = 'earth-connect-wgsl-editor-layout'
+import {
+  EDITOR_LAYOUT_KEY as layoutKey,
+  loadSavedEditorLayout,
+  type LayoutTab,
+  type SavedEditorLayout,
+} from './shaderLayout'
 const provider = new RegisteredFileSystemProvider(false)
 const filesById = new Map<string, FileEntry>()
 const filesByResource = new Map<string, FileEntry>()
@@ -153,60 +150,14 @@ function initializeWorkbench() {
   return initialization
 }
 
-function isLayoutTab(tab: unknown): tab is LayoutTab {
-  return (
-    typeof tab === 'string' ||
-    (typeof tab === 'object' && tab !== null && 'previewFileId' in tab && typeof tab.previewFileId === 'string')
-  )
-}
+type EditorLayout = Omit<SavedEditorLayout, 'layout'> & { layout: EditorGroupLayout }
 
 function loadLayout(activeFileId: string): { snapshot: EditorLayout; addPreview: boolean } | undefined {
-  try {
-    const saved = JSON.parse(localStorage.getItem(layoutKey) ?? 'null') as
-      | (Omit<EditorLayout, 'groups'> & {
-          groups: { tabs?: (LayoutTab | null)[]; active?: LayoutTab | null; files?: string[] }[]
-        })
-      | null
-    if (
-      saved &&
-      Array.isArray(saved.groups) &&
-      saved.groups.length > 0 &&
-      Array.isArray(saved.layout?.groups) &&
-      Number.isInteger(saved.activeGroup) &&
-      (saved.layout.orientation === GroupOrientation.HORIZONTAL ||
-        saved.layout.orientation === GroupOrientation.VERTICAL)
-    ) {
-      if (
-        saved.groups.every(
-          group => Array.isArray(group?.tabs) && group.tabs.every(tab => tab === null || isLayoutTab(tab)),
-        )
-      ) {
-        const migrate = (tab: LayoutTab | null | undefined) => (tab === null ? { previewFileId: activeFileId } : tab)
-        return {
-          snapshot: {
-            ...saved,
-            groups: saved.groups.map(group => ({
-              tabs: group.tabs!.map(tab => migrate(tab)!),
-              active: migrate(group.active),
-            })),
-          },
-          addPreview: false,
-        }
-      }
-      if (
-        saved.groups.every(group => Array.isArray(group?.files) && group.files.every(file => typeof file === 'string'))
-      ) {
-        return {
-          snapshot: {
-            ...saved,
-            groups: saved.groups.map(group => ({ tabs: group.files!, active: group.active ?? undefined })),
-          },
-          addPreview: true,
-        }
-      }
-    }
-  } catch {
-    /* Storage may be unavailable. */
+  const saved = loadSavedEditorLayout(activeFileId)
+  if (!saved) return undefined
+  return {
+    snapshot: saved.snapshot as unknown as EditorLayout,
+    addPreview: saved.addPreview,
   }
 }
 

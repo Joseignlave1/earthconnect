@@ -7,6 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Python bytecode
+__pycache__/
+*.pyc
+
 node_modules
 dist
 dist-pages
@@ -40,3 +44,4 @@ exports/
 /public/textures/moon-terrain.bin
 /public/textures/moon-tiles-*.bin
 /public/textures/nasa-deep-star-map.webp
+/public/textures/*.bc7

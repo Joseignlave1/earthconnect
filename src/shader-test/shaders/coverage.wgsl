@@ -9,7 +9,7 @@ fn missingDataLine(uv: vec2f) -> f32 {
   let maskUv = uv;
   let cov = textureSampleLevel(coverageSource, linearSampler, maskUv, 0.).rg;
   if (cov.r < .9 || cov.g > cov.r * .2) { return 0.; }
-  let delta = vec2f(1.25 * p.effects.z) / p.viewport.zw;
+  let delta = vec2f(1.25 * p.pixelRatio) / p.outSizePx;
   let a = textureSampleLevel(coverageSource, linearSampler, maskUv + vec2f(delta.x, 0.), 0.).rg;
   let b = textureSampleLevel(coverageSource, linearSampler, maskUv - vec2f(delta.x, 0.), 0.).rg;
   let c = textureSampleLevel(coverageSource, linearSampler, maskUv + vec2f(0., delta.y), 0.).rg;

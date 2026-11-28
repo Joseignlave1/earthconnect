@@ -1,6 +1,10 @@
 struct CursorUniforms {
-  position: vec4f,
-  scale: vec4f,
+  centerPx: vec2f,
+  viewportPx: vec2f,
+  pixelRatio: f32,
+  _pad0: f32,
+  _pad1: f32,
+  _pad2: f32,
 }
 
 @group(0) @binding(0) var<uniform> cursor: CursorUniforms;
@@ -11,9 +15,8 @@ struct CursorVertex {
 }
 
 @vertex fn cursorVertex(@builtin(vertex_index) index: u32) -> CursorVertex {
-  let corners = array<vec2f, 6>(vec2f(-1., -1.), vec2f(1., -1.), vec2f(-1., 1.), vec2f(-1., 1.), vec2f(1., -1.), vec2f(1., 1.));
-  let local = corners[index] * 4.;
-  let screen = (cursor.position.xy + local * cursor.scale.x) / cursor.position.zw;
+  let local = unitQuadCorner(index) * 4.;
+  let screen = (cursor.centerPx + local * cursor.pixelRatio) / cursor.viewportPx;
   return CursorVertex(vec4f(screen * vec2f(2., -2.) + vec2f(-1., 1.), 0., 1.), local);
 }
 

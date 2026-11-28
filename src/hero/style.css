@@ -1,0 +1,949 @@
+@font-face {
+  font-family: "DM Sans";
+  src: url("../workspace/fonts/dm-sans.woff2") format("woff2");
+  font-display: swap;
+}
+
+.bridge-hero {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  isolation: isolate;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #000000;
+  color: #f2f1ef;
+  font-family: "DM Sans", system-ui, sans-serif;
+  opacity: 1;
+  transition: opacity 320ms ease-out;
+}
+
+.bridge-hero[data-leaving] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bridge-hero-scroll-track {
+  position: relative;
+  height: 320svh;
+  min-height: 80rem;
+}
+
+.bridge-hero-sticky {
+  position: sticky;
+  top: 0;
+  display: grid;
+  align-items: start;
+  height: 100svh;
+  min-height: 29rem;
+  overflow: hidden;
+  --hero-bayer-opacity: 1;
+  --hero-scroll-cue-opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bridge-hero {
+    transition: none;
+  }
+}
+
+.bridge-hero-canvas {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.bridge-hero-copy {
+  position: relative;
+  z-index: 1;
+  justify-self: start;
+  max-width: min(44rem, calc(100vw - 3rem));
+  margin: clamp(3.4rem, 9.2svh, 7rem) 0 0 clamp(2rem, 5vw, 6.8rem);
+}
+
+/* ---------- Constellation Wordmark (WebGPU HDR + invisible accessible text overlay) ---------- */
+
+.constellation-stage {
+  position: relative;
+  width: clamp(20.5rem, 42vw, 41rem);
+  aspect-ratio: 616 / 246;
+  margin: 0 0 1.65rem;
+}
+
+.constellation-a11y-heading {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 6% 0 4%;
+  font-family: "Cinzel Decorative", Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(2.4rem, 5.1vw, 5.1rem);
+  line-height: 1.08;
+  letter-spacing: 0.16em;
+  color: transparent;
+  user-select: text;
+  cursor: default;
+}
+
+.constellation-a11y-row {
+  display: block;
+  width: fit-content;
+  color: transparent;
+}
+
+.constellation-a11y-row-2 {
+  padding-left: 5%;
+}
+
+.constellation-a11y-heading::selection,
+.constellation-a11y-row::selection {
+  background: rgba(255, 214, 158, 0.2);
+  color: transparent;
+}
+
+.constellation-bayer-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  user-select: none;
+  opacity: var(--hero-bayer-opacity);
+}
+
+.hero-bayer-label {
+  font:
+    400 10px / 1 Georgia,
+    serif;
+  font-style: italic;
+  fill: rgba(245, 228, 202, 0.56);
+  letter-spacing: 0.04em;
+}
+
+.bridge-hero-cta {
+  position: absolute;
+  z-index: 1;
+  right: clamp(2rem, 5vw, 6.2rem);
+  bottom: clamp(2.4rem, 6svh, 4.4rem);
+  display: block;
+  width: clamp(11.5rem, 16vw, 15.5rem);
+  aspect-ratio: 248 / 62;
+  color: transparent;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.bridge-hero-cta:focus-visible {
+  outline: 1px solid rgba(255, 224, 178, 0.55);
+  outline-offset: 8px;
+}
+
+.bridge-hero-scroll-cue {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: clamp(6px, 1.1svh, 14px);
+  display: grid;
+  place-items: center;
+  padding: 6px 14px;
+  border: 0;
+  background: transparent;
+  color: rgba(242, 238, 232, 0.56);
+  cursor: pointer;
+  opacity: var(--hero-scroll-cue-opacity);
+  transform: translateX(-50%);
+  transition:
+    color 220ms ease-out,
+    opacity 220ms ease-out;
+}
+
+.bridge-hero-scroll-cue svg {
+  display: block;
+  animation: scroll-cue-drift 3.4s ease-in-out infinite;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.bridge-hero-scroll-cue:hover,
+.bridge-hero-scroll-cue:focus-visible {
+  color: rgba(255, 250, 244, 0.94);
+}
+
+.bridge-hero-scroll-cue:hover svg,
+.bridge-hero-scroll-cue:focus-visible svg {
+  transform: translateY(2.5px);
+}
+
+.bridge-hero-scroll-cue:focus-visible {
+  outline: 1px solid rgba(255, 224, 178, 0.55);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+@keyframes scroll-cue-drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(2.5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bridge-hero-scroll-cue svg {
+    animation: none;
+  }
+}
+
+.bridge-hero-cta-a11y {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.bridge-hero-error {
+  position: absolute;
+  z-index: 2;
+  inset: auto 1.5rem 2rem;
+  margin: 0;
+  color: #f7b3a8;
+  text-align: center;
+  font-size: 0.82rem;
+}
+
+/* ---------- Site Interior Emerging Inside the Black Hole Event Horizon ---------- */
+
+.bridge-site-shell {
+  position: relative;
+  z-index: 3;
+  margin-top: -100svh;
+  min-height: 110svh;
+  padding: clamp(5rem, 12svh, 8.5rem) clamp(1.5rem, 5.5vw, 5rem) clamp(5rem, 11svh, 8.5rem);
+  background: #000000;
+  will-change: clip-path, opacity;
+}
+
+.editorial-root {
+  max-width: 72rem;
+  margin: 0 auto;
+  display: grid;
+  gap: clamp(4.5rem, 11svh, 7.5rem);
+}
+
+/* ---------- Opening Intro ---------- */
+
+.intro-section {
+  display: grid;
+  gap: clamp(1.25rem, 2.8svh, 1.85rem);
+  max-width: 52rem;
+}
+
+.intro-headline {
+  margin: 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(2rem, 4.1vw, 3.45rem);
+  line-height: 1.1;
+  letter-spacing: -0.028em;
+  color: #f6f0e6;
+}
+
+.intro-body {
+  margin: 0;
+  max-width: 44rem;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-weight: 300;
+  font-size: clamp(1.04rem, 1.45vw, 1.24rem);
+  line-height: 1.68;
+  color: rgba(186, 194, 210, 0.78);
+}
+
+.intro-emphasis {
+  font-weight: 400;
+  color: #f6f0e6;
+}
+
+/* ---------- Live Equal Earth Analogue Atlas ---------- */
+
+.atlas-section {
+  display: grid;
+  gap: clamp(1.4rem, 3svh, 2.2rem);
+}
+
+.atlas-header {
+  display: grid;
+  gap: 0.7rem;
+  max-width: 48rem;
+}
+
+.atlas-site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.8rem;
+  margin-bottom: 0.65rem;
+}
+
+.atlas-site-btn {
+  appearance: none;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  padding: 0 0 0.28rem;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 0.88rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: rgba(182, 190, 206, 0.54);
+  cursor: pointer;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease;
+}
+
+.atlas-site-btn:hover,
+.atlas-site-btn:focus-visible {
+  color: rgba(246, 240, 230, 0.9);
+  outline: none;
+}
+
+.atlas-site-btn[aria-selected="true"] {
+  color: #f6f0e6;
+  border-bottom-color: #e6c28b;
+}
+
+.atlas-origin {
+  margin: 0;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  color: rgba(230, 194, 139, 0.78);
+}
+
+.atlas-question {
+  margin: 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(1.4rem, 2.35vw, 1.95rem);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #f6f0e6;
+}
+
+.atlas-subline {
+  margin: 0;
+  max-width: 40rem;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: rgba(178, 186, 202, 0.74);
+}
+
+.atlas-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2.02 / 1;
+  margin: clamp(0.4rem, 1.5svh, 1.2rem) 0;
+}
+
+.atlas-plane-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  cursor: default;
+}
+
+.atlas-plane-canvas[data-cursor="loupe"] {
+  cursor: none;
+}
+
+.atlas-controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.2rem 2.5rem;
+}
+
+.atlas-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 2.2rem;
+}
+
+.atlas-toggle-pair {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+
+.atlas-toggle-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0.15rem 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 0.88rem;
+  color: rgba(164, 173, 190, 0.5);
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.atlas-toggle-btn:hover,
+.atlas-toggle-btn:focus-visible {
+  color: rgba(246, 240, 230, 0.88);
+  outline: none;
+}
+
+.atlas-toggle-btn[aria-pressed="true"] {
+  color: #f0cc92;
+}
+
+.atlas-sep {
+  color: rgba(140, 150, 170, 0.34);
+  font-size: 0.8rem;
+  user-select: none;
+}
+
+.atlas-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem 1.5rem;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.atlas-peak {
+  color: rgba(246, 240, 230, 0.84);
+}
+
+.atlas-loupe-hint {
+  color: rgba(154, 164, 184, 0.52);
+}
+
+.atlas-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 1rem 2.5rem;
+  margin-top: 0.6rem;
+}
+
+.atlas-launch-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid rgba(230, 194, 139, 0.45);
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 1.02rem;
+  font-weight: 500;
+  color: #f6f0e6;
+  text-decoration: none;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease;
+}
+
+.atlas-launch-arrow {
+  display: inline-block;
+  color: #e6c28b;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.atlas-launch-link:hover,
+.atlas-launch-link:focus-visible {
+  color: #ffffff;
+  border-bottom-color: #f2cf94;
+  outline: none;
+}
+
+.atlas-launch-link:hover .atlas-launch-arrow,
+.atlas-launch-link:focus-visible .atlas-launch-arrow {
+  transform: translate3d(3px, -3px, 0);
+}
+
+.atlas-code-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0.2rem 0;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: rgba(164, 174, 194, 0.62);
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.atlas-code-toggle:hover,
+.atlas-code-toggle:focus-visible {
+  color: #f6f0e6;
+  outline: none;
+}
+
+.atlas-code-pre {
+  margin: 0.5rem 0 0;
+  padding: 0.25rem 0;
+  overflow-x: auto;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.72;
+  color: #e8e2d8;
+  tab-size: 2;
+}
+
+.atlas-code-line {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.atlas-code-ln {
+  flex: none;
+  width: 1.6rem;
+  text-align: right;
+  user-select: none;
+  color: rgba(128, 138, 158, 0.4);
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-code-src {
+  white-space: pre;
+}
+
+.wgsl-tok-comment {
+  color: rgba(134, 146, 168, 0.64);
+  font-style: italic;
+}
+
+.wgsl-tok-kw {
+  color: #e8be80;
+}
+
+.wgsl-tok-type {
+  color: #c8b6e8;
+}
+
+.wgsl-tok-fn {
+  color: #8cbef8;
+}
+
+.wgsl-tok-num {
+  color: #e69d78;
+}
+
+.wgsl-tok-const {
+  color: #f2cf94;
+}
+
+/* ---------- Workspace Assistant ---------- */
+
+.copilot-section {
+  display: grid;
+}
+
+.copilot-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: start;
+}
+
+.copilot-copy {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.copilot-status {
+  margin: 0;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  color: rgba(230, 194, 139, 0.78);
+}
+
+.copilot-heading {
+  margin: 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(1.55rem, 2.6vw, 2.2rem);
+  line-height: 1.18;
+  letter-spacing: -0.022em;
+  color: #f6f0e6;
+}
+
+.copilot-body {
+  margin: 0;
+  max-width: 34rem;
+  font-size: 0.96rem;
+  line-height: 1.65;
+  color: rgba(178, 186, 202, 0.74);
+}
+
+.copilot-switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.4rem;
+  margin-top: 0.45rem;
+}
+
+.copilot-switch-btn {
+  appearance: none;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  padding: 0 0 0.25rem;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 0.86rem;
+  color: rgba(164, 174, 194, 0.54);
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.copilot-switch-btn:hover,
+.copilot-switch-btn:focus-visible {
+  color: rgba(246, 240, 230, 0.9);
+  outline: none;
+}
+
+.copilot-switch-btn[aria-selected="true"] {
+  color: #f0cc92;
+  border-bottom-color: rgba(230, 194, 139, 0.65);
+}
+
+.copilot-trace {
+  display: grid;
+  gap: 1.35rem;
+  padding-left: clamp(1.25rem, 2.6vw, 2rem);
+  border-left: 1px solid rgba(244, 226, 200, 0.14);
+  min-width: 0;
+}
+
+.copilot-prompt {
+  margin: 0;
+  display: flex;
+  gap: 0.7rem;
+  align-items: baseline;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 1.04rem;
+  line-height: 1.48;
+  color: #f6f0e6;
+}
+
+.copilot-chevron {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color: #e6c28b;
+}
+
+.copilot-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.copilot-step {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.copilot-step-call {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.76rem;
+  color: #8cbef8;
+}
+
+.copilot-step-detail {
+  font-size: 0.84rem;
+  color: rgba(176, 186, 204, 0.7);
+}
+
+.copilot-snippet {
+  margin: 0;
+  overflow-x: auto;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.77rem;
+  line-height: 1.72;
+  color: #e8e2d8;
+}
+
+.copilot-snippet-line {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.copilot-snippet-mark {
+  flex: none;
+  width: 0.75rem;
+  user-select: none;
+  color: rgba(140, 150, 170, 0.4);
+}
+
+.copilot-snippet-line[data-added="true"] .copilot-snippet-mark {
+  color: #e6c28b;
+}
+
+/* ---------- Equal Six-Person Crew Carousel & Quiet Colophon ---------- */
+
+.credits-section {
+  display: grid;
+  gap: clamp(1.8rem, 4svh, 2.8rem);
+}
+
+.crew-top-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+}
+
+.credits-heading {
+  margin: 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+  color: rgba(178, 186, 202, 0.64);
+}
+
+.crew-name-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1.5rem;
+}
+
+.crew-name-btn {
+  appearance: none;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  padding: 0 0 0.25rem;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 0.9rem;
+  color: rgba(168, 178, 198, 0.48);
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.crew-name-btn:hover,
+.crew-name-btn:focus-visible {
+  color: rgba(246, 240, 230, 0.9);
+  outline: none;
+}
+
+.crew-name-btn[aria-selected="true"] {
+  color: #f6f0e6;
+  border-bottom-color: #e6c28b;
+}
+
+.crew-arrows {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.crew-arrow-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0.2rem 0.35rem;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 1.05rem;
+  color: rgba(196, 204, 220, 0.62);
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.crew-arrow-btn:hover,
+.crew-arrow-btn:focus-visible {
+  color: #f0cc92;
+  outline: none;
+}
+
+.crew-carousel-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  align-items: center;
+  min-height: clamp(31rem, 64svh, 40rem);
+}
+
+.crew-visual-col {
+  position: relative;
+  width: 100%;
+  height: clamp(30rem, 62svh, 39rem);
+}
+
+.crew-astronaut-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+.crew-bio-col {
+  display: grid;
+  gap: 0.85rem;
+  align-content: center;
+  max-width: 31rem;
+}
+
+.crew-counter {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1em;
+  color: rgba(230, 194, 139, 0.72);
+}
+
+.crew-person-name {
+  margin: 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(2.1rem, 3.8vw, 3.2rem);
+  line-height: 1.08;
+  letter-spacing: -0.026em;
+  color: #f6f0e6;
+}
+
+.crew-person-role {
+  margin: 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 1rem;
+  color: rgba(230, 194, 139, 0.86);
+}
+
+.crew-person-bio {
+  margin: 0.55rem 0 0;
+  font-size: 0.98rem;
+  line-height: 1.65;
+  color: rgba(186, 194, 210, 0.78);
+}
+
+.crew-person-coord {
+  margin: 0.35rem 0 0;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(154, 164, 184, 0.74);
+}
+
+.crew-socials {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 1.8rem;
+  margin-top: 1.15rem;
+}
+
+.crew-social-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding-bottom: 0.22rem;
+  border-bottom: 1px solid rgba(244, 226, 200, 0.24);
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 0.92rem;
+  color: rgba(246, 240, 230, 0.88);
+  text-decoration: none;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease;
+}
+
+.crew-social-arrow {
+  display: inline-block;
+  font-size: 0.84rem;
+  color: #e6c28b;
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.crew-social-link:hover,
+.crew-social-link:focus-visible {
+  color: #ffffff;
+  border-bottom-color: #f0cc92;
+  outline: none;
+}
+
+.crew-social-link:hover .crew-social-arrow,
+.crew-social-link:focus-visible .crew-social-arrow {
+  transform: translate3d(2px, -2px, 0);
+}
+
+.credits-colophon {
+  margin-top: 1.2rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.credits-origin {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(210, 216, 228, 0.68);
+}
+
+.credits-sources {
+  margin: 0;
+  max-width: 50rem;
+  font-size: 0.78rem;
+  line-height: 1.65;
+  color: rgba(140, 150, 170, 0.52);
+}
+
+@media (max-width: 860px) {
+  .copilot-grid,
+  .crew-carousel-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .crew-carousel-stage {
+    min-height: auto;
+  }
+  .crew-visual-col {
+    height: clamp(22rem, 52svh, 28rem);
+  }
+  .copilot-trace {
+    padding-left: 1rem;
+  }
+  .atlas-stage {
+    aspect-ratio: 1.85 / 1;
+  }
+}
+
+@media (max-aspect-ratio: 1 / 1) {
+  .bridge-hero-sticky {
+    min-height: 33rem;
+  }
+  .bridge-hero-copy {
+    margin: clamp(2.1rem, 7.5svh, 4.5rem) 0 0 clamp(1.35rem, 6vw, 2.5rem);
+  }
+  .constellation-stage {
+    width: min(88vw, 26rem);
+    margin-bottom: 1.25rem;
+  }
+  .constellation-a11y-heading {
+    font-size: clamp(1.8rem, 9.2vw, 3.1rem);
+  }
+}

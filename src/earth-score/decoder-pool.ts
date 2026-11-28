@@ -1,5 +1,5 @@
 import type { createDecoder, DecodeRequest } from './decode.ts'
-import type { DecodeResult } from './decode.worker.ts'
+import type { DecodeResult } from './decoder-entry.worker.ts'
 import { createDecoderWorker } from './decoder-worker.ts'
 
 type Job = {
@@ -8,7 +8,7 @@ type Job = {
   reject: (error: unknown) => void
 }
 
-type Slot = { worker: Worker; ready: boolean; sentModule: boolean; job?: Job }
+type Slot = { worker: Worker; ready: boolean; dispatched: boolean; job?: Job }
 
 export function createDecoderPool(count: number, signal: AbortSignal) {
   const slots: Slot[] = []
@@ -41,8 +41,11 @@ export function createDecoderPool(count: number, signal: AbortSignal) {
     if (!job) return
     slot.job = job
     try {
-      const message = !slot.sentModule && compiledModule ? { ...job.request, module: compiledModule } : job.request
-      if (compiledModule) slot.sentModule = true
+      // Attach the shared compiled WASM module only on a worker's first request;
+      // subsequent jobs reuse the decoder instance already initialized in that worker.
+      const attachModule = !slot.dispatched && compiledModule !== undefined
+      slot.dispatched = true
+      const message = attachModule ? { ...job.request, module: compiledModule } : job.request
       const transfer = job.request.frame instanceof ArrayBuffer ? [job.request.frame] : []
       slot.worker.postMessage(message, transfer)
     } catch (error) {
@@ -96,7 +99,7 @@ export function createDecoderPool(count: number, signal: AbortSignal) {
     } catch {
       continue
     }
-    const slot: Slot = { worker, ready: false, sentModule: false }
+    const slot: Slot = { worker, ready: false, dispatched: false }
     slots.push(slot)
     worker.onmessage = ({ data }: MessageEvent<DecodeResult>) => {
       if ('ready' in data) {

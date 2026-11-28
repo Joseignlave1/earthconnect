@@ -1,17 +1,54 @@
 import { TILE_SIZE, type ScoreManifest } from './manifest.ts'
 
 // MODIS sinusoidal grid used by the frozen Earth Index datasource.
-const radius = 6371007.181
-const span = (Math.PI * radius) / 18
-const left = -Math.PI * radius
-const top = (Math.PI * radius) / 2
+export const GRID_RADIUS = 6371007.181
+export const GRID_COLS = 36
+export const GRID_ROWS = 18
+export const GRID_SPAN = (Math.PI * GRID_RADIUS) / GRID_ROWS
+export const GRID_LEFT = -Math.PI * GRID_RADIUS
+export const GRID_TOP = (Math.PI * GRID_RADIUS) / 2
+export const GRID_CELL = GRID_SPAN / TILE_SIZE
 export const PIXELS_PER_SITE = TILE_SIZE ** 2
-export const GRID_WIDTH = 36 * TILE_SIZE
-export const GRID_HEIGHT = 18 * TILE_SIZE
+export const GRID_WIDTH = GRID_COLS * TILE_SIZE
+export const GRID_HEIGHT = GRID_ROWS * TILE_SIZE
+export const SCORE_GEOMETRY_ROW_STRIDE = 3
+export const SCORE_GEOMETRY_LATITUDE_OFFSET = 0
+export const SCORE_GEOMETRY_LON_SCALE_OFFSET = 1
+export const SCORE_GEOMETRY_VALID_HALF_WIDTH_OFFSET = 2
 const radians = Math.PI / 180
 
+export function parseSiteKey(siteKey: string) {
+  return { h: Number(siteKey.slice(1, 3)), v: Number(siteKey.slice(4, 6)) }
+}
+
 function tileOrigin(siteKey: string) {
-  return { x: Number(siteKey.slice(1, 3)) * TILE_SIZE, y: Number(siteKey.slice(4, 6)) * TILE_SIZE }
+  const { h, v } = parseSiteKey(siteKey)
+  return { x: h * TILE_SIZE, y: v * TILE_SIZE }
+}
+
+export function sinusoidalCellAddress(longitude: number, latitude: number) {
+  if (
+    !Number.isFinite(longitude) ||
+    !Number.isFinite(latitude) ||
+    Math.abs(longitude) > 180 ||
+    Math.abs(latitude) > 90
+  ) {
+    return null
+  }
+  const lat = latitude * radians
+  const u = Math.min(
+    GRID_COLS - 1e-10,
+    Math.max(0, (GRID_RADIUS * longitude * radians * Math.cos(lat) - GRID_LEFT) / GRID_SPAN),
+  )
+  const w = Math.min(GRID_ROWS - 1e-10, Math.max(0, (GRID_TOP - GRID_RADIUS * lat) / GRID_SPAN))
+  const h = Math.floor(u)
+  const v = Math.floor(w)
+  return {
+    h,
+    v,
+    x: Math.min(TILE_SIZE - 1, Math.floor((u - h) * TILE_SIZE)),
+    y: Math.min(TILE_SIZE - 1, Math.floor((w - v) * TILE_SIZE)),
+  }
 }
 
 function gridRow(y: number) {
@@ -26,7 +63,7 @@ function gridRow(y: number) {
 // whole-column validity boundary for each raster row. Compute the boundary
 // in JavaScript precision so borderline cells agree with CPU picking.
 export function createScoreGeometry(manifest: ScoreManifest) {
-  const words = new Uint32Array(manifest.sites.length + GRID_HEIGHT * 3)
+  const words = new Uint32Array(manifest.sites.length + GRID_HEIGHT * SCORE_GEOMETRY_ROW_STRIDE)
   const floats = new Float32Array(words.buffer)
   for (const [index, site] of manifest.sites.entries()) {
     const { x, y } = tileOrigin(site)
@@ -34,10 +71,10 @@ export function createScoreGeometry(manifest: ScoreManifest) {
   }
   for (let y = 0; y < GRID_HEIGHT; y++) {
     const { latitude, longitudePerColumn, validHalfWidth } = gridRow(y)
-    const offset = manifest.sites.length + y * 3
-    floats[offset] = latitude
-    floats[offset + 1] = longitudePerColumn
-    words[offset + 2] = validHalfWidth
+    const offset = manifest.sites.length + y * SCORE_GEOMETRY_ROW_STRIDE
+    floats[offset + SCORE_GEOMETRY_LATITUDE_OFFSET] = latitude
+    floats[offset + SCORE_GEOMETRY_LON_SCALE_OFFSET] = longitudePerColumn
+    words[offset + SCORE_GEOMETRY_VALID_HALF_WIDTH_OFFSET] = validHalfWidth
   }
   return words
 }
@@ -88,21 +125,12 @@ export function createLayout(manifest: ScoreManifest) {
   }
 
   function addressAt(longitude: number, latitude: number) {
-    if (
-      !Number.isFinite(longitude) ||
-      !Number.isFinite(latitude) ||
-      Math.abs(longitude) > 180 ||
-      Math.abs(latitude) > 90
+    const cell = sinusoidalCellAddress(longitude, latitude)
+    if (!cell) return null
+    return addressOf(
+      `h${String(cell.h).padStart(2, '0')}v${String(cell.v).padStart(2, '0')}`,
+      cell.y * TILE_SIZE + cell.x,
     )
-      return null
-    const lat = latitude * radians
-    const u = Math.min(36 - 1e-10, Math.max(0, (radius * longitude * radians * Math.cos(lat) - left) / span))
-    const w = Math.min(18 - 1e-10, Math.max(0, (top - radius * lat) / span))
-    const h = Math.floor(u),
-      v = Math.floor(w)
-    const x = Math.floor((u - h) * TILE_SIZE),
-      y = Math.floor((w - v) * TILE_SIZE)
-    return addressOf(`h${String(h).padStart(2, '0')}v${String(v).padStart(2, '0')}`, y * TILE_SIZE + x)
   }
 
   return Object.freeze({

@@ -27,9 +27,9 @@ try {
 }
 ```
 
-Use the default WebGPU device limits for the bundled world. Loading allocates approximately 534 MB of GPU buffers plus transient decode, upload and driver memory. It uses four dedicated workers, a maximum of eight admitted fetch/decode jobs, eager uploads in completion order, and a queue fence every eight uploads. Each worker transfers its compact result. The caller's device coordinates the queue writes. This worker setup works without cross-origin isolation.
+Use the default WebGPU device limits for the bundled world. Loading allocates approximately 534 MB of GPU buffers plus transient decode, upload and driver memory. It uses 3–6 dedicated workers (scaled from `navigator.hardwareConcurrency`), up to `workerCount + 4` admitted fetch/decode jobs, eager uploads in completion order, and a queue fence every four shader chunks. Each worker transfers its compact result. The caller's device coordinates the queue writes. This worker setup works without cross-origin isolation.
 
-A dispatch submits synchronously and returns a promise for GPU completion. Submit a consumer pass on the same queue after that call and before dispatching another query if the consumer needs that result. Every dispatch overwrites the shared score buffers. Consume the results before destroying the instance. Destroy is idempotent and releases the module's buffers while the device remains available to its caller. Pass an `AbortSignal` to cancel a load and release partially allocated resources.
+`earth.dispatchShader(...)` awaits pipeline compilation before its first submission and can split chunk work across multiple submissions. Always `await earth.dispatchShader(...)` and enqueue your consumer pass on the same queue before starting another dispatch. Every dispatch overwrites the shared score buffers. Consume the results before destroying the instance. Destroy is idempotent and releases the module's buffers while the device remains available to its caller. Pass an `AbortSignal` to cancel a load and release partially allocated resources.
 
 ## Query with a Mars or Moon sample
 
@@ -47,7 +47,7 @@ await earth.dispatchShader(earth.queryShaderSource(query), signal)
 
 Either hard bound applies even when its criterion is disabled. Hard bounds are inclusive. Only active criteria contribute required values and any explicitly supplied coverage fields. Coverage must reach 0.9. Missing inputs or insufficient coverage produce 65,535 and take precedence over hard filter rejection, which produces 0. At least one enabled criterion with a finite target is required.
 
-All 19 measurement fields in the bundled world are available, including lithology, climate, permafrost and the full thermal set. Coverage columns can be referenced through `qualityKey`. The builder validates active field names and numeric parameters. Dispatch checks that the loaded world has the fields referenced by the query. `dispatchQuery` uses the same score buffer layout and queue ordering as `dispatch`.
+All 19 measurement fields in the bundled world are available, including lithology, climate, permafrost and the full thermal set. Coverage columns can be referenced through `qualityKey`. The builder validates active field names and numeric parameters. `queryShaderSource` checks that the loaded world has the fields referenced by the query, and `dispatchShader` runs the resulting WGSL using the same score buffer layout and queue ordering.
 
 ## Custom WGSL scores
 
@@ -83,10 +83,9 @@ publication when copying those buffers into a renderer. An aborted dispatch
 can leave scratch scores from batches that already ran.
 
 `earth.queryShaderSource(query)` generates an editable module from a
-`buildEarthQuery` plan. It uses the same coverage rules, inclusive encoded
-bounds, categorical targets, and normalized family weights as
-`dispatchQuery`. The formula works in source measurement codes to preserve
-narrow numeric tolerances.
+`buildEarthQuery` plan using the same coverage rules, inclusive encoded
+bounds, categorical targets, and normalized family weights. The formula works
+in source measurement codes to preserve narrow numeric tolerances.
 
 ## Earth cell coordinates
 

@@ -1,8 +1,9 @@
 import { joinWgsl, shaderModule } from './gpu.ts'
 import fullscreenWgsl from './shaders/fullscreen.wgsl?raw'
+import terrainCommonWgsl from './shaders/terrain-common.wgsl?raw'
 import terrainNormalsWgsl from './shaders/terrain-normals.wgsl?raw'
 
-const bakeNormalsShader = joinWgsl(fullscreenWgsl, terrainNormalsWgsl)
+const bakeNormalsShader = joinWgsl(fullscreenWgsl, terrainCommonWgsl, terrainNormalsWgsl)
 
 type DeviceNormalCache = {
   pipeline?: Promise<GPURenderPipeline>
